@@ -121,8 +121,8 @@ namespace Rocket
                                     : Words.T($"Arriving at {where}", $"Arriving at {where}", $"Nearly at {where}");
             var box = new Rect(W * 0.5f - 230, H - 120, 460, 70);
             GUI.Box(box, GUIContent.none, Ui.Panel);
-            GUI.Label(new Rect(box.x + 16, box.y + 8, box.width - 150, 30), say, Ui.Title);
-            GUI.Label(new Rect(box.x + 16, box.y + 38, box.width - 150, 24), Words.T("SPACE to skip", "SPACE to skip", "Press SPACE to skip"), Ui.Small);
+            Ui.Text(new Rect(box.x + 16, box.y + 8, box.width - 150, 30), say, Ui.Title);
+            Ui.Text(new Rect(box.x + 16, box.y + 38, box.width - 150, 24), Words.T("SPACE to skip", "SPACE to skip", "Press SPACE to skip"), Ui.Small);
             if (Ui.Press(new Rect(box.xMax - 120, box.y + 16, 104, 38), "Skip  >", Ui.Button)) EndRollout();
             if (r != null && rollout != null && r.fade > 0.001f)
             {

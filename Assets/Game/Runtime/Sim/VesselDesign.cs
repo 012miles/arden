@@ -29,8 +29,16 @@ namespace Rocket
         public int variant;       // paint scheme
         public int stage = -1;    // manual staging: activation stage (0-based); -1 = not staged
         public int groups;        // action-group bitmask
+        public string decal;      // milestone 34: a sticker on this part ("id|x|y|z|nx|ny|nz|size|spin", see Decals), or null
 
         public PartNode Copy() => (PartNode)MemberwiseClone();
+    }
+
+    /// <summary>A picture the player made into a decal: its id ("img:" and a hash) and the PNG, as base64.</summary>
+    [Serializable]
+    public class DecalImage
+    {
+        public string id, png;
     }
 
     /// <summary>A rocket as built in the builder: a tree of parts. nodes[0] is the root.</summary>
@@ -41,6 +49,8 @@ namespace Rocket
         public List<PartNode> nodes = new List<PartNode>();
         public bool manualStaging;
         public List<string> parts = new List<string>(); // legacy (v1) vertical stack; converted by Upgrade()
+        /// <summary>Milestone 34: the player's own decal pictures this rocket uses (small PNGs), so they travel with it to other players.</summary>
+        public List<DecalImage> images = new List<DecalImage>();
 
         public VesselDesign Clone()
         {

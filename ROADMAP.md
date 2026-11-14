@@ -614,6 +614,78 @@ planners' drag forecasts use the plain drag. The flight display shows the Mach n
   everyone but mission control; the team, comments and chat no longer overlap each other.
 - 8 new sim tests; `-autotestBuilder32` checks the builder fixes in the running game (480-492); `-coopPlayers` runs 2-4 player rooms.
 
+### Milestone 33: Expedition, first try (2026-11-14, replaced by milestone 34)
+A co-op survival road trip "but rocket and plane version" (captaincarl24's earlier design): a small arcade ship built from loose parts on
+an asteroid, flown along a lane of stops. captaincarl24 turned it down ("we're building a rocket and flying it like the rocket builder in
+singleplayer ... and why is every planet so close to each other, it's supposed to be very large"), so milestone 34 rebuilt Expedition on
+the real game and the arcade version was removed. It was never released.
+
+### Milestone 34: Expedition on the real game, cabins, a friendlier interface (2026-11-14)
+captaincarl24: "yes like that" to the Expedition redo (the real builder and parts, the real full-size solar system, walk-in interiors,
+survival, outposts to scavenge, a budget and a report), plus "can't see the flames for people joining the rooms, hide UI option, better
+menu screen, update log, research good UIs ... the chatroom blocks half the screen", and later: definitions on hover, your own presets
+bought with money, Ardlings getting out in first and third person, an Among Us-style Ardling menu, paint and decals, and "make the weather
+more random, every time I start a new world it's always storming".
+
+**Expedition** (Multiplayer: Expedition or Rocket room; works alone too)
+- **Everyone builds** the one rocket in the real builder with the real parts (each change goes to the room; someone else's change comes in
+  when you're not holding a part). Expeditions play in their own sandbox with supplies on.
+- **The objective first**: six missions (First steps on Tal, The lost outpost, Ice of Vesk, The red planet, The giant's moons, Free
+  expedition), each with goals worth points (land, walk, plant a flag, orbit, scavenge, bring the crew home), a budget, a speed budget and
+  trip time, and the real mission it's like (Apollo 11, Artemis, Europa Clipper, Perseverance, Galileo/Juno/JUICE, Voyager). Easy has half
+  as much money again, Hard 20% less (and scores 15% more).
+- **The six resources** in the plan beside the team: budget, mass and push at lift-off, speed budget, time (supplies against the trip),
+  power, data (instruments), comms (antennas), and seats; what stops a launch (over budget, not enough seats for every player) and what's
+  risky, in plain words.
+- **The players are the crew**: launching seats every player in the rocket by name, wearing the Ardling they made. The flight is the real
+  game (the host flies it; pilot, flight engineer, mission control and science jobs as in a rocket room).
+- **Survival**: food, water and air from the ship's supplies (and the suit's on foot), health falling once they run out; your Ardling's
+  supplies and health in the expedition panel. Lose Ardlings and the report says so.
+- **Outposts and wrecks** on Tal, Vesk, Ochre, Mote and Rime (⌂ on the map): land within 300 m and Scavenge for fuel (into the tanks, not
+  boosters), thruster fuel, supplies and science, once per game. In every game, not just expeditions.
+- **The report**: a score out of 1000 (goals 800, money left 100, everyone alive 100), stars, what went well, what to change and why
+  (with numbers: "the rocket had 4,100 m/s and the trip needs about 5,500"), and a leaderboard per mission on each computer.
+
+**On foot and inside**
+- **ENTER climbs out** after any landing the crew lived through, a crash included if the capsule's in one piece.
+- **First and third person** (C): through the helmet (the mouse looks round, A/D step sideways, ALT frees the pointer) or behind (the
+  camera swings round behind you as you walk). CTRL runs; jumps are higher (half a metre on Arden, nearly 3 m on Tal).
+- **Walk-in cabins** (TAB): a room for each crewed part (round capsule cabins with seats, controls and a hatch; long habitats with bunks, a
+  table and plants), bigger than the part, drawn by its own camera over the world's. Its windows are holes, so through them you see the
+  real world from inside the part, looking the way you look. E at the seats takes the controls; E at the hatch goes out on EVA. Crew sit in
+  their seats; in a room the other players walk round with you.
+
+**Make it yours**
+- **My Ardling** (Multiplayer screen): suit colour, the face on your visor note, the note's colour and a hat, with your Ardling turning in
+  a preview. It goes with you into every room: the team list shows everyone's note and colour, and their Ardlings look the way they made them.
+- **Paint and decals** (Paint in the builder): 16 colours on most body parts (click parts, or paint the whole rocket); decals (stars, rings,
+  stripes, numbers, Ardling faces and more, or your own PNG/JPG pictures from the Decals folder) stuck where you click, sized and turned.
+  Your own pictures are stored small in the rocket's design, so they go into saves and to the other players.
+- **Presets** is its own window: the 22 ready-made rockets, and up to 12 slots for your own (the first free; in a campaign the next costs
+  5,000, then 2,500 more each; a sandbox has them all).
+
+**Easier to read and play**
+- **A new title screen** (after looking at how good game menus work): Continue first and biggest, saying which game it opens; one column
+  of big buttons, each saying what it's for; the newest update's highlights in a **What's new** card (marked NEW until read) and a full
+  **Update log**.
+- **Definitions**: rest the mouse on a game word anywhere (every label and button) for 2 seconds and a box says what it means; 101 words
+  in all three word levels; a searchable Definitions page on the title screen, in the builder's File menu and the pause menu.
+- **Hide the interface** with F1 (or the Hide UI button in flight, the File menu, the pause menus); a faint reminder shows how to bring it
+  back.
+- **Multiplayer panels fold away** into one slim bar (the team, comments and chat used to cover half the screen); the choice is kept.
+- Settings: how see-through panels are, how fast definitions pop up.
+
+**Fixes**
+- Players who join a room now see the engine flames, smoke, reentry glow, parachutes and legs (they were only worked out in the host's
+  physics).
+- **Weather is different in every game**: it followed only the time and place, and every new game starts at the same time on the same pad,
+  so every game began in the same storm. Each game now has its own weather seed (older saves get one too), and storms are a little rarer.
+- The version number is the milestone again (0.34).
+
+- 7 new sim tests (definitions, the update log, preset slots, paint and decals, the expedition's rules, outposts, the weather);
+  `-autotestExpedition` plays a whole expedition (600-606); the size tour covers the new title screen, settings, update log, definitions,
+  presets, paint, decals and My Ardling.
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

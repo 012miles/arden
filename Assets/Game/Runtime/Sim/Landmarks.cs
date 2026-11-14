@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Rocket
 {
-    public enum LandmarkKind { Stones, Probe, Spire, Geysers, Arch, Caldera, Balanced, LavaTubes, Crystals }
+    public enum LandmarkKind { Stones, Probe, Spire, Geysers, Arch, Caldera, Balanced, LavaTubes, Crystals, Outpost, Wreck }   // the last two: milestone 34 outposts to scavenge
 
     /// <summary>A place worth finding on a world (milestone 27): where it is, how close counts as a visit, what it pays.</summary>
     public class Landmark

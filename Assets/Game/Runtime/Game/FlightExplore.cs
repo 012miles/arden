@@ -61,13 +61,13 @@ namespace Rocket
             if (lmTarget == null || guideTarget != null || countdown >= 0f) return;
             var r = new Rect(W * 0.5f - 190, GuideY, 380, 66);
             GUI.Box(r, GUIContent.none, Ui.Panel);
-            GUI.Label(new Rect(r.x + 64, r.y + 8, r.width - 74, 24), $"<color=#7fe0ff>?</color>  Something to find: {Ui.Dist(lmDist)}", Ui.Bold);
-            GUI.Label(new Rect(r.x + 64, r.y + 34, r.width - 74, 22), lmDist < lmTarget.reach ? "You're there: land to find out what it is" : $"Land within {Ui.Dist(lmTarget.reach)} of the blue beam", Ui.Small);
+            Ui.Text(new Rect(r.x + 64, r.y + 8, r.width - 74, 24), $"<color=#7fe0ff>?</color>  Something to find: {Ui.Dist(lmDist)}", Ui.Bold);
+            Ui.Text(new Rect(r.x + 64, r.y + 34, r.width - 74, 22), lmDist < lmTarget.reach ? "You're there: land to find out what it is" : $"Land within {Ui.Dist(lmTarget.reach)} of the blue beam", Ui.Small);
             float a = -lmBearing - camYaw + 180f;
             var c0 = new Vector2(r.x + 32, r.y + 33);
             var m = GUI.matrix;
             GUIUtility.RotateAroundPivot(a, c0 * Ui.Scale);
-            GUI.Label(new Rect(c0.x - 20, c0.y - 22, 40, 40), "▲", Ui.BigCenter);
+            Ui.Text(new Rect(c0.x - 20, c0.y - 22, 40, 40), "▲", Ui.BigCenter);
             GUI.matrix = m;
         }
 
@@ -193,7 +193,7 @@ namespace Rocket
             if (weatherLine == null || mapView) return;
             var r = new Rect(W * 0.5f - 170, H - 292, 340, 24);
             GUI.Box(r, GUIContent.none, Ui.Panel);
-            GUI.Label(new Rect(r.x + 10, r.y + 2, r.width - 20, 20), weatherLine, new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
+            Ui.Text(new Rect(r.x + 10, r.y + 2, r.width - 20, 20), weatherLine, new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
         }
 
         float windHoldUntil;

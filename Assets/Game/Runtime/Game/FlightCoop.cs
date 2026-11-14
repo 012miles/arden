@@ -81,12 +81,13 @@ namespace Rocket
             if (coopSendT <= 0) { coopSendT = 0.05f; c.room.BroadcastRaw(new NetMsg { t = "fs", json = JsonUtility.ToJson(FrameNow()) }); }
             // the goal
             if (active.hasLaunched) c.maxAltitude = Math.Max(c.maxAltitude, active.Altitude);
+            ExpeditionTick(dt);   // milestone 34
             coopGoalT -= dt;
             if (coopGoalT <= 0)
             {
                 coopGoalT = 1f;
                 var st = c.room.State;
-                if (!st.goalDone && st.goal != "free" && Coop.GoalMet(st.goal, active, c.maxAltitude, ut))
+                if (!c.Expedition && !st.goalDone && st.goal != "free" && Coop.GoalMet(st.goal, active, c.maxAltitude, ut))
                 {
                     st.goalDone = true;
                     st.summary = $"Goal done: {Coop.Goal(st.goal).name}!";
@@ -116,12 +117,13 @@ namespace Rocket
         {
             string name = m.a ?? "";
             CAct act = name == "stage" || name == "abort" ? CAct.Stage
-                : name == "group" || name == "rcs" ? CAct.Systems
+                : name == "group" || name == "rcs" || name == "scav" ? CAct.Systems
                 : name == "sas" || name == "sastoggle" || name == "autopilot" ? CAct.Steer
                 : name == "run" || name == "send" ? CAct.Science
                 : CAct.Navigate;
             bool endByHost = name == "end";
-            if (!c.SenderCan(who, act) && !endByHost) return;
+            bool anyone = name == "scav" && c.Expedition;   // in an expedition anyone can search an outpost
+            if (!c.SenderCan(who, act) && !endByHost && !anyone) return;
             var p = c.room.State.Player(who);
             Internal(() =>
             {
@@ -131,6 +133,7 @@ namespace Rocket
                     case "abort": DoAbort(); break;
                     case "group": FireGroup(m.n); break;
                     case "rcs": ToggleRcs(); break;
+                    case "scav": DoScavenge(); break;
                     case "sastoggle": ToggleSas(); break;
                     case "sas": SetSas((SasMode)m.n); break;
                     case "autopilot": if (autopilotOn) StopAutopilot(); else EnableAutopilot(); break;
@@ -184,7 +187,8 @@ namespace Rocket
             var c = Coop.Current;
             if (!c.IsHost) { c.room.Send(new NetMsg { t = "cmd", a = "end" }); return; }
             var st = c.room.State;
-            if (active != null)
+            if (c.Expedition && active != null) FinishExpedition(c);   // milestone 34: the report and the leaderboard
+            else if (active != null)
                 st.summary = $"Last flight: {(active.destroyed ? "lost" : active.landed ? "landed" : "still flying")}, highest {Ui.Dist(c.maxAltitude)}. " + (st.goal == "free" ? "" : st.goalDone ? $"Goal done: {Coop.Goal(st.goal).name}!" : $"Goal not reached: {Coop.Goal(st.goal).name}.");
             if (c.Campaign && CanRecover)
             {
@@ -266,6 +270,8 @@ namespace Rocket
                 }
             }
             while (c.sayings.Count > 0) Show(c.sayings.Dequeue(), 3f);
+            // how it looks here: flames, smoke, legs, chutes, reentry (the host's game runs the real thing)
+            active.VisualStep(dt);
             // this player's steering, to the host
             if (c.CanDo(CAct.Steer))
             {
@@ -313,13 +319,31 @@ namespace Rocket
         {
             var c = Coop.Current;
             float tw = 330;
+            if (Coop.Collapsed)
+            {
+                // folded away: one bar with the goal and the latest chat (milestone 34)
+                var st0 = c.room.State;
+                var br = new Rect(W - 430, H - 300, 420, 40);
+                c.DrawCollapsedBar(br);
+                Ui.Text(new Rect(br.x, br.y - 22, br.width, 20), $"Goal: <b>{Coop.Goal(st0.goal).name}</b> {(st0.goalDone ? "<color=#7dff8a>✓ done!</color>" : "")}", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperRight });
+                return;
+            }
             var tr = new Rect(W - tw - 10, H * 0.5f + 40, tw, 30 + c.room.State.players.Count * 20 + 78);
             if (dockMine != null) tr.y = H - 470;     // out of the docking guide's way
             c.DrawTeam(tr, true);
             var st = c.room.State;
+            if (c.Expedition)
+            {
+                var er = new Rect(tr.x, tr.yMax + 4, tw, ExpeditionPanelHeight);
+                if (er.yMax + 30 > H - 330) er.y = tr.y - er.height - 34;
+                DrawExpeditionPanel(er);
+                if ((c.Has(Coop.Control) || c.IsHost) && Ui.Press(new Rect(er.xMax - 150, er.yMax + 4, 150, 24), "End expedition", Ui.ButtonSmall)) CoopEndFlight();
+                c.DrawChat(new Rect(10, H - 330, 420, 88));
+                return;
+            }
             var gr = new Rect(tr.x, tr.yMax + 4, tw, 50);
             Ui.Box(gr);
-            GUI.Label(new Rect(gr.x + 10, gr.y + 4, tw - 20, 20), $"Goal: <b>{Coop.Goal(st.goal).name}</b> {(st.goalDone ? "<color=#7dff8a>✓ done!</color>" : "")}", Ui.Small);
+            Ui.Text(new Rect(gr.x + 10, gr.y + 4, tw - 20, 20), $"Goal: <b>{Coop.Goal(st.goal).name}</b> {(st.goalDone ? "<color=#7dff8a>✓ done!</color>" : "")}", Ui.Small);
             if (c.Has(Coop.Control) || c.IsHost)
             {
                 if (Ui.Press(new Rect(gr.x + 10, gr.y + 24, 150, 22), "End flight for all", Ui.ButtonSmall)) CoopEndFlight();
@@ -335,9 +359,9 @@ namespace Rocket
         void DrawCoopPause(float W, float H)
         {
             var c = Coop.Current;
-            var r = new Rect(W / 2 - 190, H / 2 - 130, 380, active.destroyed ? 230 : 200);
+            var r = new Rect(W / 2 - 190, H / 2 - 130, 380, active.destroyed ? 266 : 236);
             Ui.Box(r); Ui.Box(r);
-            GUI.Label(new Rect(r.x, r.y + 12, r.width, 30), active.destroyed ? "The rocket was lost" : "Paused (the flight goes on)", Ui.BigCenter);
+            Ui.Text(new Rect(r.x, r.y + 12, r.width, 30), active.destroyed ? "The rocket was lost" : "Paused (the flight goes on)", Ui.BigCenter);
             float y = r.y + 56;
             if (!active.destroyed && Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Resume", Ui.Button)) paused = false;
             if (active.destroyed) y -= 0; else y += 36;
@@ -347,6 +371,10 @@ namespace Rocket
             GUI.enabled = true;
             y += 36;
             if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Leave the room", Ui.Button)) { paused = false; root.LeaveCoop(); return; }
+            y += 36;
+            float hw = (r.width - 88) / 2;
+            if (Ui.Press(new Rect(r.x + 40, y, hw, 30), $"Hide UI ({In.Name(K.F1)})", Ui.Button)) { paused = false; Ui.ToggleHidden(); return; }
+            if (Ui.Press(new Rect(r.x + 48 + hw, y, hw, 30), "Definitions", Ui.Button)) Glossary.Open = true;
         }
     }
 }

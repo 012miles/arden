@@ -369,7 +369,7 @@ namespace Rocket
             GUI.color = c;
             bool clicked = false;
             if (clickable) clicked = Ui.Press(new Rect(r.x, r.y - 1, w, 22), label, Ui.Bold);
-            else GUI.Label(r, label, Ui.Bold);
+            else Ui.Text(r, label, Ui.Bold);
             GUI.color = old;
             return clicked;
         }
@@ -410,6 +410,15 @@ namespace Rocket
                     if (Vector3.Dot((w - bc).normalized, camPos - w) < 0) continue;     // round the far side
                     bool found = U.career.visited.Contains(l.id);
                     Marker(w, found ? l.name : "?", found ? new Color(0.55f, 1f, 0.65f) : new Color(0.5f, 0.9f, 1f));
+                }
+                // milestone 34: outposts and wrecks to scavenge, always shown (greyed once searched)
+                foreach (var l in Outposts.On(mapFocus))
+                {
+                    Vector3d p = mapFocus.AbsolutePosition(renderUt) + mapFocus.FixedToInertial(l.dir * (mapFocus.radius + Terrain.Height(mapFocus, l.dir)), renderUt);
+                    Vector3 w = (p - originAbs).ToFloat();
+                    if (Vector3.Dot((w - bc).normalized, camPos - w) < 0) continue;
+                    bool searched = U.career.scavenged.Contains(l.id);
+                    Marker(w, $"⌂ {l.name}", searched ? new Color(0.6f, 0.62f, 0.65f) : new Color(1f, 0.78f, 0.35f));
                 }
             }
 
@@ -485,12 +494,12 @@ namespace Rocket
             float extra = (showOreMap ? 22 : 0) + (showRegionMap ? 44 : 0) + (showCommMap ? 22 : 0) + (transfer != null ? 24 : 0) + (aeroLine != null ? 22 : 0);
             var ir = new Rect(W / 2 - 230, Ui.H - 330 - extra, 460, 64 + extra);
             Ui.Box(ir);
-            GUI.Label(new Rect(ir.x + 10, ir.y + 6, ir.width - 214, 20), $"Focus {mapFocus.name} (TAB) · click your orbit to plan a burn", Ui.Small);
+            Ui.Text(new Rect(ir.x + 10, ir.y + 6, ir.width - 214, 20), $"Focus {mapFocus.name} (TAB) · click your orbit to plan a burn", Ui.Small);
             if (Ui.Press(new Rect(ir.xMax - 204, ir.y + 4, 58, 20), "Ore (O)", showOreMap ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetMapLayer(!showOreMap, false);
             if (Ui.Press(new Rect(ir.xMax - 142, ir.y + 4, 64, 20), "Regions", showRegionMap ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetMapLayer(false, !showRegionMap);
             if (Ui.Press(new Rect(ir.xMax - 74, ir.y + 4, 66, 20), "Comms", showCommMap ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetMapLayer(false, false, !showCommMap);
             if (showCommMap)
-                GUI.Label(new Rect(ir.x + 10, ir.y + 50, ir.width - 20, 20),
+                Ui.Text(new Rect(ir.x + 10, ir.y + 50, ir.width - 20, 20),
                     "Links: <color=#66ff80>strong</color>, <color=#ffd84d>weak</color>, <color=#ff6650>faint</color>. Deep space stations track craft past 80 Mm.", Ui.Small);
             if (showRegionMap)
             {
@@ -502,7 +511,7 @@ namespace Rocket
                     float w = Ui.Small.CalcSize(new GUIContent(names[i])).x + 26;
                     if (lx + w > ir.xMax - 8) { lx = ir.x + 10; ly += 20; }
                     Ui.Line(new Rect(lx, ly + 5, 11, 11), Regions.ColorOf(mapFocus, i));
-                    GUI.Label(new Rect(lx + 15, ly, w, 20), names[i], Ui.Small);
+                    Ui.Text(new Rect(lx + 15, ly, w, 20), names[i], Ui.Small);
                     lx += w;
                 }
             }
@@ -511,7 +520,7 @@ namespace Rocket
                 double cov = U.survey.Coverage(mapFocus);
                 Vector3d under = active.body.InertialToFixed(active.pos, ut);
                 string here = U.survey.IsScanned(active.body, under) ? $"under you ~{Math.Round(active.OreUnder(ut) * 100):0}%" : "under you: not mapped";
-                GUI.Label(new Rect(ir.x + 10, ir.y + 50, ir.width - 20, 20),
+                Ui.Text(new Rect(ir.x + 10, ir.y + 50, ir.width - 20, 20),
                     $"<color=#ffd060>Ore</color> yellow-red, none blue, unmapped dark.  {mapFocus.name} {cov * 100:0}% mapped, {here}", Ui.Small);
             }
             string tgt = !HasTarget ? "No target. Click a moon's or a vessel's name to target it." :
@@ -521,21 +530,21 @@ namespace Rocket
                 trajectory.Exists(s => s.body == target) ? $"Target {target.name}: encounter on this path!" :
                 !double.IsNaN(closestDist) ? $"Target {target.name}: closest approach {Ui.Dist(closestDist)} in {Ui.Time(closestTime - ut)}" :
                 $"Target {target.name}";
-            GUI.Label(new Rect(ir.x + 10, ir.y + 28, ir.width - 20, 20), tgt, Ui.Label);
+            Ui.Text(new Rect(ir.x + 10, ir.y + 28, ir.width - 20, 20), tgt, Ui.Label);
             if (aeroLine != null)
             {
                 // The aerobraking forecast for the next dip into an atmosphere
                 float ay = ir.yMax - (transfer != null ? 46 : 24);
                 Color ac = aero.outcome == AeroOutcome.Captured || aero.outcome == AeroOutcome.Lands ? new Color(0.5f, 1f, 0.6f) : new Color(1f, 0.6f, 0.45f);
                 var old = GUI.color; GUI.color = ac;
-                GUI.Label(new Rect(ir.x + 10, ay, ir.width - 20, 20), aeroLine, Ui.Small);
+                Ui.Text(new Rect(ir.x + 10, ay, ir.width - 20, 20), aeroLine, Ui.Small);
                 GUI.color = old;
             }
             if (transfer != null)
             {
                 // The transfer planner: target another planet while orbiting yours
                 bool aeroBtn = CruiseTarget && target.HasAtmosphere;
-                GUI.Label(new Rect(ir.x + 10, ir.yMax - 24, ir.width - (aeroBtn ? 222 : 132), 20), transfer, Ui.Small);
+                Ui.Text(new Rect(ir.x + 10, ir.yMax - 24, ir.width - (aeroBtn ? 222 : 132), 20), transfer, Ui.Small);
                 if (TransferButton != null && Ui.Press(new Rect(ir.xMax - 118, ir.yMax - 25, 110, 20), TransferButton, Ui.ButtonSmall)) TransferButtonPressed();
                 if (aeroBtn && Ui.Press(new Rect(ir.xMax - 208, ir.yMax - 25, 86, 20), "Aerocapture", Ui.ButtonSmall)) PlanAerocapture();
             }
@@ -578,7 +587,7 @@ namespace Rocket
             var (c, dirs) = NodeHandles();
             if (dirs == null) return;
             Ui.Line(new Rect(c.x - 7, c.y - 7, 14, 14), new Color(0.3f, 0.55f, 1f));
-            GUI.Label(new Rect(c.x + 10, c.y + 6, 220, 20), $"dv {node.DeltaV:0.0} m/s  in {Ui.Time(node.ut - ut)}", Ui.Small);
+            Ui.Text(new Rect(c.x + 10, c.y + 6, 220, 20), $"dv {node.DeltaV:0.0} m/s  in {Ui.Time(node.ut - ut)}", Ui.Small);
             for (int i = 0; i < 6; i++)
             {
                 if (dirs[i] == Vector2.zero) continue;

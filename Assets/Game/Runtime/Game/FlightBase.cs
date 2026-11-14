@@ -101,7 +101,7 @@ namespace Rocket
                 var src = U.Find(cableFrom);
                 if (src != null)
                 {
-                    if (draw) GUI.Label(new Rect(r.x + 12, cy + h, 276, 20), $"Cable from <b>{src.name}</b>: {Bases.Distance(active, src):0} of {Bases.MaxCable:0} m", Ui.Small);
+                    if (draw) Ui.Text(new Rect(r.x + 12, cy + h, 276, 20), $"Cable from <b>{src.name}</b>: {Bases.Distance(active, src):0} of {Bases.MaxCable:0} m", Ui.Small);
                     h += 22;
                     if (near != null && near != src)
                     {
@@ -129,24 +129,24 @@ namespace Rocket
         {
             Ui.Box(r);
             var s = Bases.Summarize(g);
-            GUI.Label(new Rect(r.x + 12, r.y + 6, 200, 22), "Base", Ui.Header);
-            GUI.Label(new Rect(r.x + 64, r.y + 9, r.width - 76, 20), $"<b>{Bases.NameOf(g)}</b>  <size=11>{s.modules} modules · crew {s.crew}/{s.seats}</size>", Ui.Label);
+            Ui.Text(new Rect(r.x + 12, r.y + 6, 200, 22), "Base", Ui.Header);
+            Ui.Text(new Rect(r.x + 64, r.y + 9, r.width - 76, 20), $"<b>{Bases.NameOf(g)}</b>  <size=11>{s.modules} modules · crew {s.crew}/{s.seats}</size>", Ui.Label);
             float cy = r.y + 32;
             string days = double.IsInfinity(s.supplyDays) ? "no one eating" : Supplies.DaysText(s.supplyDays);
-            GUI.Label(new Rect(r.x + 12, cy, 280, 20), $"Power {s.ec:0}/{s.ecCap:0} EC   Supplies {s.supplies:0} crew-days ({days}){(s.greenhouse ? ", greenhouse" : "")}", Ui.Small);
+            Ui.Text(new Rect(r.x + 12, cy, 280, 20), $"Power {s.ec:0}/{s.ecCap:0} EC   Supplies {s.supplies:0} crew-days ({days}){(s.greenhouse ? ", greenhouse" : "")}", Ui.Small);
             cy += 18;
-            GUI.Label(new Rect(r.x + 12, cy, 280, 20), $"Ore {s.ore:0.0}/{s.oreCap:0.0} t   Fuel {s.fuel:0.0}/{s.fuelCap:0.0} t" + (s.lab ? $"   Research <color=#9fe0ff>{s.labPerDay:0.0}/day</color>" : ""), Ui.Small);
+            Ui.Text(new Rect(r.x + 12, cy, 280, 20), $"Ore {s.ore:0.0}/{s.oreCap:0.0} t   Fuel {s.fuel:0.0}/{s.fuelCap:0.0} t" + (s.lab ? $"   Research <color=#9fe0ff>{s.labPerDay:0.0}/day</color>" : ""), Ui.Small);
             cy += 22;
             foreach (var m in g.Take(4))
             {
                 int crew = m.parts.Sum(p => p.crew.Count), seats = m.parts.Sum(p => p.def.crew);
                 string here = m == active ? "  <color=#ffd060>(here)</color>" : $"  <size=10>{Bases.Distance(active, m):0} m</size>";
-                GUI.Label(new Rect(r.x + 12, cy + 3, 190, 20), $"{m.name}  <size=11>{(seats > 0 ? $"crew {crew}/{seats}" : "")}</size>{here}", Ui.Small);
+                Ui.Text(new Rect(r.x + 12, cy + 3, 190, 20), $"{m.name}  <size=11>{(seats > 0 ? $"crew {crew}/{seats}" : "")}</size>{here}", Ui.Small);
                 if (m != active && crew > 0 && active.parts.Exists(p => p.def.crew > p.crew.Count))
                     if (Ui.Press(new Rect(r.xMax - 96, cy, 84, 22), "Bring 1 here", Ui.ButtonSmall)) { Show(Bases.MoveCrew(U, m, active), 3f); return; }
                 cy += 26;
             }
-            if (g.Count > 4) GUI.Label(new Rect(r.x + 12, cy, 280, 20), $"and {g.Count - 4} more", Ui.Small);
+            if (g.Count > 4) Ui.Text(new Rect(r.x + 12, cy, 280, 20), $"and {g.Count - 4} more", Ui.Small);
         }
 
         // ---------------------------------------------------------------- cables on the ground

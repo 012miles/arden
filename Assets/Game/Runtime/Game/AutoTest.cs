@@ -87,6 +87,16 @@ namespace Rocket
                 yield break;
             }
 
+            foreach (var (flag, tour) in new (string, Func<IEnumerator>)[] { ("-autotestExpedition", ExpeditionTour) })
+            {
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), flag) < 0) continue;
+                yield return tour();
+                File.WriteAllText(Path.Combine(outDir, "autotest_log.txt"), log.ToString());
+                yield return new WaitForSecondsRealtime(0.5f);
+                Application.Quit();
+                yield break;
+            }
+
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-autotestBuilder32") >= 0)
             {
                 yield return Builder32Tour();

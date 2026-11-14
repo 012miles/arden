@@ -17,6 +17,7 @@ namespace Rocket
         public double nextWandererUt;
         public int wanderersSeen;
         public List<BaseLink> links = new List<BaseLink>();
+        public int weatherSeed;   // milestone 34: each game has its own weather
     }
 
     [Serializable]
@@ -47,6 +48,17 @@ namespace Rocket
         /// <summary>Off for the autotests that don't want rocks drifting through their screenshots.</summary>
         public bool wanderersOn = true;
 
+        /// <summary>
+        /// Milestone 34 (captaincarl24: "literally every time I start a new world it's always storming"): each game gets its
+        /// own weather. The weather used to follow only the time and place, and every new game starts at the same time on
+        /// the same pad, so every game began with the same storm. (Tests keep 0: the old, fixed weather.)
+        /// </summary>
+        public int WeatherSeed { get => weatherSeed; set { weatherSeed = value; Weather.GameSeed = value; } }
+        int weatherSeed;
+        static int NewWeatherSeed() => IsAutotest ? 0 : new System.Random().Next(1, 1_000_000);
+
+        public Universe() { WeatherSeed = NewWeatherSeed(); }
+
         public static bool IsAutotest => Array.IndexOf(Environment.GetCommandLineArgs(), "-autotest") >= 0;
         /// <summary>The current game's save (a save slot), or the old single save when no slot is picked (autotests).</summary>
         public static string SavePath => SaveSlots.Current != null ? SaveSlots.UniversePath(SaveSlots.Current)
@@ -67,7 +79,7 @@ namespace Rocket
 
         public string ToJson()
         {
-            var s = new UniverseSave { ut = ut, nextId = nextId, career = career.ToSave(), survey = survey.ToSave(), nextWandererUt = nextWandererUt, wanderersSeen = wanderersSeen };
+            var s = new UniverseSave { ut = ut, nextId = nextId, career = career.ToSave(), survey = survey.ToSave(), nextWandererUt = nextWandererUt, wanderersSeen = wanderersSeen, weatherSeed = weatherSeed };
             foreach (var v in vessels) if (!v.destroyed) s.vessels.Add(v.ToSave());
             foreach (var l in links) s.links.Add(new BaseLink { a = l.a, b = l.b });
             return JsonUtility.ToJson(s);
@@ -84,6 +96,7 @@ namespace Rocket
             survey.Load(s?.survey);
             nextWandererUt = s?.nextWandererUt ?? 0;
             wanderersSeen = s?.wanderersSeen ?? 0;
+            WeatherSeed = s != null && s.weatherSeed != 0 ? s.weatherSeed : NewWeatherSeed();   // older saves get weather of their own too
             links.Clear();
             if (s?.links != null) foreach (var l in s.links) links.Add(new BaseLink { a = l.a, b = l.b });
             if (s?.vessels == null) return;

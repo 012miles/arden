@@ -36,10 +36,13 @@ namespace Rocket
     /// you can't see far). Wind pushes ships in the lower air, more with height up to a few km, fading out by 25 km;
     /// the countdown holds when it's over 15 m/s at the pad. It all follows time and place, so it's the same in every
     /// game and needs no saving. Off in the tests unless a test turns it on.
+    /// Milestone 34: each game shifts it by its own seed (GameSeed), so new games don't all start in the same storm.
     /// </summary>
     public static class Weather
     {
         public static bool On = true;
+        /// <summary>The game's own weather (milestone 34: set by its universe; 0 = the fixed weather the tests use).</summary>
+        public static int GameSeed;
         /// <summary>For the screenshot tours: the weather everywhere, whatever the noise says.</summary>
         public static WeatherNow? Override;
 
@@ -57,14 +60,17 @@ namespace Rocket
             Vector3 d = dd.ToFloat();
             // weather systems drift across the world and change over hours
             float t = (float)((ut / Hours / 9.0) % 4096.0);
-            Vector3 drift = new Vector3(t * 0.37f, t * 0.21f, -t * 0.29f);
-            float storm = Noise.Fbm(d * 2.2f + drift, 3, b.seed + 701);
-            float gust = Noise.Fbm(d * 5f + drift * 1.7f, 2, b.seed + 703);
-            float turn = Noise.Fbm(d * 1.3f + drift * 0.5f, 2, b.seed + 705);
+            int gs = GameSeed;
+            Vector3 shift = gs == 0 ? Vector3.zero : new Vector3((gs % 977) * 0.731f, (gs % 613) * 0.417f, (gs % 389) * 0.529f);   // this game's weather
+            Vector3 drift = new Vector3(t * 0.37f, t * 0.21f, -t * 0.29f) + shift;
+            float storm = Noise.Fbm(d * 2.2f + drift, 3, b.seed + 701 + gs);
+            float gust = Noise.Fbm(d * 5f + drift * 1.7f, 2, b.seed + 703 + gs);
+            float turn = Noise.Fbm(d * 1.3f + drift * 0.5f, 2, b.seed + 705 + gs);
             if (b.style == BodyStyle.Earthlike)
             {
-                w.cloud = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.44f, 0.6f, storm));
-                w.rain = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.56f, 0.68f, storm));
+                // (milestone 34: storms a little rarer: mostly clear or cloudy, rain now and then)
+                w.cloud = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(gs == 0 ? 0.44f : 0.48f, gs == 0 ? 0.6f : 0.63f, storm));
+                w.rain = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(gs == 0 ? 0.56f : 0.6f, gs == 0 ? 0.68f : 0.7f, storm));
                 w.windSpeed = 2 + 10 * Mathf.Clamp01((gust - 0.3f) / 0.4f) + 14 * w.rain;
             }
             else

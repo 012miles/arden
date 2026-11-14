@@ -11,8 +11,14 @@ namespace Rocket
     /// </summary>
     public partial class VesselSim
     {
-        public const double EvaWalkSpeed = 1.6, EvaJumpSpeed = 2.2, BoardRange = 3.0, WorkRange = 4.5; // reach includes climbing the lander's side
+        public const double EvaWalkSpeed = 1.6, EvaRunFactor = 2.4, EvaJumpSpeed = 3.0, BoardRange = 3.0, WorkRange = 4.5; // reach includes climbing the lander's side
         public const float EvaTurnRate = 100f;
+        /// <summary>
+        /// Milestone 34 (walking in first and third person): a sideways step (-1 left, 1 right), running, and a turn in
+        /// degrees from the mouse (used up by the next step).
+        /// </summary>
+        public float evaStrafe, evaLookYaw;
+        public bool evaRun;
 
         public bool IsEva => parts.Count == 1 && parts[0].def.kind == PartKind.Eva;
         public bool IsFlag => parts.Exists(p => p.def.kind == PartKind.Flag);
@@ -43,13 +49,19 @@ namespace Rocket
             }
             Vector3d up = landedFixedPos.normalized;
             Quaternion q = landedFixedRot;
-            if (Mathf.Abs(inputYaw) > 0.01f) q = Quaternion.AngleAxis(inputYaw * EvaTurnRate * (float)dt, up.ToFloat()) * q;
-            if (Mathf.Abs(inputPitch) > 0.01f)
+            float turn = inputYaw * EvaTurnRate * (float)dt + evaLookYaw;
+            evaLookYaw = 0;
+            if (Mathf.Abs(turn) > 1e-4f) q = Quaternion.AngleAxis(turn, up.ToFloat()) * q;
+            var move = new Vector2(evaStrafe, inputPitch);
+            if (move.sqrMagnitude > 1f) move.Normalize();
+            if (move.sqrMagnitude > 1e-4f)
             {
-                Vector3d fwd = Vector3d.FromFloat(q * Vector3.forward);
+                Vector3d fwd = Vector3d.FromFloat(q * Vector3.forward), right = Vector3d.FromFloat(q * Vector3.right);
                 fwd = (fwd - up * Vector3d.Dot(fwd, up)).normalized;
+                right = (right - up * Vector3d.Dot(right, up)).normalized;
+                double speed = EvaWalkSpeed * (evaRun ? EvaRunFactor : 1.0);
                 double stand = landedFixedPos.magnitude - (body.radius + LaunchSite.SurfaceHeight(body, up));
-                Vector3d nu = (landedFixedPos + fwd * (inputPitch * EvaWalkSpeed * dt)).normalized;
+                Vector3d nu = (landedFixedPos + (fwd * move.y + right * move.x) * (speed * dt)).normalized;
                 landedFixedPos = nu * (body.radius + LaunchSite.SurfaceHeight(body, nu) + stand);
                 q = Quaternion.FromToRotation(q * Vector3.up, nu.ToFloat()) * q;
             }

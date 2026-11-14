@@ -122,10 +122,10 @@ namespace Rocket.EditorTools
                 Keybinds.ResetAll();
                 Check(In.Name(K.Space) == "SPACE" && In.Name(K.LeftShift) == "SHIFT" && In.Name(K.Period) == ".", $"defaults {In.Name(K.Space)} {In.Name(K.LeftShift)} {In.Name(K.Period)}");
                 Check(Keybinds.Clashes().Count == 0, "clashes with the default keys: " + string.Join("; ", Keybinds.Clashes()));
-                Keybinds.Set(K.Space, "Enter");
-                Check(In.Name(K.Space) == "ENTER", $"stage on {In.Name(K.Space)}");
+                Keybinds.Set(K.Space, "Backslash");   // (milestone 34: ENTER is the "get out" key now)
+                Check(In.Name(K.Space) == "\\", $"stage on {In.Name(K.Space)}");
                 Keybinds.Set(K.X, "Z");
-                Check(Keybinds.Clashes().Count == 1, $"{Keybinds.Clashes().Count} clashes after putting cut throttle on Z");
+                Check(Keybinds.Clashes().Count == 1, $"{Keybinds.Clashes().Count} clashes after putting cut throttle on Z: {string.Join("; ", Keybinds.Clashes())}");
                 Keybinds.Set(K.F1, "NotAKey");
                 Check(In.Name(K.F1) == "F1", "a bad saved key should fall back to the default");
                 Keybinds.ResetAll();

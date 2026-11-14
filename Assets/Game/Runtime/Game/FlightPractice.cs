@@ -123,22 +123,22 @@ namespace Rocket
         {
             var r = new Rect(W * 0.5f - 270, H * 0.5f - 210, 540, 380);
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 10, 300, 26), "Practice tools", Ui.Header);
-            GUI.Label(new Rect(r.x + 16, r.y + 36, r.width - 32, 20), "Sandbox only: move your ship anywhere and try again.", Ui.Small);
+            Ui.Text(new Rect(r.x + 16, r.y + 10, 300, 26), "Practice tools", Ui.Header);
+            Ui.Text(new Rect(r.x + 16, r.y + 36, r.width - 32, 20), "Sandbox only: move your ship anywhere and try again.", Ui.Small);
             float y = r.y + 66;
             var worlds = PracticeWorlds;
             practiceBody = Mathf.Clamp(practiceBody, 0, worlds.Length - 1);
             var wb = worlds[practiceBody];
             if (Ui.Press(new Rect(r.x + 16, y, 200, 30), "Refill everything", Ui.Button)) PracticeRefill();
             y += 44;
-            GUI.Label(new Rect(r.x + 16, y + 4, 60, 22), "World", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, y + 4, 60, 22), "World", Ui.Label);
             if (Ui.Press(new Rect(r.x + 80, y, 30, 28), "<", Ui.ButtonSmall)) practiceBody = (practiceBody + worlds.Length - 1) % worlds.Length;
-            GUI.Label(new Rect(r.x + 112, y + 3, 120, 22), wb.name, Ui.Center);
+            Ui.Text(new Rect(r.x + 112, y + 3, 120, 22), wb.name, Ui.Center);
             if (Ui.Press(new Rect(r.x + 234, y, 30, 28), ">", Ui.ButtonSmall)) practiceBody = (practiceBody + 1) % worlds.Length;
             y += 40;
-            GUI.Label(new Rect(r.x + 16, y + 4, 120, 22), "Orbit at", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, y + 4, 120, 22), "Orbit at", Ui.Label);
             if (Ui.Press(new Rect(r.x + 110, y, 30, 28), "-", Ui.ButtonSmall)) practiceAlt = Mathf.Max(10f, practiceAlt - (practiceAlt > 200 ? 100 : 10));
-            GUI.Label(new Rect(r.x + 142, y + 3, 90, 22), $"{practiceAlt:0} km", Ui.Center);
+            Ui.Text(new Rect(r.x + 142, y + 3, 90, 22), $"{practiceAlt:0} km", Ui.Center);
             if (Ui.Press(new Rect(r.x + 234, y, 30, 28), "+", Ui.ButtonSmall)) practiceAlt = Mathf.Min(5000f, practiceAlt + (practiceAlt >= 200 ? 100 : 10));
             if (Ui.Press(new Rect(r.x + 280, y, 240, 28), $"Put me in orbit round {wb.name}", Ui.ButtonSmall)) { PracticeOrbit(wb, practiceAlt * 1000); showPractice = false; return; }
             y += 40;
@@ -157,10 +157,10 @@ namespace Rocket
             var spots = Landmarks.All(root.bodies).ToList();
             practiceSpot = Mathf.Clamp(practiceSpot, 0, spots.Count - 1);
             var ls = spots[practiceSpot];
-            GUI.Label(new Rect(r.x + 16, y + 4, 90, 22), "Place", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, y + 4, 90, 22), "Place", Ui.Label);
             if (Ui.Press(new Rect(r.x + 80, y, 30, 28), "<", Ui.ButtonSmall)) practiceSpot = (practiceSpot + spots.Count - 1) % spots.Count;
             bool known = U.career.visited.Contains(ls.id);
-            GUI.Label(new Rect(r.x + 112, y + 3, 200, 22), known ? ls.name : $"? on {ls.body}", Ui.Center);
+            Ui.Text(new Rect(r.x + 112, y + 3, 200, 22), known ? ls.name : $"? on {ls.body}", Ui.Center);
             if (Ui.Press(new Rect(r.x + 314, y, 30, 28), ">", Ui.ButtonSmall)) practiceSpot = (practiceSpot + 1) % spots.Count;
             if (Ui.Press(new Rect(r.x + 356, y, 164, 28), "Drop me next to it", Ui.ButtonSmall))
             {
@@ -170,7 +170,7 @@ namespace Rocket
                 showPractice = false; return;
             }
             y += 44;
-            GUI.Label(new Rect(r.x + 16, y + 4, 120, 22), "Time of day", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, y + 4, 120, 22), "Time of day", Ui.Label);
             string[] tods = { "Sunrise", "Noon", "Sunset", "Night" };
             for (int i = 0; i < 4; i++)
                 if (Ui.Press(new Rect(r.x + 130 + i * 98, y, 92, 28), tods[i], Ui.ButtonSmall)) { PracticeTimeOfDay(i); showPractice = false; return; }

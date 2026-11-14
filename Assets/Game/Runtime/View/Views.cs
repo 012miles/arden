@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -92,7 +93,7 @@ namespace Rocket
         public static VesselView Create(VesselSim sim)
         {
             var vv = new VesselView { root = new GameObject("Vessel " + sim.name), flight = true };
-            foreach (var p in sim.parts) vv.AddPart(p.def, p.index, p.localPos, p.localRot, p.variant, false, p.crew.Count > 0 ? p.crew[0] : null);
+            foreach (var p in sim.parts) { vv.AddPart(p.def, p.index, p.localPos, p.localRot, p.variant, false, p.crew.Count > 0 ? p.crew[0] : null); vv.AddDecal(p.index, p.decal); }
             return vv;
         }
 
@@ -102,10 +103,20 @@ namespace Rocket
             for (int i = 0; i < nodes.Count; i++)
             {
                 var def = PartCatalog.Get(nodes[i].id);
-                if (def != null) vv.AddPart(def, i, nodes[i].pos, nodes[i].rot, nodes[i].variant, colliders);
+                if (def != null) { vv.AddPart(def, i, nodes[i].pos, nodes[i].rot, nodes[i].variant, colliders); vv.AddDecal(i, nodes[i].decal); }
             }
             return vv;
         }
+
+        /// <summary>Milestone 34: a part's decal, if it has one (stuck on its GameObject, so it moves with it).</summary>
+        public void AddDecal(int index, string decal)
+        {
+            if (string.IsNullOrEmpty(decal) || !partGo.TryGetValue(index, out var go) || go == null) return;
+            Decals.Attach(go.transform, decal, go.layer);
+        }
+
+        /// <summary>A part's GameObject (the builder works out where on it a decal goes).</summary>
+        public Transform PartTransform(int index) => partGo.TryGetValue(index, out var go) && go != null ? go.transform : null;
 
         void AddPart(PartDef def, int index, Vector3 pos, Quaternion rot, int variant, bool collider, string crewName = null)
         {
@@ -518,6 +529,7 @@ namespace Rocket
                 if (p.def.kind == PartKind.FairingHalf)
                 {
                     vv.AddPart(p.def, p.index, p.localPos, p.localRot, p.variant, false); // a new piece, not split from this view
+                    vv.AddDecal(p.index, p.decal);
                     continue;
                 }
                 if (partGo.TryGetValue(p.index, out var go))
@@ -3163,7 +3175,7 @@ namespace Rocket
             double R = body.radius;
             Vector3d c0 = centerDir.normalized * R;
             double reach = System.Math.Min(System.Math.Max(half * 0.95, 8000), 70_000);
-            foreach (var l in Landmarks.On(body))
+            foreach (var l in Landmarks.On(body).Concat(Outposts.On(body)))   // milestone 34: outposts and wrecks too
             {
                 bool show = Vector3d.Angle(l.dir, centerDir) * R < reach;
                 landmarkObjs.TryGetValue(l.id, out var go);

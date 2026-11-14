@@ -20,6 +20,7 @@ namespace Rocket
         public int roles;          // bit per MRole
         public bool ready;
         public int changes;
+        public string look;        // milestone 34: their Ardling ("suit,paper,face,hat")
         public bool Has(MRole r) => (roles & (1 << (int)r)) != 0;
     }
 
@@ -57,6 +58,13 @@ namespace Rocket
         public int unlocked = 99;                // mission design campaign: how many missions are open
         public string careerJson;                // rocket campaign: the host's career (funds, parts, contracts), for everyone's builder
         public string designJson, goal = "space", summary;
+        // ---- milestone 34: an expedition (activity 2): the plan, what's been done, the last report; the game's weather
+        public string exScenario = "tal";
+        public int exDifficulty = 1, exRuns, weatherSeed;
+        public ExProgress ex = new ExProgress();
+        public string exReport;
+        /// <summary>A room that builds and flies a rocket: a rocket room (1) or an expedition (2).</summary>
+        public bool Rocket => activity == 1 || activity == 2;
         // ---- milestone 31: the room's best flight on each mission ("scenario|score|stars"), announced so other rooms can race it
         public List<string> bests = new List<string>();
         public void BestFor(string scenario, out int score, out int stars)
@@ -124,7 +132,9 @@ namespace Rocket
         /// <summary>Rocket rooms (milestone 30): the host hears launches, the pilot's controls and other jobs' commands; players hear the flight.</summary>
         public Action<int, NetMsg> OnHostCommand;
         public Action<NetMsg> OnClientMessage;
-        public string RoleName(int r) => State.activity == 1 ? Coop.RoleNames[Mathf.Clamp(r, 0, 3)] : MissionDesign.RoleNames[Mathf.Clamp(r, 0, 3)];
+        /// <summary>Milestone 34: someone's place in a cabin (the host passes each on to everyone).</summary>
+        public Action<int, string, bool> OnPose;
+        public string RoleName(int r) => State.Rocket ? Coop.RoleNames[Mathf.Clamp(r, 0, 3)] : MissionDesign.RoleNames[Mathf.Clamp(r, 0, 3)];
 
         TcpListener listener;
         Thread acceptThread;
@@ -216,7 +226,7 @@ namespace Rocket
         {
             var r = new NetRoom { IsHost = true, Solo = true, Connected = true };
             r.State.room = "Solo"; r.State.plan = plan ?? new MissionPlan();
-            r.State.players.Add(new NetPlayer { id = 1, name = Clean(name), roles = 15 });
+            r.State.players.Add(new NetPlayer { id = 1, name = Clean(name), roles = 15, look = MyArdling.Code });
             Current = r;
             return r;
         }
@@ -228,7 +238,7 @@ namespace Rocket
             r.State.campaign = campaign;
             r.State.room = string.IsNullOrWhiteSpace(roomName) ? $"{Clean(name)}'s room" : roomName.Trim();
             r.State.plan = plan ?? new MissionPlan();
-            r.State.players.Add(new NetPlayer { id = 1, name = Clean(name), roles = 15 });
+            r.State.players.Add(new NetPlayer { id = 1, name = Clean(name), roles = 15, look = MyArdling.Code });
             for (int p = Port; p < Port + 10 && r.listener == null; p++)
             {
                 try { var l = new TcpListener(IPAddress.Any, p); l.Start(MaxPlayers); r.listener = l; r.ListenPort = p; }
@@ -262,7 +272,7 @@ namespace Rocket
                     var c = new Conn { tcp = tcp, w = new StreamWriter(tcp.GetStream(), new UTF8Encoding(false)) { AutoFlush = false } };
                     r.hostConn = c;
                     c.Start();
-                    c.Send(JsonUtility.ToJson(new NetMsg { t = "hello", name = who, ver = Proto }));
+                    c.Send(JsonUtility.ToJson(new NetMsg { t = "hello", name = who, ver = Proto, a = MyArdling.Code }));
                     r.ReadLoop(c);
                 }
                 catch (Exception e) { r.inbox.Enqueue((null, "__fail|Couldn't join: " + e.Message)); }
@@ -373,7 +383,7 @@ namespace Rocket
                 stopping = true;
                 hostConn.Close();
             }
-            if (Solo && dirty) { dirty = false; State.stateId++; StateVersion++; }
+            if (Solo && dirty) { dirty = false; State.stateId++; StateVersion++; RegisterLooks(); }
         }
 
         // ---------------------------------------------------------------- the host
@@ -386,7 +396,7 @@ namespace Rocket
                 if (State.players.Count >= MaxPlayers) { c.Send(JsonUtility.ToJson(new NetMsg { t = "refuse", a = "That room is full (4 players)." })); c.CloseAfterSending(); return; }
                 c.id = State.nextPlayer++;
                 c.hello = true;
-                var joiner = new NetPlayer { id = c.id, name = UniqueName(Clean(msg.name)) };
+                var joiner = new NetPlayer { id = c.id, name = UniqueName(Clean(msg.name)), look = Ardlings.Parse(msg.a, out _, out _, out _, out _) ? msg.a : null };
                 State.players.Add(joiner);
                 GiveJobsTo(joiner);
                 Say($"{Clean(msg.name)} joined the team.");
@@ -474,11 +484,18 @@ namespace Rocket
 
         void MarkDirty() { dirty = true; }
 
+        /// <summary>Milestone 34: everyone in the room wears the Ardling they made.</summary>
+        void RegisterLooks() { foreach (var p in State.players) MyArdling.Register(p.name, p.look); }
+
+        /// <summary>Tells the room about a new look (from the My Ardling menu).</summary>
+        public void SendLook(string code) => Send(new NetMsg { t = "look", a = code });
+
         void Broadcast()
         {
             dirty = false;
             State.stateId++;
             StateVersion++;
+            RegisterLooks();
             string json = JsonUtility.ToJson(new NetMsg { t = "state", json = JsonUtility.ToJson(State) });
             lock (conns) foreach (var c in conns) if (c.hello) c.Send(json);
         }
@@ -493,6 +510,9 @@ namespace Rocket
             bool Role(MRole r) => p.Has(r);
             switch (m.t)
             {
+                case "look":
+                    if (Ardlings.Parse(m.a, out _, out _, out _, out _)) { p.look = m.a; MarkDirty(); }
+                    break;
                 case "pick":
                 {
                     var part = MissionDesign.Part(m.b);
@@ -576,10 +596,11 @@ namespace Rocket
                     return;
                 // ---- rocket rooms (milestone 30)
                 case "design":
-                    if (State.activity == 1 && Role(MRole.Lead) && !string.IsNullOrEmpty(m.json) && m.json != State.designJson) { State.designJson = m.json; p.changes++; MarkDirty(); }
+                    // (milestone 34: in an expedition everyone builds the one rocket)
+                    if ((State.activity == 1 && Role(MRole.Lead) || State.activity == 2) && State.coopPhase == 0 && !string.IsNullOrEmpty(m.json) && m.json != State.designJson) { State.designJson = m.json; p.changes++; MarkDirty(); }
                     return;
                 case "note":
-                    if (State.activity == 1 && !string.IsNullOrWhiteSpace(m.a))
+                    if (State.Rocket && !string.IsNullOrWhiteSpace(m.a))
                     {
                         string text = m.a.Trim();
                         if (text.Length > 140) text = text.Substring(0, 140);
@@ -595,11 +616,15 @@ namespace Rocket
                     if (note != null && Role(MRole.Lead)) { note.state = m.on ? 1 : 2; MarkDirty(); }
                     return;
                 }
-                case "goal": if (State.activity == 1 && Role((MRole)Coop.Control) && State.coopPhase == 0 && Coop.Goals.Any(g => g.id == m.b)) { State.goal = m.b; State.goalDone = false; MarkDirty(); } return;
-                case "pad": if (State.activity == 1 && Role((MRole)Coop.Control) && State.coopPhase == 0) { State.runway = m.n < 0; State.pad = Math.Max(0, m.n); MarkDirty(); } return;
-                case "launch": if (State.activity == 1 && Role(MRole.Lead) && State.coopPhase == 0) OnHostCommand?.Invoke(who, m); return;
-                case "in": if (State.activity == 1 && Role((MRole)Coop.Pilot)) OnHostCommand?.Invoke(who, m); return;
-                case "cmd": if (State.activity == 1) OnHostCommand?.Invoke(who, m); return;
+                case "goal": if (State.Rocket && Role((MRole)Coop.Control) && State.coopPhase == 0 && Coop.Goals.Any(g => g.id == m.b)) { State.goal = m.b; State.goalDone = false; MarkDirty(); } return;
+                case "pad": if (State.Rocket && Role((MRole)Coop.Control) && State.coopPhase == 0) { State.runway = m.n < 0; State.pad = Math.Max(0, m.n); MarkDirty(); } return;
+                case "launch": if ((State.activity == 1 && Role(MRole.Lead) || State.activity == 2) && State.coopPhase == 0) OnHostCommand?.Invoke(who, m); return;
+                case "exsc": if (State.activity == 2 && State.coopPhase == 0 && (Role((MRole)Coop.Control) || who == MyId) && Expedition.Scenarios.Any(x => x.id == m.b)) { State.exScenario = m.b; MarkDirty(); } return;
+                case "exdiff": if (State.activity == 2 && State.coopPhase == 0 && (Role((MRole)Coop.Control) || who == MyId)) { State.exDifficulty = Mathf.Clamp(m.n, 0, 2); MarkDirty(); } return;
+                case "in": if (State.Rocket && Role((MRole)Coop.Pilot)) OnHostCommand?.Invoke(who, m); return;
+                // ---- expeditions (milestone 33): poses, actions and the pilot's controls go to the expedition on the host
+                case "cmd": if (State.Rocket) OnHostCommand?.Invoke(who, m); return;
+                case "ip": if (State.Rocket) { OnPose?.Invoke(who, m.a, m.on); BroadcastRaw(new NetMsg { t = "ipr", n = who, a = m.a, on = m.on }); } return;
                 case "answer":
                 {
                     var q = State.requests.FirstOrDefault(x => x.id == m.n);
@@ -703,7 +728,7 @@ namespace Rocket
                     try
                     {
                         var s = JsonUtility.FromJson<RoomState>(m.json);
-                        if (s != null) { State = s; StateVersion++; }
+                        if (s != null) { State = s; StateVersion++; RegisterLooks(); }
                     }
                     catch { }
                     break;

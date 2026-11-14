@@ -760,7 +760,7 @@ namespace Rocket
             string key = "__shell" + d.id + variant;
             if (partCache.TryGetValue(key, out var m)) return m;
             var b = new MeshBuilder();
-            Color col = d.variants > 0 && variant > 0 ? PartCatalog.Paints[variant % PartCatalog.Paints.Length] : d.color;
+            Color col = PartCatalog.Paintable(d) && variant > 0 ? PartCatalog.Paints[variant % PartCatalog.Paints.Length] : d.color;
             AddShell(b, d.fairingHeight, d.fairingRadius, col, 0f, Mathf.PI * 2f, false, 0f);
             m = b.ToMesh("FairingShell");
             partCache[key] = m;
@@ -804,9 +804,9 @@ namespace Rocket
 
         public static Mesh PartMesh(PartDef d, int variant = 0)
         {
-            string key = variant > 0 && d.variants > 0 ? d.id + "#" + variant : d.id;
+            string key = variant > 0 && PartCatalog.Paintable(d) ? d.id + "#" + variant : d.id;
             if (partCache.TryGetValue(key, out var cached)) return cached;
-            if (variant > 0 && d.variants > 0)
+            if (variant > 0 && PartCatalog.Paintable(d))
             {
                 Color keep = d.color;
                 d.color = PartCatalog.Paints[variant % PartCatalog.Paints.Length];

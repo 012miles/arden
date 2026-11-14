@@ -35,9 +35,37 @@ namespace Rocket
                 string tag = $"{w}x{h}";
                 bool shoot = w == 1024 || w == 2560;   // screenshots at the two extremes keep the set small
 
+                // milestone 34: the new title screen and its pages
+                root.ShowMenu();
+                root.menu.ShowPage("main");
+                yield return Check($"199_{tag}_title", true);
+                root.menu.ShowPage("settings");
+                yield return Check($"199_{tag}_settings", shoot);
+                root.menu.ShowPage("updates");
+                yield return Check($"199_{tag}_updates", shoot);
+                root.menu.ShowPage("defs");
+                yield return Check($"199_{tag}_definitions", shoot);
+                root.menu.ShowPage("single");
+                yield return Check($"199_{tag}_single", false);
+                root.menu.ShowPage("main");
+
                 root.EnterHangar();
                 var hg = root.hangar;
                 yield return Check($"200_{tag}_builder", true);
+                // milestone 34: the Presets window, both tabs
+                hg.TestShowPresets(true);
+                hg.TestPresetTab(0);
+                yield return Check($"200_{tag}_presets", shoot || w == 1440);
+                hg.TestPresetTab(1);
+                yield return Check($"200_{tag}_my_presets", shoot || w == 1440);
+                hg.TestShowPresets(false);
+                // milestone 34: the Paint panel, colours and decals
+                hg.TestPaint(true, 0);
+                yield return Check($"200_{tag}_paint", shoot || w == 1440);
+                hg.TestPaint(true, 1);
+                yield return Check($"200_{tag}_decals", shoot || w == 1440);
+                hg.TestPaint(false);
+                if (w == 1440) { hg.TestDecorate(); yield return Check($"200_{tag}_decorated", true); hg.TestPresetStarter(); }
                 if (w == 1440)
                 {
                     // the same window in Easy and Engineer words (different labels, different widths)
@@ -49,6 +77,9 @@ namespace Rocket
                     Words.Level = was;
                     root.ShowMission();
                     yield return Check($"200_{tag}_lobby", true);
+                    MyArdling.Show();   // milestone 34: the My Ardling menu
+                    yield return Check($"200_{tag}_my_ardling", true);
+                    MyArdling.Open = false;
                     root.LeaveMission();
                     root.EnterHangar();
                     hg = root.hangar;
@@ -80,6 +111,12 @@ namespace Rocket
                 f.Paused = true;
                 yield return Check($"209_{tag}_paused", shoot);
                 f.Paused = false;
+                Glossary.Open = true;
+                yield return Check($"210_{tag}_definitions_window", shoot);
+                Glossary.Open = false;
+                Ui.ToggleHidden();
+                yield return Check($"211_{tag}_hidden", w == 1440);
+                Ui.ToggleHidden();
             }
             Log($"layout problems found: {problems}");
             Screen.SetResolution(1600, 900, FullScreenMode.Windowed);

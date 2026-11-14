@@ -34,6 +34,8 @@ namespace Rocket
                 case LandmarkKind.Balanced: Balanced(solid, ground, seed); break;
                 case LandmarkKind.LavaTubes: LavaTubes(solid, glow, seed); break;
                 case LandmarkKind.Crystals: Crystals(solid, glow, seed); break;
+                case LandmarkKind.Outpost: Outpost(solid, glow, ground, seed); break;
+                case LandmarkKind.Wreck: Wreck(solid, ground, seed); break;
             }
             var go = new GameObject("Landmark " + l.name);
             go.AddComponent<MeshFilter>().sharedMesh = solid.ToMesh(l.id);
@@ -52,6 +54,124 @@ namespace Rocket
                 gr.receiveShadows = false;
             }
             return go;
+        }
+
+        /// <summary>
+        /// Milestone 34: an old outpost. A landing pad, two habitat modules joined by a tunnel, a dome, solar panels,
+        /// orange fuel tanks, an antenna mast with a blinking beacon, crates. Dusty and quiet.
+        /// </summary>
+        static void Outpost(MeshBuilder b, MeshBuilder glow, Color ground, int seed)
+        {
+            var white = new Color(0.84f, 0.84f, 0.8f);
+            var orange = new Color(0.9f, 0.47f, 0.15f);
+            var metal = new Color(0.6f, 0.61f, 0.63f);
+            var panel = new Color(0.08f, 0.11f, 0.24f);
+            var dust = Tone(ground, 1.05f);
+            // the pad
+            b.Mat = MeshBuilder.MatConcrete;
+            int s = b.v.Count;
+            b.AddFrustum(0.25f, -0.6f, 10f, 10.4f, new Color(0.55f, 0.55f, 0.53f), 32, true, false);
+            Xf(b, s, new Vector3(-16f, G(-16f, 0f), 0f), Quaternion.identity);
+            b.Mat = MeshBuilder.MatPaint;
+            for (int k = 0; k < 4; k++) b.AddBox(new Vector3(-16f + (k - 1.5f) * 2.2f, G(-16f, 0f) + 0.27f, 0f), new Vector3(1.2f, 0.02f, 7f), new Color(0.95f, 0.8f, 0.2f), Quaternion.Euler(0, 45, 0));
+            // two habitats lying on their sides, a tunnel between
+            for (int k = 0; k < 2; k++)
+            {
+                float z = k == 0 ? -5f : 5f, x = 6f;
+                b.Mat = MeshBuilder.MatPaint;
+                s = b.v.Count;
+                b.AddFrustum(3.5f, -3.5f, 1.8f, 1.8f, white, 20, true, true);
+                Xf(b, s, new Vector3(x, G(x, z) + 2.1f, z), Quaternion.Euler(0, 0, 90));
+                b.AddBox(new Vector3(x, G(x, z) + 2.1f, z), new Vector3(7.2f, 0.4f, 3.75f), orange, Quaternion.identity);   // a stripe round the middle
+                b.Mat = MeshBuilder.MatDarkMetal;
+                for (int leg = 0; leg < 4; leg++)
+                    b.AddBox(new Vector3(x + (leg < 2 ? -2.6f : 2.6f), G(x, z) + 0.5f, z + (leg % 2 == 0 ? -1.2f : 1.2f)), new Vector3(0.25f, 1.1f, 0.25f), metal * 0.6f, Quaternion.identity);
+                b.Mat = MeshBuilder.MatGlass;
+                b.AddBox(new Vector3(x + 3.6f, G(x, z) + 2.3f, z), new Vector3(0.1f, 0.9f, 1.4f), new Color(0.15f, 0.2f, 0.25f), Quaternion.identity);
+            }
+            b.Mat = MeshBuilder.MatMetal;
+            b.AddBox(new Vector3(6f, G(6f, 0f) + 2.1f, 0f), new Vector3(1.4f, 1.4f, 6.5f), metal, Quaternion.identity);
+            // a dome, half dug in
+            b.Mat = MeshBuilder.MatPaint;
+            b.AddSphere(new Vector3(17f, G(17f, -2f) - 0.6f, -2f), 3.4f, white, 20, 10, Mathf.PI * 0.55f);
+            // solar panels on posts, one fallen
+            b.Mat = MeshBuilder.MatGloss;
+            for (int k = 0; k < 3; k++)
+            {
+                float px = 4f + k * 5f, pz = 14f;
+                b.Mat = MeshBuilder.MatDarkMetal;
+                b.AddBox(new Vector3(px, G(px, pz) + 1f, pz), new Vector3(0.2f, 2f, 0.2f), metal * 0.6f, Quaternion.identity);
+                b.Mat = MeshBuilder.MatGloss;
+                if (k == 2) b.AddBox(new Vector3(px + 1.5f, G(px + 1.5f, pz + 1f) + 0.1f, pz + 1f), new Vector3(4f, 0.06f, 2.2f), panel, Quaternion.Euler(4, 20, 6));
+                else b.AddBox(new Vector3(px, G(px, pz) + 2.1f, pz), new Vector3(4f, 0.06f, 2.2f), panel, Quaternion.Euler(-30, 0, 0));
+            }
+            // fuel tanks
+            for (int k = 0; k < 3; k++)
+            {
+                float tx = 18f + (k % 2) * 3.2f, tz = 8f + k * 2.6f;
+                b.Mat = MeshBuilder.MatPaint;
+                s = b.v.Count;
+                b.AddFrustum(3.6f, 0f, 1.2f, 1.2f, orange, 16, true, true);
+                Xf(b, s, new Vector3(tx, G(tx, tz), tz), Quaternion.identity);
+                b.AddSphere(new Vector3(tx, G(tx, tz) + 3.6f, tz), 1.2f, orange, 16, 8, Mathf.PI * 0.5f);
+            }
+            // the antenna mast and its dish, a beacon on top
+            b.Mat = MeshBuilder.MatMetal;
+            float mx = -2f, mz = -12f;
+            b.AddBox(new Vector3(mx, G(mx, mz) + 5f, mz), new Vector3(0.35f, 10f, 0.35f), metal, Quaternion.identity);
+            s = b.v.Count;
+            b.AddFrustum(0.6f, 0f, 2f, 0.3f, white, 18, false, false, true);
+            Xf(b, s, new Vector3(mx + 0.8f, G(mx, mz) + 7.5f, mz), Quaternion.Euler(0, 0, -60));
+            glow.AddSphere(new Vector3(mx, G(mx, mz) + 10.3f, mz), 0.35f, new Color(1f, 0.25f, 0.15f) * 2f, 10, 6);
+            // crates and dust drifts
+            for (int i = 0; i < 12; i++)
+            {
+                float a = H(seed, i) * Mathf.PI * 2, r = 9f + 12f * H(seed, i + 20);
+                float cx = Mathf.Cos(a) * r, cz = Mathf.Sin(a) * r;
+                float sz = 0.6f + 0.6f * H(seed, i + 40);
+                b.Mat = i % 3 == 0 ? MeshBuilder.MatMetal : MeshBuilder.MatMatte;
+                b.AddBox(new Vector3(cx, G(cx, cz) + sz * 0.5f, cz), new Vector3(sz, sz, sz * 1.3f), i % 3 == 0 ? metal : new Color(0.55f, 0.45f, 0.3f), Quaternion.Euler(0, H(seed, i + 60) * 90, 0));
+            }
+            b.Mat = MeshBuilder.MatMatte;
+            for (int i = 0; i < 6; i++)
+            {
+                float a = H(seed, i + 80) * Mathf.PI * 2, r = 4f + 16f * H(seed, i + 90);
+                b.AddBox(new Vector3(Mathf.Cos(a) * r, G(Mathf.Cos(a) * r, Mathf.Sin(a) * r) + 0.1f, Mathf.Sin(a) * r), new Vector3(3f, 0.3f, 1.6f), dust, Quaternion.Euler(0, H(seed, i + 100) * 180, 0));
+            }
+        }
+
+        /// <summary>Milestone 34: a crashed lander on its side: a long tank split open, its engine bell, legs, scattered panels, a furrow.</summary>
+        static void Wreck(MeshBuilder b, Color ground, int seed)
+        {
+            var white = new Color(0.82f, 0.82f, 0.8f);
+            var scorch = new Color(0.18f, 0.16f, 0.15f);
+            var metal = new Color(0.58f, 0.59f, 0.61f);
+            b.Mat = MeshBuilder.MatMatte;
+            b.AddBox(new Vector3(-12f, 0.04f, 0), new Vector3(26f, 0.12f, 3.4f), Tone(ground, 0.6f), Quaternion.Euler(0, -6, 0));
+            // the main tank, lying down and torn
+            b.Mat = MeshBuilder.MatPaint;
+            int s = b.v.Count;
+            b.AddFrustum(4f, -4f, 1.25f, 1.25f, white, 16, true, false);
+            Xf(b, s, new Vector3(2f, G(2f, 0f) + 1.1f, 0f), Quaternion.Euler(0, 10, 92));
+            b.AddBox(new Vector3(-1.5f, G(-1.5f, 0f) + 1.6f, 0.4f), new Vector3(1.6f, 0.9f, 1.4f), scorch, Quaternion.Euler(10, 10, 30));
+            // the engine, broken off
+            b.Mat = MeshBuilder.MatDarkMetal;
+            s = b.v.Count;
+            b.AddFrustum(0.8f, -0.8f, 0.45f, 0.9f, metal * 0.7f, 14, true, false);
+            Xf(b, s, new Vector3(8.5f, G(8.5f, 2.5f) + 0.8f, 2.5f), Quaternion.Euler(20, 0, 70));
+            // legs sticking up
+            b.Mat = MeshBuilder.MatMetal;
+            for (int k = 0; k < 3; k++)
+                b.AddBox(new Vector3(-0.5f + k * 2.2f, G(k, 1.5f) + 2.2f, 1.6f - k * 0.4f), new Vector3(0.18f, 2.6f, 0.18f), metal, Quaternion.Euler(30 - k * 25, k * 40, 20));
+            // pieces everywhere
+            for (int i = 0; i < 20; i++)
+            {
+                float a = H(seed, i) * Mathf.PI * 2, r = 3f + 20f * H(seed, i + 30);
+                float sz = 0.2f + 0.7f * H(seed, i + 60);
+                float cx = Mathf.Cos(a) * r, cz = Mathf.Sin(a) * r;
+                b.Mat = i % 2 == 0 ? MeshBuilder.MatPaint : MeshBuilder.MatDarkMetal;
+                b.AddBox(new Vector3(cx, sz * 0.3f + G(cx, cz), cz), new Vector3(sz * 1.8f, sz * 0.3f, sz), i % 2 == 0 ? white : metal * 0.6f, Quaternion.Euler(H(seed, i + 90) * 50, H(seed, i + 120) * 360, 0));
+            }
         }
 
         // ---------------------------------------------------------------- helpers

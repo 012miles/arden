@@ -13,7 +13,7 @@ namespace Rocket
     public class MenuMode
     {
         readonly GameRoot root;
-        enum Page { Main, New, Load, Settings, Credits, Help, Controls, Single }
+        enum Page { Main, New, Load, Settings, Credits, Help, Controls, Single, Updates, Defs }
         Page page;
         List<SlotInfo> slots = new List<SlotInfo>();
         string newName = "", confirmDelete;
@@ -128,8 +128,8 @@ namespace Rocket
         {
             var bar = new Rect(W * 0.5f - 330, 14, 660, 54);
             GUI.Box(bar, GUIContent.none, Ui.Panel);
-            GUI.Label(new Rect(bar.x + 16, bar.y + 8, 420, 24), "SPACE CENTRE", Ui.Header);
-            GUI.Label(new Rect(bar.x + 16, bar.y + 30, 440, 20), "Click a building. Right-drag to look round, scroll to zoom.", Ui.Small);
+            Ui.Text(new Rect(bar.x + 16, bar.y + 8, 420, 24), "SPACE CENTRE", Ui.Header);
+            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 440, 20), "Click a building. Right-drag to look round, scroll to zoom.", Ui.Small);
             if (Ui.Press(new Rect(bar.xMax - 186, bar.y + 10, 170, 34), "Back to the builder", Ui.Button)) { root.EnterHangar(); return; }
             BodyView site = null;
             foreach (var bv in root.bodyViews) if (bv.SiteTransform != null) site = bv;
@@ -196,7 +196,7 @@ namespace Rocket
 
         public void ShowPage(string name)
         {
-            page = name == "single" ? Page.Single : name == "new" ? Page.New : name == "load" ? Page.Load : name == "settings" ? Page.Settings : name == "credits" ? Page.Credits : name == "help" ? Page.Help : name == "controls" ? Page.Controls : Page.Main;
+            page = name == "single" ? Page.Single : name == "new" ? Page.New : name == "load" ? Page.Load : name == "settings" ? Page.Settings : name == "credits" ? Page.Credits : name == "help" ? Page.Help : name == "controls" ? Page.Controls : name == "updates" ? Page.Updates : name == "defs" ? Page.Defs : Page.Main;
             slots = SaveSlots.List();
             if (page == Page.New) newName = $"Game {slots.Count + 1}";
         }
@@ -277,17 +277,21 @@ namespace Rocket
             if (shade == null)
             {
                 shade = new Texture2D(256, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
-                for (int i = 0; i < 256; i++) { float u = i / 255f; shade.SetPixel(i, 0, new Color(0.02f, 0.04f, 0.08f, 0.62f * Mathf.Pow(1f - u, 1.6f))); }
+                for (int i = 0; i < 256; i++) { float u = i / 255f; shade.SetPixel(i, 0, new Color(0.02f, 0.04f, 0.08f, 0.7f * Mathf.Pow(1f - u, 1.5f))); }
                 shade.Apply();
             }
-            GUI.DrawTexture(new Rect(0, 0, Mathf.Max(760f, W * 0.55f), H), shade);
-            float x = 70, y = H * 0.18f;
-            GUI.Label(new Rect(x, y, 1000, 64), "ARDEN SPACE PROGRAM", Ui.Hero);
-            GUI.Label(new Rect(x + 4, y + 66, 600, 24), "Build rockets. Fly them. Reach the giant.", Ui.Hint.ApplyLeft());
+            GUI.DrawTexture(new Rect(0, 0, Mathf.Max(820f, W * 0.55f), H), shade);
+            // milestone 34: the logo higher up, the menu as one column of big buttons, what's new on the right
+            float x = 64, y = Mathf.Max(54f, H * 0.1f);
+            Ui.Text(new Rect(x, y, 1000, 64), "ARDEN SPACE PROGRAM", Ui.Hero);
+            Ui.Line(new Rect(x + 3, y + 66, 120, 3), Ui.Accent);
+            var tag = new GUIStyle(Ui.Label) { fontSize = 16 };
+            tag.normal.textColor = new Color(0.88f, 0.93f, 0.97f);
+            Ui.Shadowed(new Rect(x + 3, y + 74, 600, 24), "Build rockets. Fly them. Reach the giant.", tag);
             y += 120;
             switch (page)
             {
-                case Page.Main: DrawMain(x, y); break;
+                case Page.Main: DrawMain(x, y, W, H); break;
                 case Page.Single: DrawSingle(x, y); break;
                 case Page.New: DrawNew(x, y, W, H); break;
                 case Page.Load: DrawLoad(x, y, W, H); break;
@@ -295,55 +299,68 @@ namespace Rocket
                 case Page.Credits: DrawCredits(x, y); break;
                 case Page.Help: if (!HowToPlay.Draw(new Rect(x, y, Mathf.Min(980, W - x - 40), Mathf.Min(470, H - y - 40)), ref helpTopic)) ShowPage("main"); break;
                 case Page.Controls: DrawControls(x, y, W, H); break;
+                case Page.Updates: if (!UpdateLog.DrawPage(new Rect(x, y, Mathf.Min(820, W - x - 40), Mathf.Min(640, H - y - 50)))) ShowPage("main"); break;
+                case Page.Defs: if (!Glossary.DrawPage(new Rect(x, y, Mathf.Min(980, W - x - 40), Mathf.Min(640, H - y - 50)))) ShowPage("main"); break;
             }
-            GUI.Label(new Rect(x, H - 34, 600, 20), $"Saves: {slots.Count}   ·   designs are shared between games", Ui.Small);
+            var foot = new GUIStyle(Ui.Small);
+            foot.normal.textColor = new Color(0.85f, 0.9f, 0.95f);
+            Ui.Shadowed(new Rect(x, H - 34, 600, 20), $"Saves: {slots.Count}   ·   designs are shared between games", foot);
             int baked = PlanetBaker.Baked;
-            string worlds = baked < 8 ? $"   ·   drawing the worlds ({baked}/8)" : "";
-            GUI.Label(new Rect(W - 420, H - 34, 390, 20), $"Version {Application.version}{worlds}", Ui.Small.ApplyRight());
+            string worlds = baked < 8 ? $"drawing the worlds ({baked}/8)   ·   " : "";
+            Ui.Shadowed(new Rect(W - 520, H - 34, 490, 20), $"{worlds}Update {UpdateLog.Latest.n}   ·   version {Application.version}", foot.ApplyRight());
         }
 
-        void DrawMain(float x, float y)
+        /// <summary>
+        /// The main title menu (milestone 34, after looking at how good game menus work): Continue first and biggest, saying
+        /// exactly which game it opens; then one column of buttons, each with a line saying what it's for; the newest
+        /// update's highlights on the right.
+        /// </summary>
+        void DrawMain(float x, float y, float W, float H)
         {
             string last = SaveSlots.Last;
             var lastInfo = slots.FirstOrDefault(s => s.id == last);
-            const float w = 300, h = 44, gap = 12;
-            GUI.enabled = lastInfo != null;
-            if (Ui.Press(new Rect(x, y, w, h), lastInfo != null ? $"Continue: {lastInfo.name}" : "Continue", Ui.Button)) { root.OpenSlot(last); return; }
-            GUI.enabled = true;
-            if (lastInfo != null) Blurb(new Rect(x + w + 18, y + 12, 400, 20), Describe(lastInfo));
+            const float w = 390, h = 52, gap = 8;
+            if (lastInfo != null)
+            {
+                if (Ui.MenuItem(new Rect(x, y, w, 62), $"Continue  ▸  {lastInfo.name}", Describe(lastInfo), true)) { root.OpenSlot(last); return; }
+            }
+            else if (Ui.MenuItem(new Rect(x, y, w, 62), "Start playing  ▸", "A new campaign: run your own space program", true)) { newMode = GameMode.Career; newSupplies = true; ShowPage("new"); return; }
+            y += 62 + gap + 6;
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Singleplayer", "A campaign, a sandbox, or a saved game")) ShowPage("single");
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "Singleplayer", Ui.Button)) ShowPage("single");
-            Blurb(new Rect(x + w + 18, y + 12, 460, 20), "Campaign or sandbox, on your own");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Multiplayer", "Build and fly together: up to 4 players")) { root.ShowMission(); return; }
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "Multiplayer", Ui.Button)) { root.ShowMission(); return; }
-            Blurb(new Rect(x + w + 18, y + 12, 460, 20), "Campaign or sandbox with up to 4 players, each on their own device");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "How to play", "Guides for building, flying and more")) ShowPage("help");
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "Settings", Ui.Button)) ShowPage("settings");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Definitions", "What every game word means")) ShowPage("defs");
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "How to play", Ui.Button)) ShowPage("help");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Settings", "Words, interface, sound, graphics, controls")) ShowPage("settings");
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "Credits", Ui.Button)) ShowPage("credits");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Update log", UpdateLog.Unread ? $"<color=#ffd060>New:</color> update {UpdateLog.Latest.n}, {UpdateLog.Latest.name.ToLowerInvariant()}" : $"Everything new, up to update {UpdateLog.Latest.n}")) ShowPage("updates");
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "Quit", Ui.Button)) Application.Quit();
+            float half = (w - gap) / 2;
+            if (Ui.MenuItem(new Rect(x, y, half, 40), "Credits", null)) ShowPage("credits");
+            if (Ui.MenuItem(new Rect(x + half + gap, y, half, 40), "Quit", null)) Application.Quit();
+            // what's new, bottom right
+            float cw = 430, ch = Mathf.Min(330, H - 200);
+            if (UpdateLog.DrawCard(new Rect(W - cw - 40, H - ch - 56, cw, ch), 6)) ShowPage("updates");
         }
 
         /// <summary>Singleplayer: a campaign, a sandbox or a saved game. (Mission design lives under Multiplayer: a room on your own works too.)</summary>
         void DrawSingle(float x, float y)
         {
-            const float w = 300, h = 44, gap = 12;
-            GUI.Label(new Rect(x, y - 6, 400, 30), "SINGLEPLAYER", Ui.Header);
-            y += 34;
-            if (Ui.Press(new Rect(x, y, w, h), "Campaign", Ui.Button)) { newMode = GameMode.Career; newSupplies = true; ShowPage("new"); }
-            Blurb(new Rect(x + w + 18, y + 4, 460, 40), "Run a space program: contracts pay for rockets, science unlocks new parts, a story to follow.");
+            const float w = 390, h = 56, gap = 8;
+            Ui.Text(new Rect(x, y - 6, 400, 30), "SINGLEPLAYER", Ui.Header);
+            y += 30;
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Campaign", "Contracts pay for rockets, science unlocks parts")) { newMode = GameMode.Career; newSupplies = true; ShowPage("new"); }
             y += h + gap;
-            if (Ui.Press(new Rect(x, y, w, h), "Sandbox", Ui.Button)) { newMode = GameMode.Sandbox; newSupplies = false; ShowPage("new"); }
-            Blurb(new Rect(x + w + 18, y + 12, 460, 40), "Every part, no money: build and fly anything, anywhere.");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Sandbox", "Every part, no money: build and fly anything")) { newMode = GameMode.Sandbox; newSupplies = false; ShowPage("new"); }
             y += h + gap;
             GUI.enabled = slots.Count > 0;
-            if (Ui.Press(new Rect(x, y, w, h), "Load a game", Ui.Button)) ShowPage("load");
+            if (Ui.MenuItem(new Rect(x, y, w, h), "Load a game", slots.Count > 0 ? $"{slots.Count} saved game{(slots.Count == 1 ? "" : "s")}" : "No saved games yet")) ShowPage("load");
             GUI.enabled = true;
-            y += h + gap;
-            if (Ui.Press(new Rect(x, y, 140, 40), "Back", Ui.Button)) ShowPage("main");
+            y += h + gap + 8;
+            if (Ui.Press(new Rect(x, y, 140, 40), "Back", Ui.Button) || In.EscapeDown) ShowPage("main");
         }
 
         static GUIStyle blurbStyle;
@@ -355,7 +372,7 @@ namespace Rocket
             float tw = Mathf.Min(r.width, blurbStyle.CalcSize(c).x + 2);
             float th = blurbStyle.CalcHeight(c, tw);
             Ui.Box(new Rect(r.x - 8, r.y - 4, tw + 16, th + 8));
-            GUI.Label(new Rect(r.x, r.y, tw, th), text, blurbStyle);
+            Ui.Text(new Rect(r.x, r.y, tw, th), text, blurbStyle);
         }
 
         static string Describe(SlotInfo s)
@@ -368,18 +385,18 @@ namespace Rocket
         {
             var r = new Rect(x, y, 640, 396);
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 24), newMode == GameMode.Career ? "New campaign" : "New sandbox", Ui.Header);
-            GUI.Label(new Rect(r.x + 16, r.y + 286, 60, 22), "Words", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, r.y + 12, 300, 24), newMode == GameMode.Career ? "New campaign" : "New sandbox", Ui.Header);
+            Ui.Text(new Rect(r.x + 16, r.y + 286, 60, 22), "Words", Ui.Label);
             Ui.WordsPicker(r.x + 80, r.y + 282, 100);
-            GUI.Label(new Rect(r.x + 396, r.y + 286, 230, 40), Words.Blurbs[(int)Words.Level], Ui.Small);
-            GUI.Label(new Rect(r.x + 16, r.y + 48, 60, 24), "Name", Ui.Label);
+            Ui.Text(new Rect(r.x + 396, r.y + 286, 230, 40), Words.Blurbs[(int)Words.Level], Ui.Small);
+            Ui.Text(new Rect(r.x + 16, r.y + 48, 60, 24), "Name", Ui.Label);
             newName = GUI.TextField(new Rect(r.x + 80, r.y + 44, 300, 28), newName, 30, Ui.Field);
             float bw = 290;
             selCentered ??= new GUIStyle(Ui.RowSel) { alignment = TextAnchor.MiddleCenter };
             if (Ui.Press(new Rect(r.x + 16, r.y + 90, bw, 40), "Campaign", newMode == GameMode.Career ? selCentered : Ui.Button)) { newMode = GameMode.Career; newSupplies = true; }
             if (Ui.Press(new Rect(r.x + 334, r.y + 90, bw, 40), "Sandbox", newMode == GameMode.Sandbox ? selCentered : Ui.Button)) { newMode = GameMode.Sandbox; newSupplies = false; }
-            GUI.Label(new Rect(r.x + 16, r.y + 136, bw, 100), "Run a space program: contracts pay for rockets, science unlocks parts in the tech tree, records and reputation open bigger missions. A guide walks you through the first flight.", Ui.Small);
-            GUI.Label(new Rect(r.x + 334, r.y + 136, bw, 100), "Every part, no money, no contracts: build and fly anything, anywhere.", Ui.Small);
+            Ui.Text(new Rect(r.x + 16, r.y + 136, bw, 100), "Run a space program: contracts pay for rockets, science unlocks parts in the tech tree, records and reputation open bigger missions. A guide walks you through the first flight.", Ui.Small);
+            Ui.Text(new Rect(r.x + 334, r.y + 136, bw, 100), "Every part, no money, no contracts: build and fly anything, anywhere.", Ui.Small);
             newSupplies = GUI.Toggle(new Rect(r.x + 16, r.y + 244, 600, 24), newSupplies, newSupplies ? "  Crew need supplies (food, water, air): they die if they run out" : "  Crew need supplies (off: no limit on long trips)", Ui.Label);
             if (Ui.Press(new Rect(r.xMax - 176, r.yMax - 48, 160, 34), "Start", Ui.Button)) { root.NewGame(newName, newMode, newSupplies); return; }
             if (Ui.Press(new Rect(r.x + 16, r.yMax - 48, 100, 34), "Back", Ui.Button)) ShowPage("single");
@@ -389,17 +406,17 @@ namespace Rocket
         {
             var r = new Rect(x, y, 700, Mathf.Min(H - y - 60, 120 + slots.Count * 58));
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 24), "Load game", Ui.Header);
+            Ui.Text(new Rect(r.x + 16, r.y + 12, 300, 24), "Load game", Ui.Header);
             var view = new Rect(r.x + 8, r.y + 44, r.width - 16, r.height - 100);
             loadScroll = GUI.BeginScrollView(view, loadScroll, new Rect(0, 0, view.width - 20, Math.Max(view.height - 4, slots.Count * 58)));
             float yy = 0;
             foreach (var s in slots.ToList())
             {
-                GUI.Label(new Rect(8, yy + 4, 380, 22), $"<b>{s.name}</b>", Ui.Label);
-                GUI.Label(new Rect(8, yy + 26, 460, 20), Describe(s), Ui.Small);
+                Ui.Text(new Rect(8, yy + 4, 380, 22), $"<b>{s.name}</b>", Ui.Label);
+                Ui.Text(new Rect(8, yy + 26, 460, 20), Describe(s), Ui.Small);
                 if (confirmDelete == s.id)
                 {
-                    GUI.Label(new Rect(view.width - 290, yy + 14, 90, 22), "Delete it?", Ui.Small);
+                    Ui.Text(new Rect(view.width - 290, yy + 14, 90, 22), "Delete it?", Ui.Small);
                     if (Ui.Press(new Rect(view.width - 200, yy + 10, 70, 28), "Yes", Ui.ButtonSmall)) { SaveSlots.Delete(s.id); confirmDelete = null; slots = SaveSlots.List(); GUI.EndScrollView(); return; }
                     if (Ui.Press(new Rect(view.width - 124, yy + 10, 70, 28), "No", Ui.ButtonSmall)) confirmDelete = null;
                 }
@@ -419,8 +436,8 @@ namespace Rocket
         {
             var r = new Rect(x, y, 660, 520);
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 24), "Credits", Ui.Header);
-            GUI.Label(new Rect(r.x + 16, r.y + 48, r.width - 32, 410), "Arden Space Program, made by captaincarl24 with Claude.\n\nStar map by NASA/Goddard Space Flight Center Scientific Visualization Studio, from Gaia DR2 (ESA/Gaia/DPAC). Textures from ambientCG (CC0). Music: \"Space\" by lasercheese, \"ArcLight\" by Matthew Pablo, \"Beyond the Stars\" and \"Drifting Beyond the Stars\" by Hitctrl, \"Space Atmosphere\" by Alexandr Zhelanov (all CC-BY 3.0); \"Another August\" by cynicmusic, \"Exploration Theme\" by CleytonKauffman, \"At Home\" by Wolfgang_, \"Out There\" and \"Galactic Temple\" by yd, \"First Light Particles\" by Yoiyami (CC0). Sounds: explosions by Michel Baradari and the Blender Foundation, hangar hum by gryc (CC-BY 3.0); rumble by theMinesAreShakin, engine by gmason, wind by aquinn and remaxim, thrusters by EZduzziteh, metal by BMacZero, crickets by Wolfgang_, launch by qubodup, interface by Kenney (CC0). Found on OpenGameArt.org.", Ui.Small);
+            Ui.Text(new Rect(r.x + 16, r.y + 12, 300, 24), "Credits", Ui.Header);
+            Ui.Text(new Rect(r.x + 16, r.y + 48, r.width - 32, 410), "Arden Space Program, made by captaincarl24.\n\nStar map by NASA/Goddard Space Flight Center Scientific Visualization Studio, from Gaia DR2 (ESA/Gaia/DPAC). Textures from ambientCG (CC0). Music: \"Space\" by lasercheese, \"ArcLight\" by Matthew Pablo, \"Beyond the Stars\" and \"Drifting Beyond the Stars\" by Hitctrl, \"Space Atmosphere\" by Alexandr Zhelanov (all CC-BY 3.0); \"Another August\" by cynicmusic, \"Exploration Theme\" by CleytonKauffman, \"At Home\" by Wolfgang_, \"Out There\" and \"Galactic Temple\" by yd, \"First Light Particles\" by Yoiyami (CC0). Sounds: explosions by Michel Baradari and the Blender Foundation, hangar hum by gryc (CC-BY 3.0); rumble by theMinesAreShakin, engine by gmason, wind by aquinn and remaxim, thrusters by EZduzziteh, metal by BMacZero, crickets by Wolfgang_, launch by qubodup, interface by Kenney (CC0). Found on OpenGameArt.org.", Ui.Small);
             if (Ui.Press(new Rect(r.x + 16, r.yMax - 48, 100, 34), "Back", Ui.Button)) ShowPage("main");
         }
 
@@ -434,8 +451,8 @@ namespace Rocket
         {
             var r = new Rect(x, y, Mathf.Min(900, W - x - 40), Mathf.Min(500, H - y - 30));
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 24), "Controls", Ui.Header);
-            GUI.Label(new Rect(r.x + 120, r.y + 15, r.width - 140, 20), rebinding.HasValue ? $"Press the new key for \"{Keybinds.Actions.First(a => a.key == rebinding.Value).what}\" (Esc cancels)" : "Click a key to change it.", Ui.Small);
+            Ui.Text(new Rect(r.x + 16, r.y + 12, 300, 24), "Controls", Ui.Header);
+            Ui.Text(new Rect(r.x + 120, r.y + 15, r.width - 140, 20), rebinding.HasValue ? $"Press the new key for \"{Keybinds.Actions.First(a => a.key == rebinding.Value).what}\" (Esc cancels)" : "Click a key to change it.", Ui.Small);
             if (rebinding.HasValue)
             {
                 if (In.EscapeDown) rebinding = null;
@@ -453,49 +470,68 @@ namespace Rocket
                 float cx = r.x + 16 + (i / rows) * cw, cy = r.y + 46 + (i % rows) * rh;
                 bool waiting = rebinding == a.key;
                 if (Ui.Press(new Rect(cx, cy, 64, rh - 4), waiting ? "..." : In.Name(a.key), waiting ? Ui.ButtonSmallSel : Ui.ButtonSmall)) rebinding = a.key;
-                GUI.Label(new Rect(cx + 70, cy + 3, cw - 76, rh), a.what, Ui.Small);
+                Ui.Text(new Rect(cx + 70, cy + 3, cw - 76, rh), a.what, Ui.Small);
             }
             var clash = Keybinds.Clashes();
-            if (clash.Count > 0) GUI.Label(new Rect(r.x + 140, r.yMax - 44, r.width - 300, 40), "<color=#ffb050>Shared keys: " + string.Join("; ", clash.Take(2)) + "</color>", Ui.Small);
+            if (clash.Count > 0) Ui.Text(new Rect(r.x + 140, r.yMax - 44, r.width - 300, 40), "<color=#ffb050>Shared keys: " + string.Join("; ", clash.Take(2)) + "</color>", Ui.Small);
             if (Ui.Press(new Rect(r.x + 16, r.yMax - 48, 100, 34), "Back", Ui.Button)) { rebinding = null; ShowPage("settings"); }
             if (Ui.Press(new Rect(r.xMax - 150, r.yMax - 48, 134, 34), "Reset all", Ui.Button)) { Keybinds.ResetAll(); rebinding = null; }
         }
 
         void DrawSettings(float x, float y)
         {
-            var r = new Rect(x, y, 700, 536);
+            var r = new Rect(x, y, 700, 624);
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 24), "Settings", Ui.Header);
+            Ui.Text(new Rect(r.x + 16, r.y + 12, 300, 24), "Settings", Ui.Header);
             float yy = r.y + 52;
             // How the game talks (milestone 24)
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), "Words", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Words", Ui.Label);
             Ui.WordsPicker(r.x + 220, yy, 96);
-            GUI.Label(new Rect(r.x + 220, yy + 30, 320, 20), Words.Blurbs[(int)Words.Level], Ui.Small);
+            Ui.Text(new Rect(r.x + 220, yy + 30, 320, 20), Words.Blurbs[(int)Words.Level], Ui.Small);
             yy += 72;
             // Interface size
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), "Interface size", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Interface size", Ui.Label);
             float bx = r.x + 220;
             foreach (float s in new[] { 1f, 0.9f, 0.8f, 0.7f })
             {
                 if (Ui.Press(new Rect(bx, yy, 84, 28), s >= 1f ? "Auto" : $"{s * 100:0}%", Mathf.Abs(Settings.UiScale - s) < 0.01f ? Ui.ButtonSmallSel : Ui.ButtonSmall)) Settings.UiScale = s;
                 bx += 88;
             }
-            GUI.Label(new Rect(bx + 6, yy + 4, r.xMax - bx - 20, 22), "Auto fits your screen", Ui.Small);
+            Ui.Text(new Rect(bx + 6, yy + 4, r.xMax - bx - 20, 22), "Auto fits your screen", Ui.Small);
+            yy += 44;
+            // Panels and definitions (milestone 34)
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Panels", Ui.Label);
+            bx = r.x + 220;
+            string[] looks = { "Solid", "Normal", "See-through" };
+            for (int i = 0; i < 3; i++)
+            {
+                if (Ui.Press(new Rect(bx, yy, 104, 28), looks[i], Settings.PanelLook == i ? Ui.ButtonSmallSel : Ui.ButtonSmall)) Settings.PanelLook = i;
+                bx += 108;
+            }
+            yy += 44;
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Definitions on hover", Ui.Label);
+            bx = r.x + 220;
+            foreach (float d in new[] { 0f, 1f, 2f })
+            {
+                if (Ui.Press(new Rect(bx, yy, 84, 28), d <= 0 ? "Off" : $"{d:0} s", Mathf.Abs(Settings.DefsDelay - d) < 0.01f ? Ui.ButtonSmallSel : Ui.ButtonSmall)) Settings.DefsDelay = d;
+                bx += 88;
+            }
+            Ui.Text(new Rect(bx + 6, yy + 4, r.xMax - bx - 20, 22), "Rest the mouse on a word", Ui.Small);
             yy += 44;
             // Sound
             float vol = FlightAudio.Volume;
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), $"Sound: {(vol < 0.01f ? "off" : $"{vol * 100:0}%")}", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), $"Sound: {(vol < 0.01f ? "off" : $"{vol * 100:0}%")}", Ui.Label);
             if (Ui.Press(new Rect(r.x + 220, yy, 60, 28), "-", Ui.Button)) FlightAudio.Volume = Mathf.Round((vol - 0.1f) * 10) / 10;
             if (Ui.Press(new Rect(r.x + 284, yy, 60, 28), "+", Ui.Button)) FlightAudio.Volume = Mathf.Round((vol + 0.1f) * 10) / 10;
             yy += 44;
             // Music (under the master sound volume)
             float mus = GameAudio.MusicVolume;
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), $"Music: {(mus < 0.01f ? "off" : $"{mus * 100:0}%")}", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), $"Music: {(mus < 0.01f ? "off" : $"{mus * 100:0}%")}", Ui.Label);
             if (Ui.Press(new Rect(r.x + 220, yy, 60, 28), "-", Ui.Button)) GameAudio.MusicVolume = Mathf.Round((mus - 0.1f) * 10) / 10;
             if (Ui.Press(new Rect(r.x + 284, yy, 60, 28), "+", Ui.Button)) GameAudio.MusicVolume = Mathf.Round((mus + 0.1f) * 10) / 10;
             yy += 44;
             // Autosave
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), "Autosave in flight", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Autosave in flight", Ui.Label);
             bx = r.x + 220;
             foreach (int m in new[] { 0, 2, 5, 10 })
             {
@@ -504,20 +540,20 @@ namespace Rocket
             }
             yy += 44;
             // Roll-out to the pad (milestone 25)
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), "Roll-out to the pad", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Roll-out to the pad", Ui.Label);
             if (Ui.Press(new Rect(r.x + 220, yy, 74, 28), "On", FlightMode.RolloutOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) FlightMode.RolloutOn = true;
             if (Ui.Press(new Rect(r.x + 298, yy, 74, 28), "Off", !FlightMode.RolloutOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) FlightMode.RolloutOn = false;
-            GUI.Label(new Rect(r.x + 400, yy + 4, 120, 22), "Countdown", Ui.Label);
+            Ui.Text(new Rect(r.x + 400, yy + 4, 120, 22), "Countdown", Ui.Label);
             if (Ui.Press(new Rect(r.x + 520, yy, 74, 28), "On", FlightMode.CountdownOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) FlightMode.CountdownOn = true;
             if (Ui.Press(new Rect(r.x + 598, yy, 74, 28), "Off", !FlightMode.CountdownOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) FlightMode.CountdownOn = false;
             yy += 44;
             // The story (milestone 28)
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), "Story missions", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Story missions", Ui.Label);
             if (Ui.Press(new Rect(r.x + 220, yy, 74, 28), "On", FlightMode.StoryOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) FlightMode.StoryOn = true;
             if (Ui.Press(new Rect(r.x + 298, yy, 74, 28), "Off", !FlightMode.StoryOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) FlightMode.StoryOn = false;
             yy += 44;
             // Graphics quality (Low suits older laptops)
-            GUI.Label(new Rect(r.x + 16, yy + 4, 200, 22), "Graphics", Ui.Label);
+            Ui.Text(new Rect(r.x + 16, yy + 4, 200, 22), "Graphics", Ui.Label);
             bx = r.x + 220;
             string[] q = { "Low", "Medium", "High" };
             for (int i = 0; i < 3; i++)
@@ -526,7 +562,7 @@ namespace Rocket
                 bx += 100;
             }
             yy += 44;
-            GUI.Label(new Rect(r.x + 16, yy, r.width - 32, 40), "The game also saves whenever you go back to the builder, and F5 / F9 quicksave and quickload during a flight.", Ui.Small);
+            Ui.Text(new Rect(r.x + 16, yy, r.width - 32, 40), "The game also saves whenever you go back to the builder, and F5 / F9 quicksave and quickload during a flight.", Ui.Small);
             yy += 44;
             if (Ui.Press(new Rect(r.x + 16, r.yMax - 48, 100, 34), "Back", Ui.Button)) ShowPage("main");
             if (Ui.Press(new Rect(r.x + 126, r.yMax - 48, 130, 34), "Controls...", Ui.Button)) ShowPage("controls");
@@ -556,6 +592,22 @@ namespace Rocket
             get => PlayerPrefs.GetInt("autosaveMin", 5);
             set { PlayerPrefs.SetInt("autosaveMin", Mathf.Clamp(value, 0, 60)); PlayerPrefs.Save(); }
         }
+
+        /// <summary>Seconds the mouse rests on a word before its definition shows (0 = off). Milestone 34.</summary>
+        public static float DefsDelay
+        {
+            get { if (!defsDelay.HasValue) defsDelay = Universe.IsAutotest ? 2f : PlayerPrefs.GetFloat("defsDelay", 2f); return defsDelay.Value; }
+            set { defsDelay = Mathf.Clamp(value, 0f, 5f); if (!Universe.IsAutotest) { PlayerPrefs.SetFloat("defsDelay", defsDelay.Value); PlayerPrefs.Save(); } }
+        }
+        static float? defsDelay;
+
+        /// <summary>How see-through the panels are: 0 solid, 1 normal, 2 clear. Milestone 34.</summary>
+        public static int PanelLook
+        {
+            get { if (!panelLook.HasValue) panelLook = Universe.IsAutotest ? 1 : Mathf.Clamp(PlayerPrefs.GetInt("panelLook", 1), 0, 2); return panelLook.Value; }
+            set { panelLook = Mathf.Clamp(value, 0, 2); if (!Universe.IsAutotest) { PlayerPrefs.SetInt("panelLook", panelLook.Value); PlayerPrefs.Save(); } Ui.Rebuild(); }
+        }
+        static int? panelLook;
     }
 
     static class StyleExt

@@ -63,7 +63,7 @@ namespace Rocket
             {
                 var gr = new Rect(W * 0.5f - 210, H - 320, 420, 24);
                 GUI.Box(gr, GUIContent.none, Ui.Panel);
-                GUI.Label(new Rect(gr.x + 10, gr.y + 2, gr.width - 20, 20), $"<color=#ffd56a>Story</color>  {Story.Chapters[m.chapter]}: <b>{m.goal}</b>", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
+                Ui.Text(new Rect(gr.x + 10, gr.y + 2, gr.width - 20, 20), $"<color=#ffd56a>Story</color>  {Story.Chapters[m.chapter]}: <b>{m.goal}</b>", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
             }
             // mission control
             if (storyText == null || Time.unscaledTime > storyUntil || countdown >= 0f) return;
@@ -74,10 +74,10 @@ namespace Rocket
             Color col = storyWho == Story.Rosa ? new Color(0.95f, 0.55f, 0.25f) : storyWho == Story.Bram ? new Color(0.35f, 0.6f, 0.95f) : new Color(0.55f, 0.85f, 0.45f);
             var badge = new Rect(r.x + 14, r.y + 14, 44, 44);
             Ui.Line(badge, col);
-            GUI.Label(badge, $"<b>{storyWho.Substring(storyWho.StartsWith("Dr") ? 3 : 0, 1)}</b>", Ui.BigCenter);
-            GUI.Label(new Rect(r.x + 70, r.y + 8, w - 150, 22), $"<color=#9fc6e8>Mission control</color>  ·  {storyWho}", Ui.Small);
-            GUI.Label(new Rect(r.x + 70, r.y + 28, w - 84, 60), Words.Say(storyText), wrapStyle ??= new GUIStyle(Ui.Label) { wordWrap = true, clipping = TextClipping.Clip });
-            if (storyGoal != null) GUI.Label(new Rect(r.x + 70, r.y + h - 30, w - 160, 22), $"<color=#ffd56a>Next:</color> <b>{storyGoal}</b>", Ui.Small);
+            Ui.Text(badge, $"<b>{storyWho.Substring(storyWho.StartsWith("Dr") ? 3 : 0, 1)}</b>", Ui.BigCenter);
+            Ui.Text(new Rect(r.x + 70, r.y + 8, w - 150, 22), $"<color=#9fc6e8>Mission control</color>  ·  {storyWho}", Ui.Small);
+            Ui.Text(new Rect(r.x + 70, r.y + 28, w - 84, 60), Words.Say(storyText), wrapStyle ??= new GUIStyle(Ui.Label) { wordWrap = true, clipping = TextClipping.Clip });
+            if (storyGoal != null) Ui.Text(new Rect(r.x + 70, r.y + h - 30, w - 160, 22), $"<color=#ffd56a>Next:</color> <b>{storyGoal}</b>", Ui.Small);
             if (Ui.Press(new Rect(r.xMax - 70, r.y + h - 34, 56, 26), "OK", Ui.ButtonSmall)) storyUntil = 0f;
         }
     }

@@ -29,7 +29,7 @@ namespace Rocket
                 float s = Mathf.Clamp(900f / (float)Math.Max(dockDist, 1), 18f, 70f);
                 var col = new Color(0.45f, 1f, 0.6f, 0.95f);
                 Bracket(new Rect(x - s, y - s, s * 2, s * 2), col);
-                GUI.Label(new Rect(x - 90, y + s + 2, 180, 20), $"their port  {Ui.Dist(dockDist)}", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperCenter });
+                Ui.Text(new Rect(x - 90, y + s + 2, 180, 20), $"their port  {Ui.Dist(dockDist)}", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperCenter });
             }
 
             // the scope: their port's line seen from your side, the screen's right and up laid onto it
@@ -48,7 +48,7 @@ namespace Rocket
             float size = 190;
             var r = new Rect(W - size - 24, H * 0.5f - size * 0.5f - 60, size, size + 104);
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, 22), "Docking guide", Ui.Header);
+            Ui.Text(new Rect(r.x + 10, r.y + 6, r.width - 20, 22), "Docking guide", Ui.Header);
             var scope = new Rect(r.x + 15, r.y + 32, size - 30, size - 30);
             var line = new Color(0.55f, 0.7f, 0.85f, 0.6f);
             Ui.Line(new Rect(scope.x, scope.center.y, scope.width, 1), line);
@@ -72,10 +72,10 @@ namespace Rocket
             double good = Stations.GoodSpeed(dockDist);
             bool okSpeed = dockClosing >= -0.05 && dockClosing <= good * 1.6 + 0.1;
             string cs(bool ok) => ok ? "#7dff8a" : "#ffb070";
-            GUI.Label(new Rect(r.x + 10, ty, r.width - 20, 20), $"<color={cs(okSpeed)}>{(dockClosing >= 0 ? "closing" : "moving away")} {Math.Abs(dockClosing):0.00} m/s</color> (aim {good:0.0})", Ui.Small);
-            GUI.Label(new Rect(r.x + 10, ty + 18, r.width - 20, 20), $"<color={cs(lined)}>off line {dockLateral:0.00} m</color>  <color={cs(facing)}>{dockAngle:0} deg</color>", Ui.Small);
+            Ui.Text(new Rect(r.x + 10, ty, r.width - 20, 20), $"<color={cs(okSpeed)}>{(dockClosing >= 0 ? "closing" : "moving away")} {Math.Abs(dockClosing):0.00} m/s</color> (aim {good:0.0})", Ui.Small);
+            Ui.Text(new Rect(r.x + 10, ty + 18, r.width - 20, 20), $"<color={cs(lined)}>off line {dockLateral:0.00} m</color>  <color={cs(facing)}>{dockAngle:0} deg</color>", Ui.Small);
             dockHint = Stations.DockHint(dockDist, dockLateral, dockAngle, dockClosing);
-            GUI.Label(new Rect(r.x + 10, ty + 38, r.width - 20, 36), $"<b>{dockHint}</b>", Ui.Small);
+            Ui.Text(new Rect(r.x + 10, ty + 38, r.width - 20, 36), $"<b>{dockHint}</b>", Ui.Small);
         }
 
         static void Bracket(Rect r, Color c)

@@ -219,12 +219,25 @@ namespace Rocket
         static readonly Color Amber = new Color(0.95f, 0.76f, 0.20f);
         static readonly Color Teal = new Color(0.12f, 0.55f, 0.60f);
 
-        /// <summary>Paint schemes for parts with variants.</summary>
+        /// <summary>Paint colours (milestone 34: sixteen, and most parts take them). 0 is each part's own colour.</summary>
         public static readonly Color[] Paints =
         {
             new Color(0.86f, 0.87f, 0.88f), new Color(0.2f, 0.21f, 0.23f), new Color(0.92f, 0.46f, 0.14f), new Color(0.75f, 0.62f, 0.32f),
+            new Color(0.78f, 0.16f, 0.15f), new Color(0.18f, 0.36f, 0.78f), new Color(0.42f, 0.7f, 0.92f), new Color(0.2f, 0.52f, 0.28f),
+            new Color(0.58f, 0.8f, 0.24f), new Color(0.95f, 0.8f, 0.2f), new Color(0.48f, 0.28f, 0.68f), new Color(0.92f, 0.52f, 0.66f),
+            new Color(0.12f, 0.55f, 0.58f), new Color(0.5f, 0.52f, 0.55f), new Color(0.12f, 0.17f, 0.32f), new Color(0.5f, 0.34f, 0.22f),
         };
-        public static readonly string[] PaintNames = { "White", "Black", "Orange", "Foil" };
+        public static readonly string[] PaintNames = { "White", "Black", "Orange", "Foil", "Red", "Blue", "Sky blue", "Green", "Lime", "Yellow", "Purple", "Pink", "Teal", "Grey", "Navy", "Brown" };
+
+        static readonly HashSet<PartKind> PaintKinds = new HashSet<PartKind>
+        {
+            PartKind.Command, PartKind.Tank, PartKind.MonoTank, PartKind.Decoupler, PartKind.RadialDecoupler, PartKind.NoseCone, PartKind.Fins,
+            PartKind.Wing, PartKind.ControlSurface, PartKind.Fairing, PartKind.FairingHalf, PartKind.Habitat, PartKind.Solid, PartKind.OreTank,
+            PartKind.Battery, PartKind.Frame, PartKind.Adapter,
+        };
+
+        /// <summary>Whether a part can be painted (milestone 34: most body parts, not just the ones with paint schemes).</summary>
+        public static bool Paintable(PartDef d) => d != null && (d.variants > 0 || PaintKinds.Contains(d.kind));
 
         public static readonly List<PartDef> All = new List<PartDef>
         {

@@ -55,9 +55,9 @@ namespace Rocket
             bool done = Guide.Finished(c.guide);
             if (done) r.height += 30;
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 12, r.y + 6, r.width - 50, 22), Guide.Title(c.guide), Ui.Header);
+            Ui.Text(new Rect(r.x + 12, r.y + 6, r.width - 50, 22), Guide.Title(c.guide), Ui.Header);
             if (Ui.Press(new Rect(r.xMax - 30, r.y + 6, 22, 20), "x", Ui.ButtonSmall)) CloseGuide();
-            GUI.Label(new Rect(r.x + 12, r.y + 30, 336, r.height - 34), text, Ui.Small);
+            Ui.Text(new Rect(r.x + 12, r.y + 30, 336, r.height - 34), text, Ui.Small);
             if (done && Ui.Press(new Rect(r.xMax - 110, r.yMax - 32, 100, 24), "Got it", Ui.ButtonSmall)) CloseGuide();
             return r.yMax;
         }

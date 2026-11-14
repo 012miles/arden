@@ -44,9 +44,52 @@ namespace Rocket
             return h;
         }
 
-        /// <summary>Everyone's look comes from their name, so it's the same every flight.</summary>
+        /// <summary>
+        /// Milestone 34: looks players picked for themselves (the My Ardling menu), by name. In a room everyone's choice
+        /// is shared, so each player's Ardling looks the way they made it on every screen.
+        /// </summary>
+        public static readonly Dictionary<string, Look> Custom = new Dictionary<string, Look>();
+
+        public static int SuitCount => Suits.Length;
+        public static int PaperCount => Papers.Length;
+        public static Color SuitColor(int i) => Suits[Mathf.Clamp(i, 0, Suits.Length - 1)];
+        public static Color PaperColor(int i) => Papers[Mathf.Clamp(i, 0, Papers.Length - 1)];
+
+        /// <summary>A look from its four choices (suit colour, note colour, face, hat).</summary>
+        public static Look Make(int suit, int paper, int face, int hat)
+        {
+            var l = new Look
+            {
+                suit = SuitColor(suit), paper = PaperColor(paper),
+                face = Mathf.Clamp(face, 0, Faces - 1), hat = Mathf.Clamp(hat, 0, Hats - 1), noteTilt = -4f,
+            };
+            l.trim = Color.Lerp(l.suit, Color.black, 0.35f);
+            if (l.suit.grayscale > 0.8f) l.trim = new Color(0.15f, 0.5f, 0.55f);
+            return l;
+        }
+
+        /// <summary>"suit,paper,face,hat" (how a look travels between games), and back. Null if it doesn't read.</summary>
+        public static string Code(int suit, int paper, int face, int hat) => $"{suit},{paper},{face},{hat}";
+        public static bool Parse(string code, out int suit, out int paper, out int face, out int hat)
+        {
+            suit = paper = face = hat = 0;
+            if (string.IsNullOrEmpty(code)) return false;
+            var p = code.Split(',');
+            return p.Length == 4 && int.TryParse(p[0], out suit) && int.TryParse(p[1], out paper) && int.TryParse(p[2], out face) && int.TryParse(p[3], out hat)
+                && suit >= 0 && suit < Suits.Length && paper >= 0 && paper < Papers.Length && face >= 0 && face < Faces && hat >= 0 && hat < Hats;
+        }
+
+        /// <summary>The four choices behind a name's own look (for starting the editor from it).</summary>
+        public static (int suit, int paper, int face, int hat) ChoicesFor(string name)
+        {
+            uint h = Hash(name);
+            return ((int)(h % (uint)Suits.Length), (int)((h >> 5) % (uint)Papers.Length), (int)((h >> 9) % Faces), (h >> 14) % 10 < 4 ? 0 : 1 + (int)((h >> 18) % (Hats - 1)));
+        }
+
+        /// <summary>Everyone's look comes from their name, so it's the same every flight (or the look they picked, milestone 34).</summary>
         public static Look LookFor(string name)
         {
+            if (name != null && Custom.TryGetValue(name, out var mine)) return mine;
             uint h = Hash(name);
             var l = new Look
             {

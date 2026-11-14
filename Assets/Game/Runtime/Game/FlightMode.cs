@@ -194,6 +194,10 @@ namespace Rocket
         /// <summary>Leaves flight: the active vessel and everything else stay in the universe (wrecks are cleared).</summary>
         public void Exit()
         {
+            FreeCursor();
+            firstPerson = false;
+            fpHiddenView = null;
+            LeaveInterior();
             for (int i = U.vessels.Count - 1; i >= 0; i--) if (U.vessels[i].destroyed) U.vessels.RemoveAt(i);
             ClearScene();
             active = null;
@@ -479,6 +483,7 @@ namespace Rocket
         public void Update()
         {
             if (active == null) return;
+            UpdateCursor();   // milestone 34: the pointer's locked while looking round in first person
             if (replay != null)
             {
                 float rdt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
@@ -574,8 +579,14 @@ namespace Rocket
                 return;
             }
 
-            if (v.IsEva) HandleEvaKeys(v);
-            else HandleVesselKeys(v);
+            if (inside) HandleInteriorKeys(v);   // milestone 34: walking round the cabin
+            else
+            {
+                if (In.Down(K.Tab) && !mapView && CanGoInside) EnterInterior();   // milestone 34: into the cabin
+                if (v.IsEva) HandleEvaKeys(v);
+                else HandleVesselKeys(v);
+                if (!(Coop.Active && remote)) HandleGetOut(v);   // milestone 34: ENTER gets out after a landing
+            }
             if (In.Down(K.T)) ToggleSas();
 
             if (In.Down(K.Period)) ChangeWarp(+1);
@@ -583,7 +594,6 @@ namespace Rocket
             if (In.Down(K.Slash) && !CoopBlock(CAct.Navigate, "warp", 0)) { SetWarpOne(); warpTargetUt = null; }
             if (In.Down(K.M)) mapView = !mapView;
             if (In.Down(K.O)) ToggleOreMap();
-            if (In.Down(K.F1)) { showHelp = !HelpVisible; helpUntil = 0; }
             if (In.Down(K.F)) { thermalView = !thermalView; Show(thermalView ? "Thermal view on" : "Thermal view off"); }
             if (In.Down(K.Delete) && node != null) { DeleteNode(); Show("Maneuver deleted"); }
             if (In.Down(K.Tab) && mapView) CycleMapFocus();
@@ -634,6 +644,7 @@ namespace Rocket
                 v.inputRoll = (In.Held(K.Q) ? 1 : 0) - (In.Held(K.E) ? 1 : 0);
             }
             if (v.inputTranslate != Vector3.zero && railsWarp) SetWarpOne();
+            HandleWalkInput(v);   // milestone 34: camera view, running, sideways steps, the mouse
             if (In.Down(K.B)) BoardNearest();
             if (In.Down(K.G)) PlantFlag();
         }
@@ -721,7 +732,7 @@ namespace Rocket
             targetVessel = parent;
             camDist = 6f;
             camPitch = 12f;
-            Show(eva.landed ? $"{who} is out. W/S walk, A/D turn, SPACE jump, G plants a flag, B climbs back in." :
+            Show(eva.landed ? $"{who} is out. W/S walk, A/D turn, CTRL run, SPACE jump, C first/third person, G plants a flag, B climbs back in." :
                               $"{who} is out. W/S A/D SHIFT/CTRL fly the jetpack, Q/E turn, B climbs back in.", 6f);
             return eva;
         }
@@ -1495,6 +1506,8 @@ namespace Rocket
             }
             cam.transform.position = pivot + dir * camDist;
             cam.transform.rotation = Quaternion.LookRotation(-dir, up);
+            ApplyFirstPersonCamera(cam);   // milestone 34: through the helmet
+            ApplyInteriorCamera(cam);      // milestone 34: inside the cabin, looking out of its windows
             float fov = photoMode ? photoFov : 60f;
             if (cam.fieldOfView != fov) { cam.fieldOfView = fov; root.nearCam.fieldOfView = fov; }
             cam.nearClipPlane = 5f;

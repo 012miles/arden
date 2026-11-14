@@ -17,6 +17,7 @@ namespace Rocket
         public Vector3 localPos;
         public Quaternion localRot = Quaternion.identity;
         public int groups, variant;
+        public string decal;           // milestone 34: a sticker (see Decals)
         public double propellant, mono, ablator;
         public double temp = 288;
         public bool ignited, chuteDeployed, chuteFailed, legsDeployed, lightOn, towerFired, fairingGone, enclosed;
@@ -259,7 +260,7 @@ namespace Rocket
                 v.parts.Add(new PartState
                 {
                     def = defs[i], index = i, parent = n.parent, attach = n.attach, localPos = n.pos, localRot = n.rot,
-                    groups = n.groups, variant = n.variant, propellant = defs[i].propellant, mono = defs[i].mono, ablator = defs[i].ablator,
+                    groups = n.groups, variant = n.variant, decal = n.decal, propellant = defs[i].propellant, mono = defs[i].mono, ablator = defs[i].ablator,
                 });
                 for (int k = 0; k < defs[i].crew; k++) v.parts[i].crew.Add(CrewNames.Next());
                 v.parts[i].charge = defs[i].ecCapacity;
@@ -491,6 +492,53 @@ namespace Rocket
         }
 
         bool EngineHasFuel(PartState p) => p.def.IsSolid ? p.propellant > 1e-9 : SectionLiquid(p.section) > 1e-9;
+
+        /// <summary>
+        /// Milestone 34: how a ship this device doesn't fly should look (a rocket room player's copy of the host's flight,
+        /// placed where the host says): engine flames and smoke from the throttle, legs, gear and panels moving, parachutes
+        /// opening, the escape tower's burn, and the air's push and heat for the reentry glow. No forces, no fuel used, no
+        /// damage: the host's game does all that. (Before, joiners saw no flames, smoke or reentry at all.)
+        /// </summary>
+        public void VisualStep(double dt)
+        {
+            if (destroyed || parts == null || body == null) return;
+            RecomputeMass();
+            UpdateLegsAndLights(dt);
+            SpoolJets(dt);
+            foreach (var p in parts) if (p.def.kind == PartKind.EscapeTower && p.towerFired) p.towerTime += (float)dt;
+            double alt = Altitude;
+            EngineForces(body.PressureAtm(alt), out _, out _, out _, out double thrust);
+            thrustNow = thrust;
+            double rho = body.Density(alt);
+            Vector3d vrel = SurfaceRelVelocity;
+            double s = vrel.magnitude;
+            dynPressure = 0.5 * rho * s * s;
+            heatFlux = rho > 0 && s > Thermal.V0 ? Thermal.HeatK * Math.Sqrt(rho) * (s * s * s - Thermal.V0 * Thermal.V0 * Thermal.V0) : 0;
+            leadingPart = -1;
+            if (heatFlux > 0)
+            {
+                Vector3 u = s > 1 ? Quaternion.Inverse(rot) * (vrel / s).ToFloat() : Vector3.up;
+                double best = 0;
+                for (int i = 0; i < parts.Count; i++)
+                {
+                    var p = parts[i];
+                    if (p.enclosed) continue;
+                    float c = p.def.radial ? 0 : Vector3.Dot(p.Axis, u);
+                    double exposure = 0.03 + 0.12 * (1 - Math.Abs(c));
+                    double r = Math.Max(p.RTop, p.RBottom);
+                    if (!p.def.radial && c > 0 && !p.topCovered && c > exposure) { exposure = c; r = Math.Max(p.RTop, 0.3); }
+                    if (!p.def.radial && c < 0 && !p.bottomCovered && -c > exposure) { exposure = -c; r = p.RBottom; }
+                    double q = heatFlux * exposure * Math.PI * r * r;
+                    if (q > best) { best = q; leadingPart = i; }
+                }
+            }
+            foreach (var p in parts)
+            {
+                if (p.def.kind != PartKind.Parachute || !p.chuteDeployed || p.chuteFailed) continue;
+                float target = landed || rho < 1e-4 ? 0 : s < 280 ? (alt < 2000 ? 1f : 0.12f) : p.chuteOpen;
+                p.chuteOpen = Mathf.MoveTowards(p.chuteOpen, target, (float)dt * (target > p.chuteOpen ? 0.6f : 2f));
+            }
+        }
 
         /// <summary>Total thrust force and torque about the CoM (vessel frame), plus gimbal authority.</summary>
         void EngineForces(double pressure, out Vector3 force, out Vector3 torque, out float gimbal, out double total)

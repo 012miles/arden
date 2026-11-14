@@ -29,7 +29,7 @@ namespace Rocket
         public HangarMode hangar;
         public FlightMode flight;
         public MenuMode menu;
-        public MissionMode mission;     // milestone 29: the mission design game
+        public MissionMode mission;     // milestone 29: the mission design game (now the multiplayer lobby)
         public bool inMenu, inMission;
         public VesselDesign currentDesign;
         public bool inFlight;
@@ -134,11 +134,16 @@ namespace Rocket
             go.transform.rotation = Quaternion.LookRotation(-SunDirection);
         }
 
+        static bool lookHooked;
+
         void Update()
         {
+            if (!lookHooked) { lookHooked = true; MyArdling.Changed += code => { var r = NetRoom.Current; if (r != null && r.Connected) r.SendLook(code); }; }
             PlanetBaker.Update();
             Coop.Current?.Update();          // milestone 30: a rocket room
             GameAudio.I?.Update();
+            if (!inMenu && !inMission && In.Down(K.F1)) Ui.ToggleHidden();   // milestone 34: hide the interface anywhere you play
+            if (inMenu || inMission) Ui.Hidden = false;
             if (inMission) mission.Update();
             else if (inMenu) menu.Update();
             else
@@ -155,6 +160,20 @@ namespace Rocket
             // A soft click for any press on the interface
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && Ui.MouseOverUI(In.MousePosition)) GameAudio.I?.Click();
+            if (Ui.Hidden && !inMenu && !inMission && !(inFlight && flight != null && flight.photoMode)) { Ui.DrawHiddenHint(); return; }
+            // while the Definitions window is open, the screen behind it is drawn but takes no clicks or keys
+            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open) && e.type != EventType.Repaint && e.type != EventType.Layout;
+            if (blocked) GUI.enabled = false;
+            DrawScreen();
+            if (blocked) GUI.enabled = true;
+            // milestone 34: the Definitions window (from the builder or pause menu), then a word's definition under the mouse
+            if (!inMenu) Glossary.DrawWindow(); else Glossary.Open = false;
+            MyArdling.DrawWindow();   // milestone 34: the My Ardling menu, over any screen
+            Glossary.DrawTip();
+        }
+
+        void DrawScreen()
+        {
             if (inMission) { mission.OnGUI(); return; }
             if (inMenu) menu.OnGUI();
             else if (inFlight) { flight.OnGUI(); if (!FlightMode.HideHud && !flight.photoMode) Tutorial.DrawFlight(flight); }
@@ -210,7 +229,7 @@ namespace Rocket
         public void EnterCoop(NetRoom room)
         {
             if (!coopStashed) { coopSavedUniverse = universe; coopSavedSlot = SaveSlots.Current; coopStashed = true; }
-            bool camp = room.State.campaign;
+            bool camp = room.State.campaign && room.State.activity == 1;   // an expedition plays in its own sandbox, with a budget
             SaveSlots.Current = null;
             universe = new Universe();
             universe.Reset(camp ? GameMode.Career : GameMode.Sandbox);
@@ -224,6 +243,7 @@ namespace Rocket
             }
             universe.wanderersOn = false;
             universe.career.guide = Guide.Closed;     // (the first-flight guide is for playing alone)
+            if (room.State.activity == 2) universe.career.suppliesOn = true;   // milestone 34: an expedition lives on its supplies
             Coop.Current = new Coop(this, room);
             mission.LeaveKeepRoom();
             inMission = false;
@@ -233,7 +253,7 @@ namespace Rocket
             currentDesign = camp ? VesselDesign.FirstFlight() : VesselDesign.Default();
             Coop.Current.UseRoomDesign();
             EnterHangar();
-            hangar.spectate = !Coop.Current.Has(Coop.Builder);
+            hangar.spectate = !Coop.Current.CanBuild;
         }
 
         public void LeaveCoop()

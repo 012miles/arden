@@ -220,15 +220,15 @@ namespace Rocket
             else if (target.xMin - 16 - bw > 0) box = new Rect(target.xMin - 16 - bw, Mathf.Clamp(target.center.y - bh * 0.5f, 10, H - bh - 10), bw, bh);
             else box = new Rect(Mathf.Clamp(target.center.x - bw * 0.5f, 10, W - bw - 10), target.yMax + 16 + bh < H ? target.yMax + 16 : Mathf.Max(10, target.yMin - 16 - bh), bw, bh);
             Ui.Box(box); Ui.Box(box);
-            GUI.Label(new Rect(box.x + 14, box.y + 10, bw - 90, 24), s.title, Ui.Header);
-            GUI.Label(new Rect(box.xMax - 70, box.y + 12, 58, 20), $"{step + 1} / {Steps.Length}", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperRight });
-            GUI.Label(new Rect(box.x + 14, box.y + 38, tw, th), text, Ui.Small);
+            Ui.Text(new Rect(box.x + 14, box.y + 10, bw - 90, 24), s.title, Ui.Header);
+            Ui.Text(new Rect(box.xMax - 70, box.y + 12, 58, 20), $"{step + 1} / {Steps.Length}", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperRight });
+            Ui.Text(new Rect(box.x + 14, box.y + 38, tw, th), text, Ui.Small);
             int result = 0;
             float by = box.yMax - 40;
             if (Ui.Press(new Rect(box.x + 14, by, 116, 28), "Skip tutorial", Ui.ButtonSmall)) { Stop(false); return 0; }
             if (extra != null && Ui.Press(new Rect(box.x + 138, by, 110, 28), extra, Ui.ButtonSmall)) result = 2;
             if (canNext && Ui.Press(new Rect(box.xMax - 110, by, 96, 28), step == Steps.Length - 1 ? "Finish" : "Next  ▸", Ui.ButtonSel)) result = 1;
-            else if (!canNext) GUI.Label(new Rect(box.xMax - 160, by + 4, 146, 22), "<color=#ffd56a>your turn!</color>", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperRight });
+            else if (!canNext) Ui.Text(new Rect(box.xMax - 160, by + 4, 146, 22), "<color=#ffd56a>your turn!</color>", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperRight });
             return result;
         }
     }

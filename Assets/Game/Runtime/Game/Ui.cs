@@ -8,6 +8,27 @@ namespace Rocket
     public static class Ui
     {
         public static float Scale = 1f, W = 1600f, H = 900f;
+        /// <summary>
+        /// Milestone 34: the whole interface hidden (F1, or "Hide interface" in a menu), in the builder, in flight, in rocket
+        /// rooms and expeditions alike: just the rocket and the world. A small reminder shows how to bring it back.
+        /// </summary>
+        public static bool Hidden;
+        public static float HiddenSince;
+        public static void ToggleHidden() { Hidden = !Hidden; HiddenSince = UnityEngine.Time.unscaledTime; }
+
+        /// <summary>While hidden: a faint reminder for a few seconds (and again whenever the mouse moves to the top-left).</summary>
+        public static void DrawHiddenHint()
+        {
+            if (!init) Init();
+            var m = new Vector2(In.MousePosition.x / Scale, (Screen.height - In.MousePosition.y) / Scale);
+            float age = UnityEngine.Time.unscaledTime - HiddenSince;
+            float a = age < 3f ? 1f : (m.x < 260 && m.y < 60 ? 1f : 0f);
+            if (a <= 0) return;
+            var old = GUI.color;
+            GUI.color = new Color(1, 1, 1, 0.75f * a);
+            if (GUI.Button(new Rect(10, 10, 230, 30), $"{In.Name(K.F1)}: show the interface", ButtonSmall)) ToggleHidden();
+            GUI.color = old;
+        }
         public const float MinWidth = 1480f, MinHeight = 900f;
         public static GUIStyle Panel, Label, Bold, Small, SmallLine, Header, Title, Hero, Button, ButtonSmall, ButtonSel, ButtonSmallSel, Row, RowSel, RowSelCenter, Center, BigCenter, Hint, Field;
         public static readonly Color Accent = new Color(0.35f, 0.8f, 1f);
@@ -55,11 +76,42 @@ namespace Rocket
             if (Event.current.type == EventType.Repaint && s != GUIStyle.none && TopLevel) drawnBuilding.Add((r, false));
         }
 
-        /// <summary>GUI.Button, noted for the layout check (buttons that land on other buttons).</summary>
-        public static bool Press(Rect r, string text, GUIStyle s) { Note(r, s); return GUI.Button(r, text, s); }
-        public static bool Press(Rect r, GUIContent c, GUIStyle s) { Note(r, s); return GUI.Button(r, c, s); }
-        public static bool Press(Rect r, string text) { Note(r, Button); return GUI.Button(r, text, Button ?? GUI.skin.button); }
-        public static bool Press(Rect r, GUIContent c) { Note(r, Button); return GUI.Button(r, c, Button ?? GUI.skin.button); }
+        /// <summary>GUI.Button, noted for the layout check (buttons that land on other buttons). Its words have definitions on hover.</summary>
+        public static bool Press(Rect r, string text, GUIStyle s) { Note(r, s); Glossary.Scan(r, text, s); return GUI.Button(r, text, s); }
+        public static bool Press(Rect r, GUIContent c, GUIStyle s) { Note(r, s); Glossary.Scan(r, c?.text, s); return GUI.Button(r, c, s); }
+        public static bool Press(Rect r, string text) { Note(r, Button); Glossary.Scan(r, text, Button); return GUI.Button(r, text, Button ?? GUI.skin.button); }
+        public static bool Press(Rect r, GUIContent c) { Note(r, Button); Glossary.Scan(r, c?.text, Button); return GUI.Button(r, c, Button ?? GUI.skin.button); }
+
+        /// <summary>
+        /// GUI.Label, with definitions (milestone 34): resting the mouse on a game word in the text shows what it means.
+        /// Every label in the game goes through here.
+        /// </summary>
+        public static void Text(Rect r, string t, GUIStyle s) { GUI.Label(r, t, s); Glossary.Scan(r, t, s); }
+        public static void Text(Rect r, string t) { GUI.Label(r, t); Glossary.Scan(r, t, GUI.skin.label); }
+        public static void Text(Rect r, GUIContent c, GUIStyle s) { GUI.Label(r, c, s); Glossary.Scan(r, c?.text, s); }
+        public static void Text(Rect r, GUIContent c) { GUI.Label(r, c); Glossary.Scan(r, c?.text, GUI.skin.label); }
+        public static void Text(Rect r, Texture tex) { GUI.Label(r, tex); }
+        public static void Text(Rect r, Texture tex, GUIStyle s) { GUI.Label(r, tex, s); }
+
+        /// <summary>A big title-screen button: a name and a line under it saying what it's for, with a bar down the left on hover.</summary>
+        public static bool MenuItem(Rect r, string name, string sub, bool primary = false)
+        {
+            if (!init) Init();
+            bool over = r.Contains(Event.current.mousePosition) && GUI.enabled;
+            bool hit = Press(r, GUIContent.none, primary ? MenuPrimary : MenuButton);
+            var was = GUI.color;
+            if (!GUI.enabled) GUI.color = new Color(1, 1, 1, 0.45f);
+            if (over || primary) Line(new Rect(r.x + 1, r.y + 6, 3, r.height - 12), primary ? Color.white : Accent);
+            bool two = !string.IsNullOrEmpty(sub) && r.height >= 44;
+            GUI.Label(new Rect(r.x + 18, r.y + (two ? 5 : 0), r.width - 30, two ? 26 : r.height), name, primary ? MenuNamePrimary : MenuName);
+            if (two) GUI.Label(new Rect(r.x + 18, r.y + 29, r.width - 30, 20), sub, MenuSub);
+            GUI.color = was;
+            return hit;
+        }
+        static GUIStyle MenuButton, MenuPrimary, MenuName, MenuNamePrimary, MenuSub;
+
+        /// <summary>Rebuilds the styles (after the panel look changes in Settings).</summary>
+        public static void Rebuild() { init = false; }
 
         /// <summary>True if the mouse (screen pixels, bottom-left origin) is over any panel drawn last frame.</summary>
         public static bool MouseOverUI(Vector2 px)
@@ -126,6 +178,24 @@ namespace Rocket
             GUI.Box(r, GUIContent.none, Panel);
         }
 
+        /// <summary>Text with a soft dark shadow, so it reads over a bright sky or the ground (the title screen).</summary>
+        public static void Shadowed(Rect r, string t, GUIStyle s)
+        {
+            var sh = new GUIStyle(s) { richText = true };
+            sh.normal.textColor = new Color(0, 0, 0, 0.75f);
+            string plain = System.Text.RegularExpressions.Regex.Replace(t, "</?color[^>]*>", "");
+            GUI.Label(new Rect(r.x + 1, r.y + 1, r.width, r.height), plain, sh);
+            GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), plain, sh);
+            Text(r, t, s);
+        }
+
+        /// <summary>A see-through dark cover behind a window over the game (the layout check knows what's under it is meant to be covered).</summary>
+        public static void Dim(Rect r, float alpha)
+        {
+            if (Event.current.type == EventType.Repaint && TopLevel) { rectsBuilding.Add(r); drawnBuilding.Add((r, true)); }
+            Line(r, new Color(0, 0, 0, alpha));
+        }
+
         public static void Bar(Rect r, float frac, Color fill)
         {
             var old = GUI.color;
@@ -178,7 +248,9 @@ namespace Rocket
             Display = Resources.Load<Font>("Fonts/Exo2-SemiBold");
             DisplayBold = Resources.Load<Font>("Fonts/Exo2-Bold");
             // Rounded panels and buttons, drawn once into small textures and nine-sliced
-            texPanel = Rounded(32, 9, new Color(0.035f, 0.05f, 0.075f, 0.86f), new Color(0.32f, 0.52f, 0.62f, 0.28f));
+            // how see-through panels are (Settings, milestone 34): solid, normal or clear
+            float panelAlpha = Settings.PanelLook == 0 ? 0.95f : Settings.PanelLook == 2 ? 0.66f : 0.86f;
+            texPanel = Rounded(32, 9, new Color(0.035f, 0.05f, 0.075f, panelAlpha), new Color(0.32f, 0.52f, 0.62f, 0.28f));
             texRowSel = Rounded(24, 6, new Color(0.16f, 0.43f, 0.6f, 0.88f), new Color(0.45f, 0.75f, 0.9f, 0.5f));
             texWhite = Tex(Color.white);
             var texBtn = Rounded(24, 6, new Color(0.12f, 0.16f, 0.21f, 0.94f), new Color(0.34f, 0.44f, 0.52f, 0.55f));
@@ -219,6 +291,18 @@ namespace Rocket
             Field = new GUIStyle(GUI.skin.textField) { fontSize = 15, font = BodyMedium, border = new RectOffset(6, 6, 6, 6), padding = new RectOffset(6, 6, 3, 3) };
             Field.normal.background = Field.focused.background = Field.hover.background = texField;
             Field.normal.textColor = Field.focused.textColor = Field.hover.textColor = text;
+            // the title screen's big buttons (milestone 34)
+            var texMenu = Rounded(24, 7, new Color(0.04f, 0.06f, 0.09f, 0.78f), new Color(0.34f, 0.48f, 0.58f, 0.35f));
+            var texMenuHover = Rounded(24, 7, new Color(0.09f, 0.17f, 0.24f, 0.9f), new Color(0.45f, 0.72f, 0.88f, 0.7f));
+            var texMenuMain = Rounded(24, 7, new Color(0.13f, 0.42f, 0.6f, 0.94f), new Color(0.55f, 0.85f, 1f, 0.75f));
+            var texMenuMainHover = Rounded(24, 7, new Color(0.17f, 0.5f, 0.7f, 0.98f), new Color(0.7f, 0.92f, 1f, 0.9f));
+            MenuButton = Btn(15, BodyMedium, texMenu, texMenuHover, texBtnDown, text);
+            MenuPrimary = Btn(15, BodyMedium, texMenuMain, texMenuMainHover, texBtnDown, Color.white);
+            MenuName = new GUIStyle(Label) { fontSize = 19, font = Display, alignment = TextAnchor.MiddleLeft, clipping = TextClipping.Clip };
+            MenuNamePrimary = new GUIStyle(MenuName);
+            MenuNamePrimary.normal.textColor = Color.white;
+            MenuSub = new GUIStyle(Small) { fontSize = 13, wordWrap = false, clipping = TextClipping.Clip };
+            MenuSub.normal.textColor = new Color(0.66f, 0.74f, 0.8f);
         }
 
         /// <summary>Three buttons choosing how the game talks (Easy / Standard / Engineer). Returns the height used.</summary>

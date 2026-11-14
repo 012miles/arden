@@ -215,8 +215,8 @@ namespace Rocket
             var bar = new Rect(W * 0.5f - 480, H - 104, 960, 92);
             Ui.Box(bar);
             string name = r.snapIndex >= 0 ? rec.snaps[r.snapIndex].name : active.name;
-            GUI.Label(new Rect(bar.x + 14, bar.y + 8, 300, 24), $"REPLAY  <size=13>{name}</size>", Ui.Header);
-            GUI.Label(new Rect(bar.x + 320, bar.y + 10, 200, 22), $"T+{Ui.Time(r.ut - rec.StartUt)}", Ui.Label);
+            Ui.Text(new Rect(bar.x + 14, bar.y + 8, 300, 24), $"REPLAY  <size=13>{name}</size>", Ui.Header);
+            Ui.Text(new Rect(bar.x + 320, bar.y + 10, 200, 22), $"T+{Ui.Time(r.ut - rec.StartUt)}", Ui.Label);
             // timeline (by sample, so long warps don't swamp it)
             var tl = new Rect(bar.x + 14, bar.y + 40, bar.width - 28, 10);
             Ui.Line(tl, new Color(0.2f, 0.25f, 0.32f));

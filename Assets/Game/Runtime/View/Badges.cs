@@ -188,10 +188,10 @@ namespace Rocket
             float pop = Mathf.Clamp01((age - 0.15f) / 0.5f);
             float s = pop <= 0 ? 0 : 64f * (1f + 0.25f * Mathf.Sin(pop * Mathf.PI) * (1f - pop) * 2.2f) * Mathf.Min(1f, pop * 3f);
             if (s > 1) GUI.DrawTexture(new Rect(r.x + 16 + 32 - s / 2, r.y + h / 2 - s / 2, s, s), Texture(a, true));
-            GUI.Label(new Rect(r.x + 92, r.y + 10, w - 100, 20), $"<color=#ffd060>{Words.T("ACHIEVEMENT UNLOCKED", "ACHIEVEMENT UNLOCKED", "BADGE EARNED!")}</color>", Ui.Small);
-            GUI.Label(new Rect(r.x + 92, r.y + 28, w - 100, 26), a.name, Ui.Header);
+            Ui.Text(new Rect(r.x + 92, r.y + 10, w - 100, 20), $"<color=#ffd060>{Words.T("ACHIEVEMENT UNLOCKED", "ACHIEVEMENT UNLOCKED", "BADGE EARNED!")}</color>", Ui.Small);
+            Ui.Text(new Rect(r.x + 92, r.y + 28, w - 100, 26), a.name, Ui.Header);
             string reward = c.IsCareer && (a.funds > 0 || a.science > 0) ? $"  <color=#9fe0a0>+{a.funds:N0} funds, +{a.science:0} science</color>" : "";
-            GUI.Label(new Rect(r.x + 92, r.y + 54, w - 100, 36), Words.Say(a.desc) + reward, Ui.Small);
+            Ui.Text(new Rect(r.x + 92, r.y + 54, w - 100, 36), Words.Say(a.desc) + reward, Ui.Small);
             // a shine sweeping across once it has arrived
             float sweep = (age - SlideTime) / 0.9f;
             if (sweep > 0 && sweep < 1)
@@ -206,8 +206,8 @@ namespace Rocket
         public static bool DrawScreen(Rect r, Career c)
         {
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 26), "Badges", Ui.Header);
-            GUI.Label(new Rect(r.x + 110, r.y + 15, 500, 22), $"{c.badges.Count} of {Achievements.All.Length} earned in this save", Ui.Small);
+            Ui.Text(new Rect(r.x + 16, r.y + 12, 300, 26), "Badges", Ui.Header);
+            Ui.Text(new Rect(r.x + 110, r.y + 15, 500, 22), $"{c.badges.Count} of {Achievements.All.Length} earned in this save", Ui.Small);
             bool open = !Ui.Press(new Rect(r.xMax - 40, r.y + 10, 28, 24), "x", Ui.ButtonSmall);
             int cols = 7;
             float cw = (r.width - 24) / cols, ch = Mathf.Min(132, (r.height - 56) / 4);
@@ -218,8 +218,8 @@ namespace Rocket
                 float x = r.x + 12 + (i % cols) * cw, y = r.y + 46 + (i / cols) * ch;
                 float s = Mathf.Min(64, ch - 56);
                 GUI.DrawTexture(new Rect(x + cw / 2 - s / 2, y, s, s), Texture(a, got));
-                GUI.Label(new Rect(x + 2, y + s + 2, cw - 4, 18), got ? $"<b>{a.name}</b>" : a.name, Ui.Hint);
-                GUI.Label(new Rect(x + 2, y + s + 19, cw - 4, 34), Words.Say(a.desc), Ui.Hint);
+                Ui.Text(new Rect(x + 2, y + s + 2, cw - 4, 18), got ? $"<b>{a.name}</b>" : a.name, Ui.Hint);
+                Ui.Text(new Rect(x + 2, y + s + 19, cw - 4, 34), Words.Say(a.desc), Ui.Hint);
             }
             return open;
         }

@@ -14,6 +14,7 @@ namespace Rocket
         Alpha1, Alpha2, Alpha3, Alpha4, Alpha5, Alpha6, Alpha7, Alpha8, Alpha9, Alpha0,
         F2,
         LeftMeta,   // Cmd on a Mac (the Windows key on a PC): Cmd+Z undoes, like Ctrl+Z
+        Enter, LeftAlt,   // milestone 34: get out after landing; free the pointer in first person
     }
 
     /// <summary>Thin input wrapper so game code doesn't care which Unity input backend is active.</summary>
@@ -78,6 +79,7 @@ namespace Rocket
         public static bool RightMouse => Mouse.current != null && Mouse.current.rightButton.isPressed;
         public static bool MiddleMouse => Mouse.current != null && Mouse.current.middleButton.isPressed;
         public static bool LeftDown => Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+        public static bool LeftMouse => Mouse.current != null && Mouse.current.leftButton.isPressed;
         public static bool RightDown => Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame;
         public static bool RightUp => Mouse.current != null && Mouse.current.rightButton.wasReleasedThisFrame;
         public static Vector2 MouseDelta => Mouse.current != null ? Mouse.current.delta.ReadValue() : Vector2.zero;
@@ -89,7 +91,7 @@ namespace Rocket
         static KeyCode Map(K k)
         {
             if (map.TryGetValue(k, out var key)) return key;
-            string s = k == K.LeftCtrl ? "LeftControl" : k.ToString();
+            string s = k == K.LeftCtrl ? "LeftControl" : k == K.Enter ? "Return" : k.ToString();
             key = (KeyCode)Enum.Parse(typeof(KeyCode), s);
             map[k] = key;
             return key;
@@ -106,6 +108,7 @@ namespace Rocket
         public static bool RightMouse => Input.GetMouseButton(1);
         public static bool MiddleMouse => Input.GetMouseButton(2);
         public static bool LeftDown => Input.GetMouseButtonDown(0);
+        public static bool LeftMouse => Input.GetMouseButton(0);
         public static bool RightDown => Input.GetMouseButtonDown(1);
         public static bool RightUp => Input.GetMouseButtonUp(1);
         public static Vector2 MouseDelta => new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * 10f;
@@ -156,13 +159,13 @@ namespace Rocket
         {
             (K.Space, "Stage / jump on EVA"), (K.LeftShift, "Throttle up / jetpack up"), (K.LeftCtrl, "Throttle down / jetpack down"),
             (K.Z, "Full throttle"), (K.X, "Cut throttle"), (K.W, "Pitch down / walk"), (K.S, "Pitch up / walk back"),
-            (K.A, "Yaw left / turn left"), (K.D, "Yaw right / turn right"), (K.Q, "Roll left"), (K.E, "Roll right"),
+            (K.A, "Yaw left / turn left"), (K.D, "Yaw right / turn right"), (K.Q, "Roll left"), (K.E, "Roll right / use (in the cabin)"),
             (K.T, "SAS"), (K.R, "RCS"), (K.H, "RCS forward"), (K.N, "RCS back"), (K.I, "RCS down"), (K.K, "RCS up"),
             (K.J, "RCS left"), (K.L, "RCS right"), (K.G, "Gear / plant a flag"), (K.U, "Lights"), (K.B, "Brakes / climb in"),
             (K.Y, "Deploy"), (K.Backspace, "Abort"), (K.F, "Thermal view"), (K.P, "Autopilot"), (K.M, "Map"), (K.O, "Map layers"),
-            (K.Tab, "Focus next world"), (K.V, "Vessel list"), (K.LeftBracket, "Previous vessel"), (K.RightBracket, "Next vessel"),
+            (K.Tab, "Focus next world (map) / go inside the cabin"), (K.V, "Vessel list"), (K.LeftBracket, "Previous vessel"), (K.RightBracket, "Next vessel"),
             (K.Period, "Warp faster"), (K.Comma, "Warp slower"), (K.Slash, "Stop warp"), (K.F5, "Quicksave"), (K.F9, "Quickload"),
-            (K.F1, "Hide the help bar"), (K.C, "Builder: angle snap"),
+            (K.F1, "Hide / show the interface"), (K.C, "Angle snap (builder) / camera view (EVA)"), (K.Enter, "Get out after landing"), (K.LeftAlt, "Free the pointer (first person)"),
         };
 
         public static string Override(K k)

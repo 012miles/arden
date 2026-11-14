@@ -97,9 +97,9 @@ namespace Rocket
             int sec = Mathf.Max(0, Mathf.CeilToInt(countdown));
             var r = new Rect(W * 0.5f - 160, 112, 320, 96);
             GUI.Box(r, GUIContent.none, Ui.Panel);
-            GUI.Label(new Rect(r.x, r.y + 6, r.width, 56), sec > 0 ? $"T-{sec}" : "LIFTOFF", Ui.BigCenter);
+            Ui.Text(new Rect(r.x, r.y + 6, r.width, 56), sec > 0 ? $"T-{sec}" : "LIFTOFF", Ui.BigCenter);
             string what = countdown > 8f ? "Final checks" : countdown > 5f ? "Swing arms pulling away" : countdown > 3f ? "Water on the pad" : "Engines starting";
-            GUI.Label(new Rect(r.x, r.y + 60, r.width, 22), $"{what}   ·   SPACE: go now", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
+            Ui.Text(new Rect(r.x, r.y + 60, r.width, 22), $"{what}   ·   SPACE: go now", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
         }
 
         // ---------------------------------------------------------------- recovery
@@ -179,15 +179,15 @@ namespace Rocket
             if (guideTarget == null) return;
             var r = new Rect(W * 0.5f - 190, GuideY, 380, 70);
             GUI.Box(r, GUIContent.none, Ui.Panel);
-            GUI.Label(new Rect(r.x + 64, r.y + 8, r.width - 74, 24), $"Land on {guideTarget}: {Ui.Dist(guideDist)}", Ui.Bold);
+            Ui.Text(new Rect(r.x + 64, r.y + 8, r.width - 74, 24), $"Land on {guideTarget}: {Ui.Dist(guideDist)}", Ui.Bold);
             string miss = guideMiss < 60 ? "on target" : $"you'll come down {Ui.Dist(guideMiss)} off";
-            GUI.Label(new Rect(r.x + 64, r.y + 36, r.width - 74, 22), Words.T($"Ballistic landing point: {miss}", $"Where you're heading: {miss}", $"Keep it {(guideMiss < 60 ? "steady" : "closer")}: {miss}"), Ui.Small);
+            Ui.Text(new Rect(r.x + 64, r.y + 36, r.width - 74, 22), Words.T($"Ballistic landing point: {miss}", $"Where you're heading: {miss}", $"Keep it {(guideMiss < 60 ? "steady" : "closer")}: {miss}"), Ui.Small);
             // an arrow toward it, turned to match the camera (whose yaw the flight camera counts toward the west)
             float a = -(guideBearing) - camYaw + 180f;
             var c = new Vector2(r.x + 32, r.y + 35);
             var m = GUI.matrix;
             GUIUtility.RotateAroundPivot(a, c * Ui.Scale);
-            GUI.Label(new Rect(c.x - 20, c.y - 22, 40, 40), "▲", Ui.BigCenter);
+            Ui.Text(new Rect(c.x - 20, c.y - 22, 40, 40), "▲", Ui.BigCenter);
             GUI.matrix = m;
         }
 

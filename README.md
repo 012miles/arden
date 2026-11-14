@@ -9,12 +9,21 @@ Developed by captaincarl24
 - **Build rockets and spaceplanes**: stack parts, set up stages, and see your delta-v, thrust-to-weight and burn time before launch.
 - **Fly real orbits**: thrust, drag and heating, exact orbits on rails, time warp, a map view, a launch autopilot and a flight computer.
 - **Go further**: rendezvous and docking, space stations, landers, rovers, bases, supplies for long voyages, aerobraking and heat shields, and an intercept planner.
-- **Crew**: Ardlings with jobs and experience, spacewalks, flag planting and climbing back in.
+- **Crew**: Ardlings with jobs and experience. Walk in first or third person (C), run, jump, plant flags, climb back in; ENTER climbs out
+  after any landing the crew lived through. TAB goes inside the cabin: walk round and look out of the windows at the real world.
+- **Make it yours**: paint your rocket in 16 colours and stick on decals (built-in ones or your own pictures), save your own presets, and
+  dress your Ardling (suit colour, visor note, hat) for multiplayer.
+- **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole
+  interface with F1.
 - **Career**: science, money, contracts and an upgradeable space centre, plus achievements, a story, replays, photo mode (F2) and weather.
 - **Three difficulty levels**: Easy, Standard and Engineer, with explanations that match.
-- **Multiplayer**: up to 4 players on the same network share one rocket as builder, pilot, engineer and mission control. Host or join from
-  one screen.
-- **Mission Design**: plan a whole mission around a science goal, balancing mass, power, money, data, radio contact and time. Then launch it, get a scored report, compare two designs side by side, see which real NASA missions are like yours, and race other teams on the same mission.
+- **Expedition** (multiplayer, 1-4 players, solo works too): everyone builds one rocket together in the real builder with the real parts,
+  then rides in it as their own Ardling through the real, full-size solar system. Pick a mission (Tal, the lost outpost, Vesk, Ochre,
+  Brume's moons or a free expedition) and a difficulty; the builder shows the six resources (mass, power, budget, data, comms, time) and
+  what stops a launch. Survive on your supplies, scavenge old outposts and wrecks for fuel and food, walk round inside the cabin, climb out
+  on the surface, and finish with a scored report and a leaderboard.
+- **Rocket rooms** (multiplayer): up to 4 players share one rocket as builder, pilot, engineer and mission control. Host or join from one
+  screen.
 
 ## The worlds
 
@@ -42,6 +51,23 @@ Ready-to-play builds go in this repo's **Releases** page.
 How to play is in the game itself: the first game starts an **interactive tutorial** (File > Play the tutorial in the builder plays it
 again), **How to play** on the title screen covers every part, and **Controls** lets you change the keys.
 
+### Expedition
+
+Host an **Expedition** under Multiplayer (it works on your own too). Everyone in the room builds the same rocket; the host or mission
+control picks the mission and difficulty in the plan beside the team. Every player needs a seat. When everyone's ready, LAUNCH: the
+host's game flies it and the jobs (pilot, flight engineer, mission control, science) work as in a rocket room. Goals tick off as you go;
+land within 300 m of an outpost or wreck (⌂ on the map) to **Scavenge** it; **End expedition** scores the run.
+
+| Key | What it does |
+| --- | --- |
+| ENTER | Climb out after landing |
+| W A S D, Ctrl, Space | Walk, run, jump (on foot) |
+| C | First or third person (on foot) |
+| G | Plant a flag |
+| B | Climb back in |
+| TAB | Go inside the cabin (E at the seats flies, E at the hatch goes out) |
+| Alt | Free the mouse pointer in first person |
+
 ### Builder
 
 | Key / mouse | What it does |
@@ -54,7 +80,9 @@ again), **How to play** on the title screen covers every part, and **Controls** 
 | X / R / C | Symmetry count / radial or mirror / angle snap |
 | Right-drag, scroll | Turn the view, zoom |
 
-The search box at the top of the parts list finds parts by name or kind, and **Presets** has 22 ready-made rockets.
+The search box at the top of the parts list finds parts by name or kind. **Presets** has 22 ready-made rockets and slots for your own
+(the first is free; a campaign buys more). **Paint** colours parts and sticks decals on them: put your own PNG or JPG pictures in the
+Decals folder ("Add your own pictures...") to use them.
 
 ### Main keys (flight)
 
@@ -73,6 +101,8 @@ The search box at the top of the parts list finds parts by name or kind, and **P
 | , . / | Time warp |
 | F5 / F9 | Quicksave / quickload |
 | F1 / F2 | Hide the interface / photo mode |
+| TAB | Go inside the cabin |
+| ENTER | Climb out after landing |
 | Esc | Menu |
 
 ## Opening the project in Unity

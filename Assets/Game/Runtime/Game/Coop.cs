@@ -33,7 +33,7 @@ namespace Rocket
     /// plans the route (maneuver nodes, targets, time warp) and watches the goal; the builder runs the science and the
     /// radio. Each player's game only lets them do their own job, and passes it to the host.
     /// </summary>
-    public class Coop
+    public partial class Coop
     {
         public const int Builder = 0, Pilot = 1, Engineer = 2, Control = 3;
         public static readonly string[] RoleNames = { "Builder", "Pilot", "Flight engineer", "Mission control" };
@@ -66,7 +66,11 @@ namespace Rocket
         public static Coop Current;
         public readonly NetRoom room;
         readonly GameRoot root;
-        public static bool Active => Current != null && Current.room != null && Current.room.Connected && Current.room.State.activity == 1;
+        public static bool Active => Current != null && Current.room != null && Current.room.Connected && Current.room.State.Rocket;
+        /// <summary>Milestone 34: an expedition (everyone builds, the players are the crew, a mission with a budget and a report).</summary>
+        public bool Expedition => room.State.activity == 2;
+        /// <summary>Whether this player builds: the builder in a rocket room, everyone in an expedition.</summary>
+        public bool CanBuild => Expedition || Has(Builder);
         public bool IsHost => room.IsHost;
         /// <summary>A campaign room: the host's saved space program (money, research, contracts), shared with everyone.</summary>
         public bool Campaign => room.State.campaign;
@@ -78,11 +82,15 @@ namespace Rocket
             this.room = room;
             room.OnHostCommand = (who, m) => commands.Enqueue((who, m));
             room.OnClientMessage = OnStream;
+            room.OnPose = (who, a, on) => poses[who] = (a, on, Time.unscaledTime);
         }
+
+        /// <summary>Milestone 34: where each player is in a cabin ("part|x|z|yaw"), whether they're inside, and when it was heard.</summary>
+        public readonly Dictionary<int, (string a, bool on, float t)> poses = new Dictionary<int, (string, bool, float)>();
 
         public bool Has(int role) => room.Me != null && room.Me.Has((MRole)role);
         public static int RoleFor(CAct a) => a == CAct.Build || a == CAct.Science ? Builder : a == CAct.Steer ? Pilot : a == CAct.Navigate ? Control : Engineer;
-        public bool CanDo(CAct a) => Has(RoleFor(a));
+        public bool CanDo(CAct a) => Has(RoleFor(a)) || (a == CAct.Build && Expedition);
         public bool SenderCan(int who, CAct a) { var p = room.State.Player(who); return p != null && p.Has((MRole)RoleFor(a)); }
         public string Holder(int role) => string.Join(", ", room.State.players.Where(p => p.Has((MRole)role)).Select(p => p.name).DefaultIfEmpty("nobody"));
         public string MyJobs(bool flying) => string.Join("; ", Enumerable.Range(0, 4).Where(Has).Select(r => $"{RoleNames[r]}: {(flying ? FlyJobs[r] : BuildJobs[r])}"));
@@ -137,6 +145,7 @@ namespace Rocket
                 case "snap": snapJson = m.json; snapId = m.n; break;
                 case "say": if (!string.IsNullOrEmpty(m.a)) { sayings.Enqueue(m.a); while (sayings.Count > 6) sayings.Dequeue(); } break;
                 case "boom": boom = true; break;
+                case "ipr": if (m.n != room.MyId) poses[m.n] = (m.a, m.on, Time.unscaledTime); break;
                 case "career": careerJson = m.json; careerNew = true; break;
             }
         }
@@ -229,8 +238,12 @@ namespace Rocket
                 }
                 return;
             }
-            if (room.State.activity != 1) return;
+            if (!room.State.Rocket) return;
             ShareCareer();
+            // milestone 34: everyone sees the host's weather; an expedition report arriving goes on this computer's board too
+            if (IsHost) { if (room.State.weatherSeed != Weather.GameSeed) { room.State.weatherSeed = Weather.GameSeed; room.Touch(); } }
+            else if (room.State.weatherSeed != 0) Weather.GameSeed = room.State.weatherSeed;
+            if (Expedition && room.State.exRuns != seenReports) { if (seenReports >= 0 && !string.IsNullOrEmpty(room.State.exReport)) { try { var rep = JsonUtility.FromJson<ExReport>(room.State.exReport); Rocket.Expedition.AddToBoard(Application.persistentDataPath, rep); showReport = true; } catch { } } seenReports = room.State.exRuns; }
             var hangar = root.hangar;
             // the host: a launch asked for while building
             if (IsHost && !root.inFlight)
@@ -240,25 +253,53 @@ namespace Rocket
                     var (who, m) = commands.Dequeue();
                     if (m.t != "launch" || Phase != 0) continue;
                     VesselDesign d = null;
-                    try { d = JsonUtility.FromJson<VesselDesign>(room.State.designJson); d.Upgrade(); } catch { }
+                    try { d = JsonUtility.FromJson<VesselDesign>(room.State.designJson); d.Upgrade(); Decals.Learn(d); } catch { }
                     if (d == null || d.nodes.Count == 0) continue;
                     var st = room.State;
                     string problem = Campaign ? root.universe.career.LaunchProblem(d, st.runway) : null;
+                    if (problem == null && Expedition) { var dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(st.exScenario), st.exDifficulty, st.players.Count); if (!dash.CanLaunch) problem = dash.blockers[0]; }
                     if (problem != null) { room.Chat($"Can't launch yet: {problem}"); continue; }
                     st.coopPhase = 1; st.flights++; st.goalDone = false; st.summary = null;
                     maxAltitude = 0;
+                    if (Expedition)
+                    {
+                        // a fresh expedition: the budget, the crew, nothing done yet
+                        var sc = Rocket.Expedition.Scenario(st.exScenario);
+                        st.ex = new ExProgress { budget = Rocket.Expedition.Budget(sc, st.exDifficulty), cost = Prices.Of(d), crew = st.players.Count,
+                            dvHad = Staging.AnalyzeDesign(d, 9.81).Sum(r => r.dvVac) };
+                        root.universe.career.scavenged.Clear();
+                    }
                     room.Touch();
                     root.Launch(d, st.runway, Mathf.Clamp(st.pad, 0, LaunchSite.Pads.Length - 1));
-                    root.flight.Notice($"Flying together! {MyJobs(true)}");
+                    if (Expedition) root.flight.SeatPlayers(st.players.Select(q => q.name).ToList());
+                    root.flight.Notice(Expedition ? $"Off on the expedition! Everyone's aboard. {MyJobs(true)}" : $"Flying together! {MyJobs(true)}");
                     break;
                 }
             }
             bool building = !root.inFlight && !root.inMenu && !root.inMission;
             if (building)
             {
-                bool builder = Has(Builder);
+                bool builder = CanBuild;
                 if (hangar.spectate == builder) hangar.spectate = !builder;
-                if (builder)
+                if (builder && Expedition)
+                {
+                    // milestone 34: everyone builds the same rocket. A change made here goes to the room; someone else's
+                    // change comes in when there's nothing unsent here and nothing in this player's hand.
+                    designTimer -= Time.unscaledDeltaTime;
+                    if (designTimer <= 0 && hangar.design != null)
+                    {
+                        designTimer = 0.25f;
+                        string j = JsonUtility.ToJson(hangar.design);
+                        string roomJ = room.State.designJson;
+                        if (j != lastAppliedDesign && j != roomJ) { lastSentDesign = j; lastAppliedDesign = j; room.Send(new NetMsg { t = "design", json = j }); }
+                        else if (!string.IsNullOrEmpty(roomJ) && roomJ != lastAppliedDesign && !hangar.Holding)
+                        {
+                            lastAppliedDesign = roomJ;
+                            try { var d = JsonUtility.FromJson<VesselDesign>(roomJ); d.Upgrade(); hangar.SetDesignFromNet(d); } catch { }
+                        }
+                    }
+                }
+                else if (builder)
                 {
                     designTimer -= Time.unscaledDeltaTime;
                     if (designTimer <= 0 && hangar.design != null)
@@ -290,7 +331,7 @@ namespace Rocket
         public void UseRoomDesign()
         {
             if (string.IsNullOrEmpty(room.State.designJson)) return;
-            try { var d = JsonUtility.FromJson<VesselDesign>(room.State.designJson); d.Upgrade(); root.currentDesign = d; } catch { }
+            try { var d = JsonUtility.FromJson<VesselDesign>(room.State.designJson); d.Upgrade(); Decals.Learn(d); root.currentDesign = d; } catch { }
         }
 
         // ---------------------------------------------------------------- building: launching
@@ -298,13 +339,24 @@ namespace Rocket
         /// <summary>The builder's LAUNCH: the host launches; a player builder asks the host to.</summary>
         public void Launch(VesselDesign d, bool runway, int pad)
         {
-            if (!Has(Builder)) return;
+            if (!CanBuild) return;
             room.Send(new NetMsg { t = "design", json = JsonUtility.ToJson(d) });
             room.Send(new NetMsg { t = "launch", on = runway, n = pad });
         }
 
-        public bool AllReady => room.State.players.Where(p => !p.Has((MRole)Builder)).All(p => p.ready);
-        public string NotReady => string.Join(", ", room.State.players.Where(p => !p.Has((MRole)Builder) && !p.ready).Select(p => p.name));
+        public bool AllReady => room.State.players.Where(p => Expedition ? p.id != room.MyId : !p.Has((MRole)Builder)).All(p => p.ready);
+        public string NotReady => string.Join(", ", room.State.players.Where(p => (Expedition ? p.id != room.MyId : !p.Has((MRole)Builder)) && !p.ready).Select(p => p.name));
+
+        /// <summary>Why the team's rocket can't go on this expedition yet (over budget, not enough seats), or null.</summary>
+        public string LaunchProblem(VesselDesign d)
+        {
+            if (!Expedition) return null;
+            var dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(room.State.exScenario), room.State.exDifficulty, room.State.players.Count);
+            return dash.CanLaunch ? null : dash.blockers[0];
+        }
+
+        public bool showReport;
+        int seenReports = -1;
 
         // ---------------------------------------------------------------- the panels
 
@@ -312,6 +364,27 @@ namespace Rocket
         string noteText = "", chatText = "";
         public int notePart = -1;
         Vector2 noteScroll;
+
+        /// <summary>
+        /// Milestone 34: the team, comments and chat panels folded away into one slim bar (they used to cover half the
+        /// screen). Kept between rooms.
+        /// </summary>
+        public static bool Collapsed
+        {
+            get { try { return PlayerPrefs.GetInt("coopCollapsed", 0) == 1; } catch { return false; } }
+            set { try { PlayerPrefs.SetInt("coopCollapsed", value ? 1 : 0); PlayerPrefs.Save(); } catch { } }
+        }
+
+        /// <summary>The folded-away bar: the room, how many are here, the latest chat line, and a button to open it all again.</summary>
+        public void DrawCollapsedBar(Rect r)
+        {
+            Ui.Box(r);
+            var chat = room.State.chat;
+            string last = chat.Count > 0 ? chat[chat.Count - 1] : "no messages yet";
+            var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
+            Ui.Text(new Rect(r.x + 10, r.y + (r.height - 20) / 2, r.width - 150, 20), $"<b>{room.State.room}</b> · {room.State.players.Count} here · <color=#9aa4ad>{last}</color>", clip);
+            if (Ui.Press(new Rect(r.xMax - 132, r.y + (r.height - 26) / 2, 124, 26), "Team & chat ▸", Ui.ButtonSmall)) Collapsed = false;
+        }
 
         /// <summary>How tall the team panel is (it grows with the players, and with the job buttons when they're open).</summary>
         public float TeamHeight(bool flying) => 30 + room.State.players.Count * 20 + 48 + (!flying && room.State.players.Count > 1 ? (showJobs ? 30 : 26) : 0);
@@ -324,20 +397,25 @@ namespace Rocket
         public void DrawTeam(Rect r, bool flying)
         {
             Ui.Box(r); Ui.Box(r);
-            GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, 22), $"<b>{room.State.room}</b>  ·  code <color=#ffd56a>{room.State.code}</color>", Ui.Small);
+            Ui.Text(new Rect(r.x + 10, r.y + 6, r.width - 50, 22), $"<b>{room.State.room}</b>  ·  code <color=#ffd56a>{room.State.code}</color>", Ui.Small);
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 5, 26, 22), "–", Ui.ButtonSmall)) Collapsed = true;   // fold the panels away
             float y = r.y + 28;
             var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
             foreach (var p in room.State.players)
             {
                 string jobs = string.Join(", ", Enumerable.Range(0, 4).Where(k => p.Has((MRole)k)).Select(k => RoleNames[k]));
-                GUI.Label(new Rect(r.x + 10, y, r.width - 20, 20), $"{(p.ready && !flying ? "<color=#7dff8a>✓</color> " : "")}<b>{p.name}</b>{(p.id == room.MyId ? " (you)" : "")}: {jobs}", clip);
+                // milestone 34: each player's Ardling note and suit colour
+                var lk = MyArdling.LookOf(p.look ?? p.name);
+                GUI.DrawTexture(new Rect(r.x + 10, y + 1, 18, 18), Ardlings.FaceTexture(lk.face, lk.paper));
+                Ui.Line(new Rect(r.x + 10, y + 18, 18, 2), lk.suit);
+                Ui.Text(new Rect(r.x + 32, y, r.width - 42, 20), $"{(p.ready && !flying ? "<color=#7dff8a>✓</color> " : "")}<b>{p.name}</b>{(p.id == room.MyId ? " (you)" : "")}: {jobs}", clip);
                 for (int k = 0; k < 4; k++) if (p.Has((MRole)k)) Ui.Line(new Rect(r.x + 4, y + 4, 3, 12), RoleColor[k]);
                 y += 20;
             }
             // one job: what it involves; several (a small team): just their names, so it fits
             int jobCount = Enumerable.Range(0, 4).Count(Has);
             string jobText = jobCount <= 1 ? $"<color=#9fc6e8>Your job:</color> {MyJobs(flying)}" : $"<color=#9fc6e8>Your jobs:</color> {string.Join(", ", Enumerable.Range(0, 4).Where(Has).Select(k => RoleNames[k]))}";
-            GUI.Label(new Rect(r.x + 10, y + 2, r.width - 20, 44), jobText, new GUIStyle(Ui.Small) { wordWrap = true });
+            Ui.Text(new Rect(r.x + 10, y + 2, r.width - 20, 44), jobText, new GUIStyle(Ui.Small) { wordWrap = true });
             if (!flying && room.State.players.Count > 1)
             {
                 if (!showJobs)
@@ -370,7 +448,7 @@ namespace Rocket
         {
             Ui.Box(r); Ui.Box(r);
             bool builder = Has(Builder);
-            GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, 24), builder ? "The team's comments" : "Comment on the rocket", Ui.Header);
+            Ui.Text(new Rect(r.x + 10, r.y + 6, r.width - 20, 24), builder ? "The team's comments" : "Comment on the rocket", Ui.Header);
             float y = r.y + 34;
             // the goal and where from (mission control picks)
             var goal = Goal(room.State.goal);
@@ -378,14 +456,14 @@ namespace Rocket
             string from = room.State.runway ? "Runway" : LaunchSite.Pads[Mathf.Clamp(room.State.pad, 0, LaunchSite.Pads.Length - 1)].name;
             if (control)
             {
-                GUI.Label(new Rect(r.x + 10, y + 4, 60, 20), "Goal", Ui.Small);
+                Ui.Text(new Rect(r.x + 10, y + 4, 60, 20), "Goal", Ui.Small);
                 if (Ui.Press(new Rect(r.x + 60, y, r.width - 70, 26), goal.name + "  ▸", Ui.ButtonSmall))
                 {
                     int gi = Array.FindIndex(Goals, g => g.id == goal.id);
                     room.Send(new NetMsg { t = "goal", b = Goals[(gi + 1) % Goals.Length].id });
                 }
                 y += 30;
-                GUI.Label(new Rect(r.x + 10, y + 4, 60, 20), "From", Ui.Small);
+                Ui.Text(new Rect(r.x + 10, y + 4, 60, 20), "From", Ui.Small);
                 if (Ui.Press(new Rect(r.x + 60, y, r.width - 70, 26), from + "  ▸", Ui.ButtonSmall))
                 {
                     int next = room.State.runway ? 0 : room.State.pad + 1;
@@ -395,7 +473,7 @@ namespace Rocket
             }
             else
             {
-                GUI.Label(new Rect(r.x + 10, y, r.width - 20, 40), $"Goal: <b>{goal.name}</b>   ·   from the <b>{from.ToLowerInvariant()}</b>\n<color=#8a929c>(mission control picks: {Holder(Control)})</color>", new GUIStyle(Ui.Small) { wordWrap = true });
+                Ui.Text(new Rect(r.x + 10, y, r.width - 20, 40), $"Goal: <b>{goal.name}</b>   ·   from the <b>{from.ToLowerInvariant()}</b>\n<color=#8a929c>(mission control picks: {Holder(Control)})</color>", new GUIStyle(Ui.Small) { wordWrap = true });
                 y += 44;
             }
             // the comments
@@ -407,12 +485,12 @@ namespace Rocket
             foreach (var n in notes) total += st.CalcHeight(new GUIContent(NoteLine(n, d)), listRect.width - 90) + 8;
             noteScroll = GUI.BeginScrollView(listRect, noteScroll, new Rect(0, 0, listRect.width - 18, Mathf.Max(total, 10)));
             float ny = 0;
-            if (notes.Count == 0) GUI.Label(new Rect(4, 0, listRect.width - 24, 40), builder ? "No comments yet: the others can click a part of your rocket to comment on it." : "No comments yet. Click a part of the rocket, then write what you think.", st);
+            if (notes.Count == 0) Ui.Text(new Rect(4, 0, listRect.width - 24, 40), builder ? "No comments yet: the others can click a part of your rocket to comment on it." : "No comments yet. Click a part of the rocket, then write what you think.", st);
             foreach (var n in notes.AsEnumerable().Reverse())
             {
                 string line = NoteLine(n, d);
                 float h = st.CalcHeight(new GUIContent(line), listRect.width - 90);
-                GUI.Label(new Rect(4, ny, listRect.width - 94, h), line, st);
+                Ui.Text(new Rect(4, ny, listRect.width - 94, h), line, st);
                 if (builder && n.state == 0)
                 {
                     if (Ui.Press(new Rect(listRect.width - 86, ny, 34, 22), "✓", Ui.ButtonSmall)) room.Send(new NetMsg { t = "noteState", n = n.id, on = true });
@@ -425,7 +503,7 @@ namespace Rocket
             {
                 float by = r.yMax - bottomH + 4;
                 string onWhat = notePart >= 0 && d != null && notePart < d.nodes.Count ? $"On the <b>{PartCatalog.Get(d.nodes[notePart].id)?.name ?? "part"}</b>:" : "On the whole rocket (click a part first to pick one):";
-                GUI.Label(new Rect(r.x + 10, by, r.width - 20, 20), onWhat, new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip });
+                Ui.Text(new Rect(r.x + 10, by, r.width - 20, 20), onWhat, new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip });
                 noteText = GUI.TextField(new Rect(r.x + 10, by + 20, r.width - 90, 26), noteText ?? "", 140, Ui.Field);
                 bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter) && !string.IsNullOrWhiteSpace(noteText);
                 if ((Ui.Press(new Rect(r.xMax - 74, by + 20, 64, 26), "Send", Ui.ButtonSmall) || enter) && !string.IsNullOrWhiteSpace(noteText))
@@ -445,7 +523,7 @@ namespace Rocket
                 var me = room.Me;
                 if (me != null && Ui.Press(new Rect(r.x + 10, r.yMax - 36, r.width - 20, 30), me.ready ? "Ready to launch ✓  (click to undo)" : "I'm ready to launch", me.ready ? Ui.ButtonSel : Ui.Button)) room.Ready(!me.ready);
             }
-            else GUI.Label(new Rect(r.x + 10, r.yMax - 40, r.width - 20, 36), room.State.players.Count <= 1 ? "<color=#7dff8a>Playing alone: LAUNCH when you're ready.</color>" : AllReady ? "<color=#7dff8a>Everyone's ready: LAUNCH when you are.</color>" : $"Waiting for: {NotReady}", new GUIStyle(Ui.Small) { wordWrap = true });
+            else Ui.Text(new Rect(r.x + 10, r.yMax - 40, r.width - 20, 36), room.State.players.Count <= 1 ? "<color=#7dff8a>Playing alone: LAUNCH when you're ready.</color>" : AllReady ? "<color=#7dff8a>Everyone's ready: LAUNCH when you are.</color>" : $"Waiting for: {NotReady}", new GUIStyle(Ui.Small) { wordWrap = true });
         }
         string NoteLine(CoopNote n, VesselDesign d)
         {
@@ -462,7 +540,7 @@ namespace Rocket
             var chat = room.State.chat;
             float y = r.y + 4;
             var clip = new GUIStyle(Ui.Small) { clipping = TextClipping.Clip, wordWrap = false };
-            for (int i = Math.Max(0, chat.Count - 3); i < chat.Count; i++) { GUI.Label(new Rect(r.x + 8, y, r.width - 16, 18), chat[i], clip); y += 18; }
+            for (int i = Math.Max(0, chat.Count - 3); i < chat.Count; i++) { Ui.Text(new Rect(r.x + 8, y, r.width - 16, 18), chat[i], clip); y += 18; }
             chatText = GUI.TextField(new Rect(r.x + 8, r.yMax - 30, r.width - 80, 24), chatText ?? "", 120, Ui.Field);
             bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter) && !string.IsNullOrWhiteSpace(chatText);
             if ((Ui.Press(new Rect(r.xMax - 66, r.yMax - 30, 58, 24), "Send", Ui.ButtonSmall) || enter) && !string.IsNullOrWhiteSpace(chatText))
