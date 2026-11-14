@@ -130,7 +130,7 @@ namespace Rocket
                 suit = rng.Next(Ardlings.SuitCount); paper = rng.Next(Ardlings.PaperCount); face = rng.Next(Ardlings.Faces); hat = rng.Next(Ardlings.Hats);
             }
             bool cancel = Ui.Press(new Rect(r.xMax - 280, r.yMax - 52, 120, 36), "Cancel", Ui.Button) || In.EscapeDown;
-            if (Ui.Press(new Rect(r.xMax - 150, r.yMax - 52, 132, 36), "Done", Ui.ButtonSel))
+            if (Ui.Press(new Rect(r.xMax - 150, r.yMax - 52, 132, 36), "Done", Ui.ButtonGo))
             {
                 Code = Ardlings.Code(suit, paper, face, hat);
                 Register(PlayerName, Code);
@@ -170,7 +170,7 @@ namespace Rocket
                 cam.targetTexture = rt;
                 var data = cam.GetUniversalAdditionalCameraData();
                 data.renderType = CameraRenderType.Base;
-                data.renderPostProcessing = false;
+                data.renderPostProcessing = false;   // (no exposure: the colours as they are)
             }
             rig.SetActive(true);
             string key = $"{look.suit}|{look.paper}|{look.face}|{look.hat}";
@@ -203,10 +203,16 @@ namespace Rocket
                 var r = g.AddComponent<MeshRenderer>();
                 r.sharedMaterial = Mats.Lit;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                if (layer == PreviewLayer) { var pb = new MaterialPropertyBlock(); pb.SetFloat("_Ambient", 0.6f); r.SetPropertyBlock(pb); }   // lit evenly, whatever the sun's doing
             }
             Piece(body.transform, Ardlings.Body(look, false));
             var note = Ardlings.AddNote(body.transform, look);
             note.layer = layer;
+            // (milestone 35: out of the game's light the note's paper would glare white: dimmed to match)
+            var mpb = new MaterialPropertyBlock();
+            mpb.SetFloat("_Bright", layer == PreviewLayer ? 0.95f : 0.75f);
+            mpb.SetFloat("_Flat", layer == PreviewLayer ? 1f : 0.7f);
+            note.GetComponent<Renderer>().SetPropertyBlock(mpb);
             Mesh[] lm = { Ardlings.Arm(look, -1), Ardlings.Arm(look, 1), Ardlings.Leg(look, -1), Ardlings.Leg(look, 1) };
             Vector3[] piv = { Ardlings.ShoulderL, Ardlings.ShoulderR, Ardlings.HipL, Ardlings.HipR };
             for (int k = 0; k < 4; k++)

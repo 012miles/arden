@@ -162,13 +162,15 @@ namespace Rocket
             if (e.type == EventType.MouseDown && e.button == 0 && Ui.MouseOverUI(In.MousePosition)) GameAudio.I?.Click();
             if (Ui.Hidden && !inMenu && !inMission && !(inFlight && flight != null && flight.photoMode)) { Ui.DrawHiddenHint(); return; }
             // while the Definitions window is open, the screen behind it is drawn but takes no clicks or keys
-            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open) && e.type != EventType.Repaint && e.type != EventType.Layout;
+            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open || Lessons.PickerOpen) && e.type != EventType.Repaint && e.type != EventType.Layout;
             if (blocked) GUI.enabled = false;
             DrawScreen();
             if (blocked) GUI.enabled = true;
             // milestone 34: the Definitions window (from the builder or pause menu), then a word's definition under the mouse
             if (!inMenu) Glossary.DrawWindow(); else Glossary.Open = false;
             MyArdling.DrawWindow();   // milestone 34: the My Ardling menu, over any screen
+            if (inFlight && !Ui.Hidden) Lessons.Draw(flight);   // milestone 35: a lesson's box
+            if (!inMenu && !inFlight) Lessons.DrawPicker(); else Lessons.PickerOpen = false;
             Glossary.DrawTip();
         }
 
@@ -331,7 +333,10 @@ namespace Rocket
             menu.Leave();
             nearCam.enabled = true;
             currentDesign = design;
-            EnterHangar();
+            // milestone 35 (captaincarl24: "once you load into a single player game you can select which buildings, like a
+            // Kerbal-type main menu"): a game opens at the space centre, seen from the air; click a building to go in
+            if (Universe.IsAutotest) EnterHangar();
+            else ShowCentre();
         }
 
         public void EnterHangar()
@@ -360,6 +365,18 @@ namespace Rocket
             inFlight = true;
             SetWorldVisible(true);
             flight.Begin(currentDesign, runway, pad);
+        }
+
+        /// <summary>Milestone 35: a lesson's rocket to the pad (free, and not kept as the last design built).</summary>
+        public void LaunchLesson(VesselDesign design)
+        {
+            revertSnapshot = null;
+            hangar.Exit();
+            menu.Leave();
+            inMenu = false;
+            inFlight = true;
+            SetWorldVisible(true);
+            flight.Begin(design.Clone());
         }
 
         /// <summary>Takes control of a vessel that's already out there (from the vessel list).</summary>

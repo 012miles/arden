@@ -83,7 +83,7 @@ namespace Rocket.EditorTools
             var arm = Ardlings.Arm(look, 1).bounds;
             Check(arm.center.magnitude < 0.2f, $"arm isn't built round its shoulder (centre {arm.center})");
             var tex = Ardlings.FaceTexture(look.face, look.paper);
-            Check(tex != null && tex.width == 128, "no face texture");
+            Check(tex != null && tex.width >= 128, "no face texture");   // (milestone 35: 256 px now)
             // The marker face has dark ink on it somewhere in the middle
             var px = tex.GetPixels();
             int ink = px.Count(c => c.grayscale < 0.2f);

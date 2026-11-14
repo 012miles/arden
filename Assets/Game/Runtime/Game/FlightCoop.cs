@@ -255,7 +255,7 @@ namespace Rocket
                     active.destroyed = true;
                     active.destroyReason = "The rocket was destroyed.";
                     SpawnBoom(active.body, active.pos, Mathf.Clamp(active.Length * 2.5f, 8f, 40f));
-                    if (views.TryGetValue(active, out var dv)) dv.SetVisible(false);
+                    Shatter(active, Mathf.Clamp((float)active.SurfaceRelVelocity.magnitude / 40f, 0.6f, 2f));   // milestone 35
                 }
                 // the route: the host's maneuver node, unless mission control (this player) is changing it right now
                 if (Time.unscaledTime > nodeEditUntil)
@@ -337,7 +337,7 @@ namespace Rocket
                 var er = new Rect(tr.x, tr.yMax + 4, tw, ExpeditionPanelHeight);
                 if (er.yMax + 30 > H - 330) er.y = tr.y - er.height - 34;
                 DrawExpeditionPanel(er);
-                if ((c.Has(Coop.Control) || c.IsHost) && Ui.Press(new Rect(er.xMax - 150, er.yMax + 4, 150, 24), "End expedition", Ui.ButtonSmall)) CoopEndFlight();
+                if ((c.Has(Coop.Control) || c.IsHost) && Ui.Press(new Rect(er.xMax - 150, er.yMax + 4, 150, 24), "End expedition", Ui.ButtonStopSmall)) CoopEndFlight();
                 c.DrawChat(new Rect(10, H - 330, 420, 88));
                 return;
             }
@@ -346,7 +346,7 @@ namespace Rocket
             Ui.Text(new Rect(gr.x + 10, gr.y + 4, tw - 20, 20), $"Goal: <b>{Coop.Goal(st.goal).name}</b> {(st.goalDone ? "<color=#7dff8a>✓ done!</color>" : "")}", Ui.Small);
             if (c.Has(Coop.Control) || c.IsHost)
             {
-                if (Ui.Press(new Rect(gr.x + 10, gr.y + 24, 150, 22), "End flight for all", Ui.ButtonSmall)) CoopEndFlight();
+                if (Ui.Press(new Rect(gr.x + 10, gr.y + 24, 150, 22), "End flight for all", Ui.ButtonStopSmall)) CoopEndFlight();
                 if (c.Has(Coop.Control) && Ui.Press(new Rect(gr.x + 168, gr.y + 24, 150, 22), node == null ? "Add maneuver" : "Delete maneuver", Ui.ButtonSmall))
                 {
                     if (node == null) AddNodeAtNextApsis(); else DeleteNode();

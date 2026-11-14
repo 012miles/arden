@@ -44,7 +44,7 @@ namespace Rocket
             foreach (var p in parts)
             {
                 // Heat leaves its mark: soot and scorching build up above ~650 K (faster on ablative shields)
-                double hot = (p.temp - 650) / Math.Max(1, p.def.maxTemp - 650);
+                double hot = (p.temp - 650) / Math.Max(1, p.TempLimit - 650);
                 if (hot > 0) p.charred = Mathf.Min(1f, p.charred + (float)(dt * hot * (p.def.kind == PartKind.HeatShield ? 0.25 : 0.09)));
             }
             // Too much air pressure on an exposed part, for more than half a second, crushes it
@@ -52,7 +52,7 @@ namespace Rocket
                 for (int i = parts.Count - 1; i >= 0 && !destroyed; i--)
                 {
                     var p = parts[i];
-                    float limit = PressureLimit(p.def);
+                    float limit = PressureLimit(p.def) * p.Toughness;
                     if (p.enclosed || qk <= limit) { p.overPressure = 0; continue; }
                     p.overPressure += (float)dt;
                     if (p.overPressure < 0.5f) continue;

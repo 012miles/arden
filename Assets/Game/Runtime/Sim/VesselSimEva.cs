@@ -21,6 +21,12 @@ namespace Rocket
         public bool evaRun;
 
         public bool IsEva => parts.Count == 1 && parts[0].def.kind == PartKind.Eva;
+        /// <summary>Milestone 35 (captaincarl24: "why do Ardlings have infinite flags, give them a limit of like 3"): flags per trip outside.</summary>
+        public const int FlagsCarried = 3;
+        public int FlagsLeft => IsEva ? Math.Max(0, FlagsCarried - parts[0].flagsUsed) : 0;
+        /// <summary>Milestone 35: down on the sea (a splashdown bobs; an astronaut swims).</summary>
+        public bool InWater => landed && Terrain.IsWater(body, landedFixedPos);
+        public const double EvaSwimSpeed = 0.9;
         public bool IsFlag => parts.Exists(p => p.def.kind == PartKind.Flag);
         public bool evaJump;
         public string EvaName => IsEva && parts[0].crew.Count > 0 ? parts[0].crew[0] : null;
@@ -38,6 +44,7 @@ namespace Rocket
                 Vector3d fWorld = Vector3d.Rotate(rot, Vector3d.FromFloat(fLocal));
                 if (Vector3d.Dot(fWorld, pos.normalized) / mass > body.SurfaceGravity * 1.02) { landed = false; hasLaunched = true; rails = null; return; }
             }
+            if (evaJump && Terrain.IsWater(body, landedFixedPos)) evaJump = false;   // milestone 35: no jumping out of the sea
             if (evaJump)
             {
                 evaJump = false;
@@ -59,7 +66,8 @@ namespace Rocket
                 Vector3d fwd = Vector3d.FromFloat(q * Vector3.forward), right = Vector3d.FromFloat(q * Vector3.right);
                 fwd = (fwd - up * Vector3d.Dot(fwd, up)).normalized;
                 right = (right - up * Vector3d.Dot(right, up)).normalized;
-                double speed = EvaWalkSpeed * (evaRun ? EvaRunFactor : 1.0);
+                bool swim = Terrain.IsWater(body, up);
+                double speed = swim ? EvaSwimSpeed * (evaRun ? 1.6 : 1.0) : EvaWalkSpeed * (evaRun ? EvaRunFactor : 1.0);   // (milestone 35: slower swimming)
                 double stand = landedFixedPos.magnitude - (body.radius + LaunchSite.SurfaceHeight(body, up));
                 Vector3d nu = (landedFixedPos + (fwd * move.y + right * move.x) * (speed * dt)).normalized;
                 landedFixedPos = nu * (body.radius + LaunchSite.SurfaceHeight(body, nu) + stand);
@@ -196,8 +204,10 @@ namespace Rocket
         /// <summary>A landed astronaut plants a flag a step ahead. Returns the flag (a new vessel), or null with the reason.</summary>
         public VesselSim PlantFlag(double ut, out string why)
         {
-            why = !IsEva ? "Only an astronaut on EVA can plant a flag." : !landed ? "Stand on the ground to plant a flag." : null;
+            why = !IsEva ? "Only an astronaut on EVA can plant a flag." : !landed ? "Stand on the ground to plant a flag."
+                : FlagsLeft <= 0 ? $"No flags left: an Ardling carries {FlagsCarried} each time they go out. Climb back in for more." : null;
             if (why != null) return null;
+            parts[0].flagsUsed++;
             Vector3d up = landedFixedPos.normalized;
             Vector3d fwd = Vector3d.FromFloat(landedFixedRot * Vector3.forward);
             fwd = (fwd - up * Vector3d.Dot(fwd, up)).normalized;

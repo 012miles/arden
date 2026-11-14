@@ -1947,7 +1947,7 @@ namespace Rocket
             float bx = W - 10 - 150;
             LaunchRect = new Rect(bx, 6, 150, 34);
             GUI.enabled = validation == null && careerProblem == null && design.nodes.Count > 0 && (!coop || Coop.Current.AllReady);
-            if (Ui.Press(LaunchRect, career.IsCareer ? $"LAUNCH  {career.LaunchCost(design):N0}" : "LAUNCH  ▸", Ui.Button))
+            if (Ui.Press(LaunchRect, career.IsCareer ? $"LAUNCH  {career.LaunchCost(design):N0}" : "LAUNCH  ▸", Ui.ButtonGo))   // milestone 35: green for go
             {
                 if (coop) Coop.Current.Launch(design, runwayLaunch, launchPad);
                 else { Tutorial.Launched(); root.Launch(design, runwayLaunch, launchPad); }
@@ -2218,12 +2218,12 @@ namespace Rocket
                 (Words.T("Load a design...", "Load a design...", "Open a saved rocket"), () => { showLoad = true; saved = DesignStore.List(); }),
                 (Words.T("Save this design", "Save this design", "Save this rocket"), () => { DesignStore.Save(design); Toast($"Saved \"{design.name}\""); }),
                 ($"{Words.T("Vessels out there", "Vessels out there", "Ships out there")} ({root.universe.vessels.Count})", () => { showVessels = true; showLoad = false; }),
-                ("Play the tutorial", () => Tutorial.Start()),
+                ("Tutorials...", () => Lessons.PickerOpen = true),   // milestone 35: orbit, landing, docking lessons too
                 ($"Hide the interface ({In.Name(K.F1)})", () => Ui.ToggleHidden()),
                 ("Definitions", () => Glossary.Open = true),
             })
             {
-                if (Coop.Active && (label.StartsWith(Words.T("Vessels out there", "Vessels out there", "Ships out there")) || label == "Play the tutorial")) continue;   // the room's ships are the host's
+                if (Coop.Active && (label.StartsWith(Words.T("Vessels out there", "Vessels out there", "Ships out there")) || label == "Tutorials...")) continue;   // the room's ships are the host's
                 if (Ui.Press(new Rect(r.x + 6, y, r.width - 12, 30), label, Ui.ButtonSmall)) { showFile = false; act(); }
                 y += 34;
             }

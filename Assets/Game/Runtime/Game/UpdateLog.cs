@@ -23,6 +23,15 @@ namespace Rocket
         /// <summary>Every update, newest first.</summary>
         public static readonly Update[] All =
         {
+            U(35, "Nov 14, 2026", "Lessons, crashes and the sea",
+                "Tutorials: three new lessons (get into orbit, land on Tal, dock with a station) that set you up and talk you through it",
+                "A game opens at the space centre: click a building to go in",
+                "Easy mode helps you fly: tougher parts, stages fire when they run dry, parachutes and legs open by themselves, SAS starts on",
+                "Parts aren't all identical: each gives way somewhere around its rating",
+                "Crashes break the rocket apart: pieces fly, tumble and come to rest, scorched, with smoke trails",
+                "Splash down and bob on the waves; Ardlings swim (front crawl) and tread water",
+                "Ardlings: new walking, running and jumping poses, a smaller helmet and nicer sticky notes; 3 flags per trip outside",
+                "Green LAUNCH and Start buttons, red Abort"),
             U(34, "Nov 14, 2026", "Expedition on the real game",
                 "Expedition rebuilt: everyone builds one rocket with the real parts and rides in it as an Ardling, through the real solar system",
                 "Six missions with a budget and goals, the six resources in the plan, supplies to survive on and a scored report with a leaderboard",

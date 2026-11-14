@@ -12,7 +12,7 @@ namespace Rocket
     public static class Ardlings
     {
         public const float Height = 1.2f;
-        const float HelmetR = 0.31f;
+        const float HelmetR = 0.27f;   // milestone 35: a little smaller (was 0.31)
         static readonly Vector3 HelmetC = new Vector3(0, -HelmetR, 0);
 
         public struct Look
@@ -249,11 +249,11 @@ namespace Rocket
             s = b.v.Count;
             b.Mat = MeshBuilder.MatMetal;
             b.AddFrustum(0.06f, -0.01f, 0.024f, 0.026f, metal, 14, capTop: true);
-            b.Transform(s, Quaternion.Euler(90f, 0, 0), HelmetC + new Vector3(0.262f, 0.12f, -0.035f));
+            b.Transform(s, Quaternion.Euler(90f, 0, 0), HelmetC + new Vector3(HelmetR * 0.845f, HelmetR * 0.387f, -0.035f));
             s = b.v.Count;
             b.Mat = MeshBuilder.MatLamp;
             b.AddFrustum(0.064f, 0.058f, 0.02f, 0.02f, new Color(1f, 0.95f, 0.8f), 14, capTop: true);
-            b.Transform(s, Quaternion.Euler(90f, 0, 0), HelmetC + new Vector3(0.262f, 0.12f, -0.035f));
+            b.Transform(s, Quaternion.Euler(90f, 0, 0), HelmetC + new Vector3(HelmetR * 0.845f, HelmetR * 0.387f, -0.035f));
             }
             float th = Mathf.PI * 0.34f;
             s = b.v.Count;
@@ -267,7 +267,7 @@ namespace Rocket
             Squash(b, s, Quaternion.Euler(84f, 0, 0), new Vector3(1.12f, 0.86f, 1f));
 
             // Neck seal: a metal ring with a coloured band
-            b.AddFrustum(-0.585f, -0.64f, 0.152f, 0.168f, metal, S(28), capTop: true);
+            b.AddFrustum(-2f * HelmetR + 0.01f, -0.64f, 0.152f, 0.168f, metal, S(28), capTop: true);   // (taller now the helmet's smaller)
             b.Mat = MeshBuilder.MatPaint;
             b.AddFrustum(-0.62f, -0.645f, 0.172f, 0.174f, look.trim, S(28));
 
@@ -554,7 +554,7 @@ namespace Rocket
                 }
                 case 7: // a flower on the side of the helmet
                 {
-                    Vector3 at = HelmetC + new Vector3(0.24f, 0.17f, 0.06f);
+                    Vector3 at = HelmetC + new Vector3(0.24f, 0.17f, 0.06f) * (HelmetR / 0.31f);
                     for (int k = 0; k < 5; k++)
                     {
                         float a = k * Mathf.PI * 2f / 5f;
@@ -606,7 +606,7 @@ namespace Rocket
 
         // ---------------------------------------------------------------- the sticky note
 
-        public const float NoteSize = 0.2f;
+        public const float NoteSize = 0.175f;
         static Mesh noteMesh;
         static readonly Dictionary<int, Material> noteMats = new Dictionary<int, Material>();
         static readonly Dictionary<int, Texture2D> noteTex = new Dictionary<int, Texture2D>();
@@ -621,8 +621,10 @@ namespace Rocket
                 float h = NoteSize * 0.5f;
                 noteMesh.vertices = new[] { new Vector3(-h, -h, 0), new Vector3(h, -h, 0), new Vector3(h, h, 0), new Vector3(-h, h, 0) };
                 noteMesh.normals = new[] { Vector3.forward, Vector3.forward, Vector3.forward, Vector3.forward };
-                noteMesh.uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) };
-                noteMesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+                // milestone 35: wound to face out of the visor (it faced in, so everyone saw the plain back of the paper,
+                // mirrored); the texture runs left to right as seen from outside
+                noteMesh.uv = new[] { new Vector2(1, 0), new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 1) };
+                noteMesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
                 noteMesh.RecalculateBounds();
             }
             var go = new GameObject("Note");
@@ -652,7 +654,7 @@ namespace Rocket
         {
             int key = face * 100 + System.Array.IndexOf(Papers, paper);
             if (noteTex.TryGetValue(key, out var t)) return t;
-            const int N = 128;
+            const int N = 256;   // milestone 35: sharper
             t = new Texture2D(N, N, TextureFormat.RGBA32, true) { name = "Face " + key, wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
             var px = new Color[N * N];
             Color ink = new Color(0.07f, 0.07f, 0.09f);
@@ -664,11 +666,29 @@ namespace Rocket
                     Color c = paper * (p.y > 0.72f ? 0.93f : 1f) * (0.97f + 0.03f * Mathf.PerlinNoise(x * 0.31f, y * 0.07f));
                     float edge = Mathf.Max(Mathf.Abs(p.x), Mathf.Abs(p.y));
                     c *= Mathf.Lerp(1f, 0.86f, Mathf.InverseLerp(0.9f, 1f, edge));
+                    // rosy cheeks on the cheerful faces (milestone 35)
+                    if (face == 0 || face == 1 || face == 2 || face == 3 || face == 7)
+                    {
+                        float ck = Mathf.Min(Vector2.Distance(p, new Vector2(-0.58f, -0.14f)), Vector2.Distance(p, new Vector2(0.58f, -0.14f)));
+                        c = Color.Lerp(c, new Color(1f, 0.55f, 0.6f), 0.38f * Mathf.Clamp01((0.17f - ck) / 0.08f));
+                    }
+                    // the bottom-right corner curling up: a lighter fold with a shadow line
+                    float fold = p.x - p.y;
+                    if (fold > 1.62f) c = Color.Lerp(paper * 1.08f, Color.white, 0.25f) * (0.96f + 0.04f * (fold - 1.62f));
+                    else if (fold > 1.56f) c *= 0.82f;
                     float d = FaceDistance(face, p, out bool fill, out Color fillCol);
                     float aa = 2.2f / N;
-                    float a = Mathf.Clamp01((0.055f + aa - d) / (2f * aa));
+                    float a = Mathf.Clamp01((0.05f + aa - d) / (2f * aa));
                     if (fill) c = Color.Lerp(c, fillCol, Mathf.Clamp01((aa - d) / (2f * aa) + 0.5f));
                     c = Color.Lerp(c, ink, a);
+                    // a shine in round eyes
+                    if (face == 0 || face == 1 || face == 3 || face == 5 || face == 7 || face == 9)
+                    {
+                        Vector2 le = new Vector2(-0.36f, 0.18f), re = new Vector2(0.36f, 0.18f), sh = new Vector2(-0.035f, 0.04f);
+                        if (face == 5) { le.y -= 0.05f; re.y -= 0.05f; }
+                        float hs = Mathf.Min(Vector2.Distance(p, le + sh), face == 3 ? 9f : Vector2.Distance(p, re + sh));
+                        c = Color.Lerp(c, Color.white, Mathf.Clamp01((0.032f - hs) / aa));
+                    }
                     c.a = 1f;
                     px[y * N + x] = c;
                 }

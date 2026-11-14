@@ -74,7 +74,7 @@ namespace Rocket
         Quaternion renderRot = Quaternion.identity;
         double renderUt;
 
-        class Boom { public GameObject go; public CelestialBody body; public Vector3d rel; public float t, size; }
+        class Boom { public GameObject go; public CelestialBody body; public Vector3d rel; public float t, size, delay; }
 
         public FlightMode(GameRoot root) { this.root = root; }
 
@@ -97,6 +97,7 @@ namespace Rocket
             string cleared = ClearSpawnArea(runway, pad);
             active = runway ? VesselSim.CreateOnRunway(design, Home, ut) : VesselSim.CreateOnPad(design, Home, ut, pad);
             active.launchUt = ut;
+            if (Words.Easy && active.parts.Any(p => p.def.torque > 0 || p.def.sasTier > 0)) active.sas = SasMode.Stability;   // milestone 35: Easy starts with SAS on
             U.Add(active);
             int seats = 0;
             foreach (var p in active.parts) if (p.def.kind == PartKind.Command) seats += p.def.crew;
@@ -195,6 +196,7 @@ namespace Rocket
         public void Exit()
         {
             FreeCursor();
+            Lessons.Stop();
             firstPerson = false;
             fpHiddenView = null;
             LeaveInterior();
@@ -217,6 +219,7 @@ namespace Rocket
             loaded.Clear();
             foreach (var b in booms) UnityEngine.Object.Destroy(b.go);
             booms.Clear();
+            ClearChunks();
             if (guideBeam != null) guideBeam.SetActive(false);
             ClearExplore();
             remote = false;
@@ -484,6 +487,7 @@ namespace Rocket
         {
             if (active == null) return;
             UpdateCursor();   // milestone 34: the pointer's locked while looking round in first person
+            EasyHelpers(active, Time.unscaledDeltaTime);   // milestone 35: Easy lends a hand
             if (replay != null)
             {
                 float rdt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
@@ -495,6 +499,7 @@ namespace Rocket
                     UpdateCamera();
                     audio?.Update(active, true, false, false, rdt);
                     UpdateBooms(Time.unscaledDeltaTime);
+                    UpdateChunks(Time.unscaledDeltaTime);
                     return;
                 }
             }
@@ -550,6 +555,7 @@ namespace Rocket
             audio?.Update(active, paused || photoMode, mapView, railsWarp, Time.unscaledDeltaTime);
             UpdateMusic();
             UpdateBooms(Time.unscaledDeltaTime);
+            UpdateChunks(Time.unscaledDeltaTime);   // milestone 35: the pieces of a crash
             reportTimer -= Time.unscaledDeltaTime;
             if (reportTimer <= 0)
             {
@@ -776,7 +782,7 @@ namespace Rocket
             U.Add(flag);
             views[flag] = VesselView.Create(flag);
             if (eva.body != Home) U.career.SetRecord(eva.body.name == "Vesk" ? Records.VeskFlag : Records.TalFlag);
-            Show($"{eva.EvaName} planted a flag on {eva.body.name}.", 3f);
+            Show($"{eva.EvaName} planted a flag on {eva.body.name}. {(eva.FlagsLeft == 0 ? "That was the last one." : $"{eva.FlagsLeft} left.")}", 3f);
             U.Save();
             return flag;
         }
@@ -1278,7 +1284,7 @@ namespace Rocket
         /// <summary>A vessel other than the active one was destroyed: boom if it's in view, a message if it mattered.</summary>
         void LoseVessel(VesselSim u)
         {
-            if (u.body == active.body && Vector3d.Distance(u.pos, active.pos) < ViewRange) SpawnBoom(u.body, u.pos, Mathf.Clamp(u.Length * 2f, 6f, 30f));
+            if (u.body == active.body && Vector3d.Distance(u.pos, active.pos) < ViewRange) { SpawnBoom(u.body, u.pos, Mathf.Clamp(u.Length * 2f, 6f, 30f)); Shatter(u, 1f); }
             if (!u.isDebris) Show(u.destroyReason, 5f);
             U.career.OnVesselLost(u);
             if (targetVessel == u) targetVessel = null;
@@ -1303,7 +1309,7 @@ namespace Rocket
                 Achievements.OnDestroyed(U, v, v.SurfaceRelVelocity.magnitude);
                 U.career.OnVesselLost(v);
                 SpawnBoom(v.body, v.pos, Mathf.Clamp(v.Length * 2.5f, 8f, 40f));
-                views[v].SetVisible(false);
+                Shatter(v, Mathf.Clamp((float)v.SurfaceRelVelocity.magnitude / 40f, 0.6f, 2f));   // milestone 35: it breaks apart
                 autopilotOn = false;
                 SetWarpOne();
                 Show(v.destroyReason, 8f);
@@ -1394,15 +1400,21 @@ namespace Rocket
         void SpawnBoom(CelestialBody b, Vector3d rel, float size)
         {
             if (active != null) audio?.Boom(b == active.body ? Vector3d.Distance(rel, active.pos) : double.MaxValue);
-            var go = new GameObject("Explosion");
-            go.AddComponent<MeshFilter>().sharedMesh = MeshFactory.Explosion();
-            go.AddComponent<MeshRenderer>().sharedMaterial = Mats.Additive;
-            booms.Add(new Boom { go = go, body = b, rel = rel, size = size });
+            // milestone 35: a cluster of bursts going off one after another, not one round flash
+            int n = size > 12 ? 7 : 4;
+            for (int k = 0; k < n; k++)
+            {
+                var go = new GameObject("Explosion");
+                go.AddComponent<MeshFilter>().sharedMesh = MeshFactory.Explosion();
+                go.AddComponent<MeshRenderer>().sharedMaterial = Mats.Additive;
+                Vector3d off = k == 0 ? Vector3d.zero : Vector3d.FromFloat(UnityEngine.Random.insideUnitSphere * size * 0.35f);
+                booms.Add(new Boom { go = go, body = b, rel = rel + off, size = size * (k == 0 ? 1f : UnityEngine.Random.Range(0.35f, 0.7f)), delay = k == 0 ? 0 : UnityEngine.Random.Range(0.05f, 0.6f) });
+            }
             // Fire, flung debris and (in air) smoke (milestone 23)
             if (active != null && b == active.body)
             {
                 double alt = rel.magnitude - b.radius;
-                Smoke.Burst((b.AbsolutePosition(renderUt) + rel - originAbs).ToFloat(), size * 0.8f, b.HasAtmosphere && b.PressureAtm(alt) > 0.02);
+                Smoke.Burst((b.AbsolutePosition(renderUt) + rel - originAbs).ToFloat(), size * 0.45f, b.HasAtmosphere && b.PressureAtm(alt) > 0.02);   // (milestone 35: smaller, so the wreckage shows)
             }
         }
 
@@ -1412,14 +1424,30 @@ namespace Rocket
             {
                 var b = booms[i];
                 b.t += dt;
-                float k = b.t / 0.4f;                  // a quick flash; the fireball and smoke are particles (Smoke.Burst)
+                float k = (b.t - b.delay) / 0.45f;     // a quick flash; the fireball and smoke are particles (Smoke.Burst)
                 if (k >= 1f) { UnityEngine.Object.Destroy(b.go); booms.RemoveAt(i); continue; }
                 b.go.transform.position = (b.body.AbsolutePosition(renderUt) + b.rel - originAbs).ToFloat();
-                b.go.transform.localScale = Vector3.one * b.size * (0.25f + 0.55f * Mathf.Sqrt(k)) * (1f - k);
+                b.go.transform.localScale = k < 0 ? Vector3.zero : Vector3.one * b.size * (0.25f + 0.55f * Mathf.Sqrt(k)) * (1f - k);
+                b.go.transform.rotation = Quaternion.Euler(b.size * 13f, b.size * 29f + b.t * 40f, 0);   // each burst turned its own way
             }
         }
 
         // ---------------------------------------------------------------- rendering
+
+        /// <summary>Milestone 35: a ship down on the sea rides the waves, up and down and rocking a little (only how it looks).</summary>
+        Vector3 Bob(VesselSim v)
+        {
+            if (v == null || v.IsEva || !v.InWater) return Vector3.zero;
+            float t = Time.time + v.id * 1.7f;
+            return v.pos.normalized.ToFloat() * (0.28f * Mathf.Sin(t * 1.1f) + 0.12f * Mathf.Sin(t * 2.3f + 0.7f));
+        }
+
+        Quaternion Rock(VesselSim v)
+        {
+            if (v == null || v.IsEva || !v.InWater) return Quaternion.identity;
+            float t = Time.time + v.id * 1.7f;
+            return Quaternion.Euler(3.5f * Mathf.Sin(t * 0.9f), 0, 4f * Mathf.Sin(t * 0.7f + 1.1f));
+        }
 
         void UpdateViews()
         {
@@ -1428,7 +1456,7 @@ namespace Rocket
             renderRot = rollout != null ? active.rot : Quaternion.Slerp(active.prevRot, active.rot, alpha);
             originAbs = active.body.AbsolutePosition(renderUt) + renderRel;
             double pressure = active.body.PressureAtm(active.Altitude);
-            if (views.TryGetValue(active, out var av)) av.Sync(active, Vector3.zero, renderRot, pressure, thermalView);
+            if (views.TryGetValue(active, out var av)) av.Sync(active, Bob(active), renderRot * Rock(active), pressure, thermalView);   // (milestone 35: a splashdown bobs on the waves)
             // Other vessels get a model while they're within view range of the active one.
             foreach (var d in U.vessels)
             {
@@ -1437,7 +1465,7 @@ namespace Rocket
                 if (!show) { RemoveView(d); continue; }
                 if (!views.TryGetValue(d, out var dv)) views[d] = dv = VesselView.Create(d);
                 Vector3d abs = d.body.AbsolutePosition(renderUt) + Vector3d.Lerp(d.prevPos, d.pos, alpha);
-                dv.Sync(d, (abs - originAbs).ToFloat(), Quaternion.Slerp(d.prevRot, d.rot, alpha), d.body.PressureAtm(d.Altitude), thermalView);
+                dv.Sync(d, (abs - originAbs).ToFloat() + Bob(d), Quaternion.Slerp(d.prevRot, d.rot, alpha) * Rock(d), d.body.PressureAtm(d.Altitude), thermalView);
             }
             staleViews.Clear();
             foreach (var k in views.Keys) if (k != active && !U.vessels.Contains(k)) staleViews.Add(k);

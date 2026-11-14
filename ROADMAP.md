@@ -686,6 +686,33 @@ more random, every time I start a new world it's always storming".
   `-autotestExpedition` plays a whole expedition (600-606); the size tour covers the new title screen, settings, update log, definitions,
   presets, paint, decals and My Ardling.
 
+### Milestone 35: lessons, the space centre first, better crashes, the sea, Ardlings (2026-11-14)
+captaincarl24: "add more tutorials like how to get into orbit, how to land on the moon, how to dock with another space station; make easy
+mode even simpler, not the text but the mechanics as well; once you load into a single player game you can select which buildings, like a
+Kerbal type main menu; make the launch button green; an item rated 150 breaks between about 140 and 170; more realistic crashes instead of a
+circle; land in the ocean and bob around, and swim if you leave; why do Ardlings have infinite flags, give them a limit of 3; better
+Ardling animations, a slightly smaller helmet and a better sticky note face."
+- **Lessons** (File > Tutorials in the builder, beside the first tutorial): *Get into orbit* (on the pad with an orbiter: lift off, the
+  gravity turn, raise the highest point, coast, round it out), *Land on Tal* (a lander 25 km up round Tal: point back, slow down, legs,
+  the landing burn, touch down), *Dock with a station* (a ferry 70 m behind a station: SAS and RCS, line up, drift in, latch). Each step
+  checks the flight and moves on by itself; crash and Try again. Lesson ships are free and don't stay in the save.
+- **The space centre first**: loading or starting a game opens the space centre from the air; click a building (or Rocket builder).
+- **Easy helps you fly**: parts half as tough again; a stage that runs dry with engines next fires the next one; parachutes open once
+  they won't tear; legs come down near the ground; SAS starts on.
+- **Parts vary**: each part's limits (crash speed, heat, air pressure) are its rating times 0.93-1.13, picked when it's built and kept in
+  saves; the crash message says the rating and where this one gave way. (Fixed at exactly the rating in the tests and tours.)
+- **Crashes break apart**: every part flies off on its own from the blast, tumbles, falls, bounces, skids and comes to rest on the ground
+  (worked out over the turning ground), scorched, the biggest trailing smoke; the fireball is a cluster of bursts instead of one round
+  flash, with a smaller smoke cloud so the wreckage shows.
+- **The sea**: a ship down on the water bobs and rocks; an astronaut swims (slower than walking, no jumping out), front crawl when moving
+  and treading water when still, head just above the surface.
+- **Ardlings**: new poses for running (bigger strides, leaning in), jumping (arms up, knees bent), treading water and swimming, an idle
+  sway; a smaller helmet (0.27 m, a taller collar); sharper sticky notes (256 px) with shine in the eyes, rosy cheeks on the happy faces
+  and a curled corner. 3 flags per trip outside.
+- **Colours**: green LAUNCH (builder and the pad), Start, Done and Ready; red Abort and End flight.
+- 4 new sim tests (flags, toughness, lessons, swimming); `-autotest35` tours the space centre, tutorials, lessons, a crash, the sea,
+  swimming and the new look (700-711).
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

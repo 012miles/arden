@@ -90,7 +90,7 @@ namespace Rocket
             if (y < r.yMax - 78) Ui.Text(new Rect(x, r.yMax - 76, w, 34), $"<color=#8a929c>Like {sc.real}</color>", wrap);
             // ready
             var me = room.Me;
-            if (me != null && Ui.Press(new Rect(x, r.yMax - 36, w, 30), me.ready ? "Ready ✓  (click to undo)" : "I'm ready", me.ready ? Ui.ButtonSel : Ui.Button)) room.Ready(!me.ready);
+            if (me != null && Ui.Press(new Rect(x, r.yMax - 36, w, 30), me.ready ? "Ready ✓  (click to undo)" : "I'm ready", me.ready ? Ui.ButtonGo : Ui.Button)) room.Ready(!me.ready);
         }
 
         /// <summary>Height the plan wants (it fills the space between the team and the chat).</summary>

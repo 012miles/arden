@@ -102,6 +102,7 @@ namespace Rocket
             if (s?.vessels == null) return;
             foreach (var vs in s.vessels)
             {
+                if (vs.name != null && vs.name.StartsWith("Lesson: ")) continue;   // milestone 35: lesson ships don't stay
                 var v = VesselSim.FromSave(vs, bodies, ut);
                 if (v == null) continue;
                 v.survey = survey;

@@ -18,6 +18,16 @@ namespace Rocket
         public Quaternion localRot = Quaternion.identity;
         public int groups, variant;
         public string decal;           // milestone 34: a sticker (see Decals)
+        public int flagsUsed;          // milestone 35: an astronaut carries 3 flags each time they go out
+        /// <summary>
+        /// Milestone 35 (captaincarl24: "an item has a limit of 150, the max it can handle is like 170 or it breaks at 140"):
+        /// no two parts are quite the same. Each one's real limits are its rating times this (0.93 to 1.13, picked when it's
+        /// built), so a part rated 150 gives way somewhere between about 140 and 170. Easy makes every part half as tough again.
+        /// </summary>
+        public float toughness = 1f;
+        public float Toughness => (toughness > 0 ? toughness : 1f) * (Words.Easy ? 1.5f : 1f);
+        public float CrashLimit => def.crashTolerance * Toughness;
+        public double TempLimit => def.maxTemp * Toughness;
         public double propellant, mono, ablator;
         public double temp = 288;
         public bool ignited, chuteDeployed, chuteFailed, legsDeployed, lightOn, towerFired, fairingGone, enclosed;
@@ -50,7 +60,7 @@ namespace Rocket
         public Vector3 Bottom => localPos + localRot * new Vector3(0, -def.length, 0);
         public float RTop => def.radial ? def.radialSize.z * 0.5f : def.topDiameter * 0.5f;
         public float RBottom => def.radial ? def.radialSize.z * 0.5f : def.bottomDiameter * 0.5f;
-        public float HeatFraction => (float)(temp / def.maxTemp);
+        public float HeatFraction => (float)(temp / TempLimit);
         public double Mass => def.dryMass + propellant + mono + ore + supplies * Supplies.MassPerDay + (fairingGone ? 0 : def.fairingMass);
         /// <summary>Wheel hub in the vessel frame (landing gear), following the deploy animation.</summary>
         public Vector3 WheelHub => localPos + localRot * Vector3.Lerp(new Vector3(0.15f, 0, 0), new Vector3(def.strutLength, 0, 0), legDeploy);
@@ -249,6 +259,10 @@ namespace Rocket
 
         // ---------------------------------------------------------------- creation
 
+        /// <summary>Parts vary a little round their ratings (milestone 35). Off in the tests and tours, so they come out the same every time.</summary>
+        public static bool VaryToughness = !Universe.IsAutotest;
+        static readonly System.Random ToughRng = new System.Random();
+
         static VesselSim Build(VesselDesign design, CelestialBody body)
         {
             design.Upgrade();
@@ -263,6 +277,7 @@ namespace Rocket
                     groups = n.groups, variant = n.variant, decal = n.decal, propellant = defs[i].propellant, mono = defs[i].mono, ablator = defs[i].ablator,
                 });
                 for (int k = 0; k < defs[i].crew; k++) v.parts[i].crew.Add(CrewNames.Next());
+                if (VaryToughness) v.parts[i].toughness = 0.93f + 0.2f * (float)ToughRng.NextDouble();
                 v.parts[i].charge = defs[i].ecCapacity;
                 v.parts[i].supplies = defs[i].supplyCapacity;
             }
@@ -943,12 +958,12 @@ namespace Rocket
             Vector3d vP = vel + Vector3d.Cross(Vector3d.FromFloat(angVel), rW) - body.SurfaceVelocity(P);
             double vn = Vector3d.Dot(vP, nrm);
             double impact = wheel ? -vn : vP.magnitude;
-            float tol = p.def.crashTolerance * (!wheel && Terrain.IsWater(body, body.InertialToFixed(radial, ut)) ? Terrain.WaterCushion : 1f);
+            float tol = p.CrashLimit * (!wheel && Terrain.IsWater(body, body.InertialToFixed(radial, ut)) ? Terrain.WaterCushion : 1f);
             if (impact > tol)
             {
-                Destroy(kind == 2 ? $"{p.def.name} broke hitting the ground at {-vn:F1} m/s (it takes {p.def.crashTolerance:F0})"
-                      : wheel ? $"Landing gear collapsed at {-vn:F1} m/s sink rate (it takes {p.def.crashTolerance:F0})"
-                              : $"{p.def.name} hit the ground at {impact:F0} m/s (it takes {p.def.crashTolerance:F0})");
+                Destroy(kind == 2 ? $"{p.def.name} broke hitting the ground at {-vn:F1} m/s (rated {p.def.crashTolerance:F0}; this one gave way at {p.CrashLimit:F0})"
+                      : wheel ? $"Landing gear collapsed at {-vn:F1} m/s sink rate (rated {p.def.crashTolerance:F0}; this one gave way at {p.CrashLimit:F0})"
+                              : $"{p.def.name} hit the ground at {impact:F0} m/s (rated {p.def.crashTolerance:F0}; this one gave way at {p.CrashLimit:F0})");
                 return;
             }
             double fn = Math.Max(0, k * pen - c * vn);
@@ -1269,12 +1284,12 @@ namespace Rocket
             {
                 if (i >= parts.Count) continue;   // an explosion took several parts at once
                 var p = parts[i];
-                if (p.temp <= p.def.maxTemp) continue;
-                if (HoldsFuel(p)) { Explode(p, $"{p.def.name} overheated and exploded ({p.temp:0} K, limit {p.def.maxTemp:0} K)"); if (destroyed) return; continue; }
+                if (p.temp <= p.TempLimit) continue;
+                if (HoldsFuel(p)) { Explode(p, $"{p.def.name} overheated and exploded ({p.temp:0} K, rated {p.def.maxTemp:0} K)"); if (destroyed) return; continue; }
                 bool leaf = topo == null || topo.children[p.index].Count == 0;
                 if (p.def.kind == PartKind.Command || !leaf)
                 {
-                    Destroy($"{p.def.name} burned up on reentry ({p.temp:0} K, limit {p.def.maxTemp:0} K)");
+                    Destroy($"{p.def.name} burned up on reentry ({p.temp:0} K, rated {p.def.maxTemp:0} K)");
                     return;
                 }
                 lastEvent = $"{p.def.name} burned up!";
@@ -1589,7 +1604,7 @@ namespace Rocket
             // Lifting off: ignore millimetre-scale wobble in the terrain height (it's evaluated in single precision).
             if (minH > -0.05 && Vector3d.Dot(SurfaceRelVelocity, pos.normalized) > 0.005) return;
             double impact = SurfaceRelVelocity.magnitude;
-            float tolerance = low.def.kind == PartKind.Leg && low.legDeploy < 0.9f ? 4f : low.def.crashTolerance;
+            float tolerance = low.def.kind == PartKind.Leg && low.legDeploy < 0.9f ? 4f * low.Toughness : low.CrashLimit;
             bool water = Terrain.IsWater(body, body.InertialToFixed(pos, ut));
             if (water) tolerance *= Terrain.WaterCushion;   // the sea gives (milestone 25)
             if (impact > tolerance)

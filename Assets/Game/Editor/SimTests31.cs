@@ -13,7 +13,7 @@ namespace Rocket.EditorTools
             Run("Real missions: every mission and every free-design subject names real missions like it; a CubeSat frame and a nuclear battery add their own", RealMissionsText);
             Run("Comparing designs: a line for each resource, the better value marked, the cheaper design wins on cost, a design that can't launch loses on problems, same design = no winner", CompareDesigns);
             Run("Racing rooms: a room keeps its best score per mission and announces it with the mission; announcements round-trip, older ones still read; rivals are other rooms on the same mission only", RoomRivals);
-            Run("Guide: a page for playing together and mission design in every word level, before the keys page", GuideTogether);
+            Run("Guide: a page for playing together and expeditions in every word level, before the keys page", GuideTogether);
             Run("New company name: the first launch copies the saves from this game's folder under the old company name (not the older prototype's), skips test runs, and never copies twice", NewCompanyFolder);
         }
 
@@ -155,7 +155,7 @@ namespace Rocket.EditorTools
                     Words.Level = l;
                     string t = (string)page.Invoke(null, new object[] { i });
                     Check(t.Contains("room") && t.Length > 400, $"{l}: the page is too short or doesn't mention rooms");
-                    Check(t.ToLower().Contains("mission"), $"{l}: the page doesn't explain mission design");
+                    Check(t.ToLower().Contains("expedition"), $"{l}: the page doesn't explain expeditions");   // (milestone 34: expeditions replaced mission design rooms)
                 }
             }
             finally { Words.Level = was; }

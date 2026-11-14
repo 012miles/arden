@@ -31,6 +31,8 @@ namespace Rocket
         }
         public const float MinWidth = 1480f, MinHeight = 900f;
         public static GUIStyle Panel, Label, Bold, Small, SmallLine, Header, Title, Hero, Button, ButtonSmall, ButtonSel, ButtonSmallSel, Row, RowSel, RowSelCenter, Center, BigCenter, Hint, Field;
+        /// <summary>Milestone 35: green for go (launch, start, done, ready), red for stop (abort, end the flight).</summary>
+        public static GUIStyle ButtonGo, ButtonGoSmall, ButtonStop, ButtonStopSmall;
         public static readonly Color Accent = new Color(0.35f, 0.8f, 1f);
         static Texture2D texPanel, texRowSel, texWhite;
         static List<Rect> rects = new List<Rect>(), rectsBuilding = new List<Rect>();
@@ -291,6 +293,18 @@ namespace Rocket
             Field = new GUIStyle(GUI.skin.textField) { fontSize = 15, font = BodyMedium, border = new RectOffset(6, 6, 6, 6), padding = new RectOffset(6, 6, 3, 3) };
             Field.normal.background = Field.focused.background = Field.hover.background = texField;
             Field.normal.textColor = Field.focused.textColor = Field.hover.textColor = text;
+            // green and red buttons (milestone 35)
+            var texGo = Rounded(24, 6, new Color(0.13f, 0.5f, 0.24f, 0.97f), new Color(0.45f, 0.9f, 0.55f, 0.75f));
+            var texGoHover = Rounded(24, 6, new Color(0.17f, 0.62f, 0.3f, 0.99f), new Color(0.6f, 1f, 0.68f, 0.9f));
+            var texGoDown = Rounded(24, 6, new Color(0.1f, 0.4f, 0.2f, 1f), new Color(0.5f, 0.9f, 0.6f, 0.9f));
+            var texStop = Rounded(24, 6, new Color(0.55f, 0.13f, 0.12f, 0.96f), new Color(0.95f, 0.45f, 0.4f, 0.7f));
+            var texStopHover = Rounded(24, 6, new Color(0.68f, 0.17f, 0.15f, 0.99f), new Color(1f, 0.6f, 0.55f, 0.9f));
+            ButtonGo = Btn(15, BodyBold, texGo, texGoHover, texGoDown, Color.white);
+            ButtonGoSmall = Btn(13, BodyMedium, texGo, texGoHover, texGoDown, Color.white);
+            ButtonGoSmall.padding = new RectOffset(4, 4, 2, 2);
+            ButtonStop = Btn(15, BodyBold, texStop, texStopHover, texStop, Color.white);
+            ButtonStopSmall = Btn(13, BodyMedium, texStop, texStopHover, texStop, Color.white);
+            ButtonStopSmall.padding = new RectOffset(4, 4, 2, 2);
             // the title screen's big buttons (milestone 34)
             var texMenu = Rounded(24, 7, new Color(0.04f, 0.06f, 0.09f, 0.78f), new Color(0.34f, 0.48f, 0.58f, 0.35f));
             var texMenuHover = Rounded(24, 7, new Color(0.09f, 0.17f, 0.24f, 0.9f), new Color(0.45f, 0.72f, 0.88f, 0.7f));

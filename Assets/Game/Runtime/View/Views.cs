@@ -17,22 +17,30 @@ namespace Rocket
         readonly Dictionary<int, MeshRenderer> plumeRenderers = new Dictionary<int, MeshRenderer>();
         readonly Dictionary<int, ParticleSystem> smokes = new Dictionary<int, ParticleSystem>();
         readonly Dictionary<int, Transform[]> ardlingLimbs = new Dictionary<int, Transform[]>();
-        float walkPhase, walkAmp, floatAmp;
+        float walkPhase, walkAmp, floatAmp, runAmp, airAmp, swimAmp, swimMove, strokePhase;
 
         /// <summary>
-        /// The Ardling's body language: arms and legs swing as they walk (faster when turning on the spot counts as a
-        /// shuffle), they breathe gently standing still, and in the air or in space the limbs drift out into a float.
+        /// The Ardling's body language (milestone 35: richer). Standing, they breathe and sway a little; walking, arms and
+        /// legs swing with a bob in each step; running, bigger strides leaning forward; in the air near the ground (a jump),
+        /// arms up and knees bent; in space, limbs drifting in a float; in the sea, treading water upright with arms sculling,
+        /// or swimming front crawl, body flat, arms turning over and legs kicking, head just above the water.
         /// </summary>
         void AnimateArdling(VesselSim sim, PartState p, Transform[] limbs)
         {
             float dt = Mathf.Min(UnityEngine.Time.deltaTime, 0.05f), t = UnityEngine.Time.time;
-            bool ground = sim.landed;
-            float walk = ground ? Mathf.Clamp(sim.inputPitch, -1f, 1f) : 0f;
-            float move = Mathf.Max(Mathf.Abs(walk), ground ? Mathf.Abs(sim.inputYaw) * 0.5f : 0f);
-            walkAmp = Mathf.MoveTowards(walkAmp, move > 0.02f ? 1f : 0f, dt * 5f);
-            floatAmp = Mathf.MoveTowards(floatAmp, ground ? 0f : 1f, dt * 2f);
-            walkPhase += dt * 8f * Mathf.Max(move, 0.35f) * (walk < 0 ? -1f : 1f);
-            float swing = Mathf.Sin(walkPhase) * 34f * walkAmp;
+            bool ground = sim.landed, water = ground && sim.InWater;
+            float fwd = ground ? Mathf.Clamp(sim.inputPitch, -1f, 1f) : 0f, strafe = ground ? Mathf.Clamp(sim.evaStrafe, -1f, 1f) : 0f;
+            float move = Mathf.Max(Mathf.Max(Mathf.Abs(fwd), Mathf.Abs(strafe)), ground ? Mathf.Abs(sim.inputYaw) * 0.5f : 0f);
+            bool nearGround = !ground && sim.Altitude < 3000 && sim.body.SurfaceGravity > 0.2;
+            walkAmp = Mathf.MoveTowards(walkAmp, ground && !water && move > 0.02f ? 1f : 0f, dt * 5f);
+            runAmp = Mathf.MoveTowards(runAmp, ground && !water && sim.evaRun && move > 0.1f ? 1f : 0f, dt * 4f);
+            airAmp = Mathf.MoveTowards(airAmp, nearGround ? 1f : 0f, dt * 6f);
+            floatAmp = Mathf.MoveTowards(floatAmp, !ground && !nearGround ? 1f : 0f, dt * 2f);
+            swimAmp = Mathf.MoveTowards(swimAmp, water ? 1f : 0f, dt * 3f);
+            swimMove = Mathf.MoveTowards(swimMove, water && move > 0.05f ? 1f : 0f, dt * 2.5f);
+            walkPhase += dt * (8f + 5f * runAmp) * Mathf.Max(move, 0.35f) * (fwd < 0 ? -1f : 1f);
+            strokePhase += dt * (2.6f + 1.4f * (sim.evaRun ? 1f : 0f)) * Mathf.Max(move, 0.3f);
+            float swing = Mathf.Sin(walkPhase) * (34f + 16f * runAmp) * walkAmp;
             float breathe = Mathf.Sin(t * 1.7f) * 2.5f;
             float drift = Mathf.Sin(t * 1.2f), drift2 = Mathf.Sin(t * 0.9f + 1.3f);
             for (int k = 0; k < 4; k++)
@@ -40,15 +48,32 @@ namespace Rocket
                 int side = k % 2 == 0 ? -1 : 1;
                 bool arm = k < 2;
                 Quaternion standing = arm
-                    ? Quaternion.Euler(swing * side * 0.8f + breathe * 0.3f, 0, side * (5f + breathe * 0.4f))
+                    ? Quaternion.Euler(swing * side * 0.8f + breathe * 0.3f - 12f * runAmp, 0, side * (5f + breathe * 0.4f))
                     : Quaternion.Euler(-swing * side, 0, 0);
+                Quaternion jumping = arm ? Quaternion.Euler(-35f, 0, side * 55f) : Quaternion.Euler(28f - 10f * side * Mathf.Sin(t * 3f), 0, side * 6f);
                 Quaternion floating = arm
                     ? Quaternion.Euler(-20f + 10f * drift * side, 0, side * (32f + 6f * drift2))
                     : Quaternion.Euler(18f + 8f * drift2 * side, 0, side * 6f);
-                limbs[k].localRotation = Quaternion.Slerp(standing, floating, floatAmp);
+                // in the sea: treading (arms sculling out to the sides, slow kicks) or the crawl (arms turning over, quick kicks)
+                Quaternion tread = arm ? Quaternion.Euler(-60f, 0, side * (42f + 18f * Mathf.Sin(t * 2.4f + side))) : Quaternion.Euler(16f * Mathf.Sin(t * 2f + side), 0, side * 8f);
+                Quaternion crawl = arm ? Quaternion.Euler(-(strokePhase * Mathf.Rad2Deg + (side > 0 ? 180f : 0f)), 0, side * 12f) : Quaternion.Euler(22f * Mathf.Sin(strokePhase * 2.4f + (side > 0 ? Mathf.PI : 0f)), 0, side * 4f);
+                Quaternion swimming = Quaternion.Slerp(tread, crawl, swimMove);
+                var q = Quaternion.Slerp(standing, jumping, airAmp);
+                q = Quaternion.Slerp(q, floating, floatAmp);
+                q = Quaternion.Slerp(q, swimming, swimAmp);
+                limbs[k].localRotation = q;
             }
-            // a small bob in each step
-            if (partGo.TryGetValue(p.index, out var go)) go.transform.localPosition = p.localPos + p.localRot * new Vector3(0, Mathf.Abs(Mathf.Sin(walkPhase)) * 0.03f * walkAmp, 0);
+            // the whole body: a bob in each step, leaning into a run, flat and low in the water when swimming
+            if (partGo.TryGetValue(p.index, out var go))
+            {
+                float stepBob = Mathf.Abs(Mathf.Sin(walkPhase)) * (0.03f + 0.03f * runAmp) * walkAmp;
+                float waves = Mathf.Sin(t * 1.3f) * 0.05f * swimAmp;
+                float sink = Mathf.Lerp(0.72f, 0.42f, swimMove) * swimAmp;
+                float lean = 9f * runAmp * (fwd < 0 ? -1f : 1f) + 72f * swimMove * swimAmp;
+                float sway = Mathf.Sin(t * 0.8f) * 1.2f * (1f - walkAmp) * (1f - swimAmp) + Mathf.Sin(strokePhase) * 8f * swimMove;
+                go.transform.localPosition = p.localPos + p.localRot * new Vector3(0, stepBob + waves - sink, 0);
+                go.transform.localRotation = p.localRot * Quaternion.Euler(lean, 0, sway);
+            }
         }
         static readonly Dictionary<string, Material> plumeMats = new Dictionary<string, Material>();
 
@@ -573,6 +598,25 @@ namespace Rocket
 
         public void SetVisible(bool v) { if (root != null) root.SetActive(v); }
         public void Destroy() { if (root != null) Object.Destroy(root); root = null; }
+
+        /// <summary>Milestone 35: takes the parts off the model as loose pieces (kept where they are in the world), then removes the rest.</summary>
+        public List<GameObject> DetachParts()
+        {
+            var list = new List<GameObject>();
+            foreach (var kv in partGo)
+            {
+                var go = kv.Value;
+                if (go == null || !go.activeInHierarchy) continue;
+                go.transform.SetParent(null, true);
+                foreach (var col in go.GetComponentsInChildren<Collider>()) Object.Destroy(col);
+                list.Add(go);
+            }
+            partGo.Clear();
+            renderers.Clear();
+            renderersExtra.Clear();
+            Destroy();
+            return list;
+        }
     }
 
     /// <summary>

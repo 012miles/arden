@@ -521,7 +521,7 @@ namespace Rocket
                     qx += w + 4;
                 }
                 var me = room.Me;
-                if (me != null && Ui.Press(new Rect(r.x + 10, r.yMax - 36, r.width - 20, 30), me.ready ? "Ready to launch ✓  (click to undo)" : "I'm ready to launch", me.ready ? Ui.ButtonSel : Ui.Button)) room.Ready(!me.ready);
+                if (me != null && Ui.Press(new Rect(r.x + 10, r.yMax - 36, r.width - 20, 30), me.ready ? "Ready to launch ✓  (click to undo)" : "I'm ready to launch", me.ready ? Ui.ButtonGo : Ui.Button)) room.Ready(!me.ready);
             }
             else Ui.Text(new Rect(r.x + 10, r.yMax - 40, r.width - 20, 36), room.State.players.Count <= 1 ? "<color=#7dff8a>Playing alone: LAUNCH when you're ready.</color>" : AllReady ? "<color=#7dff8a>Everyone's ready: LAUNCH when you are.</color>" : $"Waiting for: {NotReady}", new GUIStyle(Ui.Small) { wordWrap = true });
         }

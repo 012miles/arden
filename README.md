@@ -16,7 +16,8 @@ Developed by captaincarl24
 - **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole
   interface with F1.
 - **Career**: science, money, contracts and an upgradeable space centre, plus achievements, a story, replays, photo mode (F2) and weather.
-- **Three difficulty levels**: Easy, Standard and Engineer, with explanations that match.
+- **Three difficulty levels**: Easy, Standard and Engineer, with explanations that match. Easy also helps you fly: tougher parts, stages
+  that fire when they run dry, parachutes and legs that open by themselves.
 - **Expedition** (multiplayer, 1-4 players, solo works too): everyone builds one rocket together in the real builder with the real parts,
   then rides in it as their own Ardling through the real, full-size solar system. Pick a mission (Tal, the lost outpost, Vesk, Ochre,
   Brume's moons or a free expedition) and a difficulty; the builder shows the six resources (mass, power, budget, data, comms, time) and
@@ -48,8 +49,9 @@ Ready-to-play builds go in this repo's **Releases** page.
 
   The `xattr` step is needed because the app isn't signed with an Apple developer certificate.
 
-How to play is in the game itself: the first game starts an **interactive tutorial** (File > Play the tutorial in the builder plays it
-again), **How to play** on the title screen covers every part, and **Controls** lets you change the keys.
+How to play is in the game itself: the first game starts an **interactive tutorial**, and **File > Tutorials** in the builder has guided
+lessons too (get into orbit, land on Tal, dock with a station). **How to play** on the title screen covers every part, and **Controls**
+lets you change the keys. A game opens at the space centre: click a building to go in.
 
 ### Expedition
 

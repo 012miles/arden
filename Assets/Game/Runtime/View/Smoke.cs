@@ -158,6 +158,44 @@ namespace Rocket
         /// An explosion (milestone 23): a rolling fireball, a burst of glowing debris that arcs down, and in air a cloud
         /// of dark smoke that rises and spreads. Fire and forget at a render-space point; it cleans itself up.
         /// </summary>
+        /// <summary>
+        /// Milestone 35: a thin trail of smoke from a piece of wreckage (a child of it, so it follows), fading out after a few
+        /// seconds. Much lighter than a Burst.
+        /// </summary>
+        public static ParticleSystem Trail(Transform follow, float size, float seconds)
+        {
+            if (mat == null) mat = new Material(Resources.Load<Shader>("Shaders/RocketSmoke")) { name = "Smoke" };
+            var c = new GameObject("Smoke trail");
+            c.transform.SetParent(follow, false);
+            var ps = c.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.loop = false; main.playOnAwake = false; main.duration = seconds;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.8f);
+            main.startSize = new ParticleSystem.MinMaxCurve(size * 0.5f, size * 1f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startColor = Color.white;
+            main.gravityModifier = -0.02f;
+            main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
+            main.simulationSpace = ParticleSystemSimulationSpace.Custom;
+            main.customSimulationSpace = Anchor;
+            var em = ps.emission; em.rateOverTime = 9f;
+            var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = size * 0.15f;
+            var col = ps.colorOverLifetime; col.enabled = true;
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(new Color(0.2f, 0.19f, 0.18f), 0f), new GradientColorKey(new Color(0.45f, 0.44f, 0.43f), 1f) },
+                      new[] { new GradientAlphaKey(0.55f, 0f), new GradientAlphaKey(0.3f, 0.5f), new GradientAlphaKey(0f, 1f) });
+            col.color = g;
+            var sol = ps.sizeOverLifetime; sol.enabled = true;
+            sol.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0, 0.6f), new Keyframe(1, 2f)));
+            var r = c.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.Billboard; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+            r.maxParticleSize = 2f;
+            ps.Play();
+            return ps;
+        }
+
         public static void Burst(Vector3 at, float size, bool inAir)
         {
             if (sparkMat == null) sparkMat = new Material(Resources.Load<Shader>("Shaders/RocketSpark")) { name = "Sparks" };

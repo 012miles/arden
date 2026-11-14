@@ -78,6 +78,10 @@ namespace Rocket
             DrawStory(W, H);
             if (Coop.Active) DrawCoopFlight(W, H);
             DrawScavenge(W, H);   // milestone 34: an outpost or wreck to search, in any game
+            // milestone 35: a big green LAUNCH on the pad (the same as SPACE), so nobody has to know the key
+            if (!active.hasLaunched && !active.IsEva && !active.destroyed && !mapView && countdown < 0f && active.nextStage == 0 && active.stages.Count > 0
+                && Ui.Press(new Rect(W / 2 - 120, H - 320, 240, 42), $"LAUNCH  ({In.Name(K.Space)})", Ui.ButtonGo))
+            { if (!TryCountdown()) Stage(); }
             DrawInteriorHud(W, H);   // milestone 34: the cabin's prompts
             var v = active;
             var body = v.body;
@@ -225,10 +229,7 @@ namespace Rocket
                     if (Ui.Press(new Rect(tx, kr.yMax - 40, bw, 30), label, on ? Ui.ButtonSmallSel : Ui.ButtonSmall)) act();
                     tx += bw + 3;
                 }
-                var oldBg = GUI.backgroundColor;
-                GUI.backgroundColor = new Color(1f, 0.35f, 0.3f);
-                if (Ui.Press(new Rect(tx + 2, kr.yMax - 40, bw - 2, 30), Words.T("Abort", "Abort", "Eject"), Ui.ButtonSmall)) DoAbort();
-                GUI.backgroundColor = oldBg;
+                if (Ui.Press(new Rect(tx + 2, kr.yMax - 40, bw - 2, 30), Words.T("Abort", "Abort", "Eject"), Ui.ButtonStopSmall)) DoAbort();   // red for stop (milestone 35)
             }
 
             DrawNavball(W, H, v);
@@ -520,7 +521,9 @@ namespace Rocket
             cy += 30;
             if (v.landed)
             {
-                if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), "Plant a flag (G)", Ui.ButtonSmall)) PlantFlag();
+                GUI.enabled = v.FlagsLeft > 0;
+                if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), v.FlagsLeft > 0 ? $"Plant a flag (G): {v.FlagsLeft} left" : "No flags left (climb in for more)", Ui.ButtonSmall)) PlantFlag();
+                GUI.enabled = true;
                 cy += 30;
             }
             cy += CableRows(r, cy, true);

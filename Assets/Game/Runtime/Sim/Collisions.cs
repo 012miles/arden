@@ -167,8 +167,8 @@ namespace Rocket
                 if (ima > 0) { a.vel += n * (j * ima); a.angVel += IinvA(Vector3.Cross(rA, nf * (float)j)); }
                 if (imb > 0) { b.vel -= n * (j * imb); b.angVel -= IinvB(Vector3.Cross(rB, nf * (float)j)); }
                 double speed = -vn;
-                if (speed > pa.def.crashTolerance && !a.landed) { a.Destroy($"Crashed into {b.name} at {speed:0} m/s ({pa.def.name} can take {pa.def.crashTolerance:0} m/s)"); crash = a.name; }
-                if (speed > pb.def.crashTolerance && !b.landed) { b.Destroy($"Crashed into {a.name} at {speed:0} m/s ({pb.def.name} can take {pb.def.crashTolerance:0} m/s)"); crash = crash == null ? b.name : crash + " and " + b.name; }
+                if (speed > pa.CrashLimit && !a.landed) { a.Destroy($"Crashed into {b.name} at {speed:0} m/s ({pa.def.name} can take {pa.def.crashTolerance:0} m/s)"); crash = a.name; }
+                if (speed > pb.CrashLimit && !b.landed) { b.Destroy($"Crashed into {a.name} at {speed:0} m/s ({pb.def.name} can take {pb.def.crashTolerance:0} m/s)"); crash = crash == null ? b.name : crash + " and " + b.name; }
                 if (crash == null && speed > 0.3) a.lastEvent = $"Bumped into {b.name} at {speed:0.0} m/s";
             }
             a.rails = null; b.rails = null;

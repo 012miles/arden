@@ -4,6 +4,8 @@ Shader "Rocket/Note"
     Properties
     {
         _MainTex ("Face", 2D) = "white" {}
+        _Bright ("Brightness", Float) = 1
+        _Flat ("Unlit amount", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -24,6 +26,7 @@ Shader "Rocket/Note"
             TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
+                float _Bright, _Flat;
             CBUFFER_END
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; };
             struct Varyings { float4 positionHCS : SV_POSITION; float3 nWS : TEXCOORD0; float3 pWS : TEXCOORD1; float2 uv : TEXCOORD2; };
@@ -43,7 +46,8 @@ Shader "Rocket/Note"
                 if (!front) albedo = float3(0.9, 0.88, 0.8) * albedo.r;   // the back is plain paper
                 Light sun = GetMainLight(TransformWorldToShadowCoord(i.pWS));
                 float3 col = albedo * (sun.color * sun.shadowAttenuation * saturate(dot(n, sun.direction)) * 0.95 + RkAmbient(n));
-                return half4(col, 1);
+                col = lerp(col, albedo, _Flat);   // (milestone 35: out of the game's light, shown as it is)
+                return half4(col * _Bright, 1);
             }
             ENDHLSL
         }

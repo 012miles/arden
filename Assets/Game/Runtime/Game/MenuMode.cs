@@ -126,11 +126,13 @@ namespace Rocket
 
         void DrawCentre(float W, float H)
         {
-            var bar = new Rect(W * 0.5f - 330, 14, 660, 54);
+            var bar = new Rect(W * 0.5f - 380, 14, 760, 54);
             GUI.Box(bar, GUIContent.none, Ui.Panel);
             Ui.Text(new Rect(bar.x + 16, bar.y + 8, 420, 24), "SPACE CENTRE", Ui.Header);
-            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 440, 20), "Click a building. Right-drag to look round, scroll to zoom.", Ui.Small);
-            if (Ui.Press(new Rect(bar.xMax - 186, bar.y + 10, 170, 34), "Back to the builder", Ui.Button)) { root.EnterHangar(); return; }
+            bool first = root.universe != null && root.universe.vessels.Count == 0;
+            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 420, 20), first ? "Click the <b>Assembly building</b> to build your first rocket." : "Click a building to go in. Right-drag to look round, scroll to zoom.", Ui.Small);
+            if (Ui.Press(new Rect(bar.xMax - 300, bar.y + 10, 130, 34), "Title screen", Ui.Button)) { centre = false; root.ShowMenu(); return; }
+            if (Ui.Press(new Rect(bar.xMax - 162, bar.y + 10, 146, 34), "Rocket builder", Ui.ButtonGo)) { root.EnterHangar(); return; }
             BodyView site = null;
             foreach (var bv in root.bodyViews) if (bv.SiteTransform != null) site = bv;
             if (site == null) return;
@@ -398,7 +400,7 @@ namespace Rocket
             Ui.Text(new Rect(r.x + 16, r.y + 136, bw, 100), "Run a space program: contracts pay for rockets, science unlocks parts in the tech tree, records and reputation open bigger missions. A guide walks you through the first flight.", Ui.Small);
             Ui.Text(new Rect(r.x + 334, r.y + 136, bw, 100), "Every part, no money, no contracts: build and fly anything, anywhere.", Ui.Small);
             newSupplies = GUI.Toggle(new Rect(r.x + 16, r.y + 244, 600, 24), newSupplies, newSupplies ? "  Crew need supplies (food, water, air): they die if they run out" : "  Crew need supplies (off: no limit on long trips)", Ui.Label);
-            if (Ui.Press(new Rect(r.xMax - 176, r.yMax - 48, 160, 34), "Start", Ui.Button)) { root.NewGame(newName, newMode, newSupplies); return; }
+            if (Ui.Press(new Rect(r.xMax - 176, r.yMax - 48, 160, 34), "Start  ▸", Ui.ButtonGo)) { root.NewGame(newName, newMode, newSupplies); return; }
             if (Ui.Press(new Rect(r.x + 16, r.yMax - 48, 100, 34), "Back", Ui.Button)) ShowPage("single");
         }
 

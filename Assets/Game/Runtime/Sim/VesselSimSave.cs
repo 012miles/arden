@@ -15,6 +15,8 @@ namespace Rocket
         public Quaternion localRot;
         public int groups, variant;
         public string decal;
+        public int flagsUsed;
+        public float toughness;
         public double propellant, mono, ablator, temp;
         public bool ignited, chuteDeployed, chuteFailed, legsDeployed, lightOn, towerFired, fairingGone;
         public float chuteOpen, legDeploy, towerTime, spool;
@@ -80,7 +82,7 @@ namespace Rocket
                 s.parts.Add(new PartSave
                 {
                     id = p.def.id, index = p.index, parent = p.parent, attach = p.attach, localPos = p.localPos, localRot = p.localRot,
-                    groups = p.groups, variant = p.variant, decal = p.decal, propellant = p.propellant, mono = p.mono, ablator = p.ablator, temp = p.temp,
+                    groups = p.groups, variant = p.variant, decal = p.decal, flagsUsed = p.flagsUsed, toughness = p.toughness, propellant = p.propellant, mono = p.mono, ablator = p.ablator, temp = p.temp,
                     ignited = p.ignited, chuteDeployed = p.chuteDeployed, chuteFailed = p.chuteFailed, legsDeployed = p.legsDeployed,
                     lightOn = p.lightOn, towerFired = p.towerFired, fairingGone = p.fairingGone,
                     chuteOpen = p.chuteOpen, legDeploy = p.legDeploy, towerTime = p.towerTime, spool = p.spool,
@@ -111,7 +113,7 @@ namespace Rocket
                 v.parts.Add(new PartState
                 {
                     def = def, index = ps.index, parent = ps.parent, attach = ps.attach, localPos = ps.localPos, localRot = ps.localRot,
-                    groups = ps.groups, variant = ps.variant, decal = ps.decal, propellant = ps.propellant, mono = ps.mono, ablator = ps.ablator, temp = ps.temp,
+                    groups = ps.groups, variant = ps.variant, decal = ps.decal, flagsUsed = ps.flagsUsed, toughness = ps.toughness, propellant = ps.propellant, mono = ps.mono, ablator = ps.ablator, temp = ps.temp,
                     ignited = ps.ignited, chuteDeployed = ps.chuteDeployed, chuteFailed = ps.chuteFailed, legsDeployed = ps.legsDeployed,
                     lightOn = ps.lightOn, towerFired = ps.towerFired, fairingGone = ps.fairingGone,
                     chuteOpen = ps.chuteOpen, legDeploy = ps.legDeploy, towerTime = ps.towerTime, spool = ps.spool,
