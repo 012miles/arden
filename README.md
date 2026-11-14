@@ -119,5 +119,3 @@ Builds, screenshots and Unity's `Library` cache are kept out of the repo on purp
 - **Sounds** (from OpenGameArt.org):
   - CC-BY 3.0: explosions by Michel Baradari and the Blender Foundation, hangar hum by gryc.
   - CC0: rumble by theMinesAreShakin, engine by gmason, wind by aquinn and remaxim, thrusters by EZduzziteh, metal by BMacZero, crickets by Wolfgang_, launch by qubodup, interface sounds by Kenney.
-
-Mission Design was made for the NASA Space Apps Challenge 2026 "Space Mission Design Game" challenge.
