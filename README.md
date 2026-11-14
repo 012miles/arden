@@ -2,7 +2,7 @@
 
 An original rocket-building and spaceflight game made in Unity. Build rockets, fly them to orbit and beyond, explore a small solar system of its own, and plan whole space missions alone or with friends.
 
-Made by captaincarl24
+Developed by captaincarl24
 
 ## What you can do
 
