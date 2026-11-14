@@ -1,0 +1,29 @@
+# Unity rebuilds these when the project opens
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+
+# Game builds and packages (share these through GitHub Releases instead)
+/[Bb]uild/
+/[Bb]uildMac/
+*.7z
+*.7z.0*
+*.zip
+*.tar.xz
+*.tar.xz.0*
+
+# Working folders that only matter on this PC
+/Downloads/
+/Screenshots/
+/TestResults/
+
+# Editor files made automatically
+/.vscode/
+*.csproj
+*.sln
+*.slnx
+*.tmp
+.DS_Store
+Thumbs.db

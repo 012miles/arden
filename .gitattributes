@@ -1,0 +1,2 @@
+# GitHub refuses files over 100 MB, so the star map (124 MB) goes through Git LFS.
+*.exr filter=lfs diff=lfs merge=lfs -text
