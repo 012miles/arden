@@ -123,7 +123,7 @@ namespace Rocket
             GUI.Box(box, GUIContent.none, Ui.Panel);
             GUI.Label(new Rect(box.x + 16, box.y + 8, box.width - 150, 30), say, Ui.Title);
             GUI.Label(new Rect(box.x + 16, box.y + 38, box.width - 150, 24), Words.T("SPACE to skip", "SPACE to skip", "Press SPACE to skip"), Ui.Small);
-            if (GUI.Button(new Rect(box.xMax - 120, box.y + 16, 104, 38), "Skip  >", Ui.Button)) EndRollout();
+            if (Ui.Press(new Rect(box.xMax - 120, box.y + 16, 104, 38), "Skip  >", Ui.Button)) EndRollout();
             if (r != null && rollout != null && r.fade > 0.001f)
             {
                 var was = GUI.color;

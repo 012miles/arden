@@ -86,7 +86,7 @@ namespace Rocket
                 if (draw)
                 {
                     GUI.enabled = enabled;
-                    if (GUI.Button(new Rect(r.x + 12, cy + h, 276, 26), label, Ui.ButtonSmall)) act();
+                    if (Ui.Press(new Rect(r.x + 12, cy + h, 276, 26), label, Ui.ButtonSmall)) act();
                     GUI.enabled = true;
                 }
                 h += 30;
@@ -143,7 +143,7 @@ namespace Rocket
                 string here = m == active ? "  <color=#ffd060>(here)</color>" : $"  <size=10>{Bases.Distance(active, m):0} m</size>";
                 GUI.Label(new Rect(r.x + 12, cy + 3, 190, 20), $"{m.name}  <size=11>{(seats > 0 ? $"crew {crew}/{seats}" : "")}</size>{here}", Ui.Small);
                 if (m != active && crew > 0 && active.parts.Exists(p => p.def.crew > p.crew.Count))
-                    if (GUI.Button(new Rect(r.xMax - 96, cy, 84, 22), "Bring 1 here", Ui.ButtonSmall)) { Show(Bases.MoveCrew(U, m, active), 3f); return; }
+                    if (Ui.Press(new Rect(r.xMax - 96, cy, 84, 22), "Bring 1 here", Ui.ButtonSmall)) { Show(Bases.MoveCrew(U, m, active), 3f); return; }
                 cy += 26;
             }
             if (g.Count > 4) GUI.Label(new Rect(r.x + 12, cy, 280, 20), $"and {g.Count - 4} more", Ui.Small);

@@ -13,12 +13,29 @@ namespace Rocket
         Period, Comma, Slash, Backspace, Escape, Delete, Tab, F1, F5, F9, LeftBracket, RightBracket, V, Y, O,
         Alpha1, Alpha2, Alpha3, Alpha4, Alpha5, Alpha6, Alpha7, Alpha8, Alpha9, Alpha0,
         F2,
+        LeftMeta,   // Cmd on a Mac (the Windows key on a PC): Cmd+Z undoes, like Ctrl+Z
     }
 
     /// <summary>Thin input wrapper so game code doesn't care which Unity input backend is active.</summary>
     public static class In
     {
         public static readonly K[] Digits = { K.Alpha1, K.Alpha2, K.Alpha3, K.Alpha4, K.Alpha5, K.Alpha6, K.Alpha7, K.Alpha8, K.Alpha9, K.Alpha0 };
+
+        /// <summary>
+        /// Someone's typing in a text box (a name, the chat, the parts search): the game's keys stay quiet so letters don't
+        /// stage the rocket or open the map. ESC still works (it leaves the text box).
+        /// </summary>
+        public static bool Typing { get { try { return GUIUtility.keyboardControl != 0; } catch { return false; } } }
+        static bool Quiet(K k)
+        {
+            if (!Typing) return false;
+            // ESC while typing just leaves the text box (it doesn't also pause the game)
+            if (k == K.Escape && EscapeRaw) { try { GUIUtility.keyboardControl = 0; } catch { } }
+            return true;
+        }
+
+        /// <summary>Ctrl on a PC, Cmd on a Mac.</summary>
+        public static bool Cmd => Held(K.LeftCtrl) || Held(K.LeftMeta);
 
 #if ENABLE_INPUT_SYSTEM
         static readonly Dictionary<K, Key> map = new Dictionary<K, Key>();
@@ -51,12 +68,13 @@ namespace Rocket
         }
 
         public static bool EscapeDown => Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+        static bool EscapeRaw => EscapeDown;
 
         /// <summary>What to call the key a game key is on right now ("SPACE", "SHIFT", "["...).</summary>
         public static string Name(K k) => Pretty(Map(k).ToString());
 
-        public static bool Held(K k) { var kb = Keyboard.current; return kb != null && kb[Map(k)].isPressed; }
-        public static bool Down(K k) { var kb = Keyboard.current; return kb != null && kb[Map(k)].wasPressedThisFrame; }
+        public static bool Held(K k) { if (Quiet(k)) return false; var kb = Keyboard.current; return kb != null && kb[Map(k)].isPressed; }
+        public static bool Down(K k) { if (Quiet(k)) return false; var kb = Keyboard.current; return kb != null && kb[Map(k)].wasPressedThisFrame; }
         public static bool RightMouse => Mouse.current != null && Mouse.current.rightButton.isPressed;
         public static bool MiddleMouse => Mouse.current != null && Mouse.current.middleButton.isPressed;
         public static bool LeftDown => Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
@@ -80,10 +98,11 @@ namespace Rocket
         public static void Remapped() => map.Clear();
         public static string AnyKeyDown() => null;
         public static bool EscapeDown => Input.GetKeyDown(KeyCode.Escape);
+        static bool EscapeRaw => EscapeDown;
         public static string Name(K k) => Pretty(Map(k).ToString());
 
-        public static bool Held(K k) => Input.GetKey(Map(k));
-        public static bool Down(K k) => Input.GetKeyDown(Map(k));
+        public static bool Held(K k) => !Quiet(k) && Input.GetKey(Map(k));
+        public static bool Down(K k) => !Quiet(k) && Input.GetKeyDown(Map(k));
         public static bool RightMouse => Input.GetMouseButton(1);
         public static bool MiddleMouse => Input.GetMouseButton(2);
         public static bool LeftDown => Input.GetMouseButtonDown(0);

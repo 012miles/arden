@@ -507,6 +507,7 @@ namespace Rocket
                 UpdateRecovery(Time.unscaledDeltaTime);
             }
             CoopHostTick(Mathf.Min(Time.unscaledDeltaTime, 0.1f));
+            if (!root.inFlight || active?.parts == null) return;   // mission control ended the flight just now (milestone 32: this used to crash)
             trajTimer -= Time.unscaledDeltaTime;
             if (trajTimer <= 0 || mapView || railsWarp)
             {

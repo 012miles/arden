@@ -87,6 +87,15 @@ namespace Rocket
                 yield break;
             }
 
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-autotestBuilder32") >= 0)
+            {
+                yield return Builder32Tour();
+                File.WriteAllText(Path.Combine(outDir, "autotest_log.txt"), log.ToString());
+                yield return new WaitForSecondsRealtime(0.5f);
+                Application.Quit();
+                yield break;
+            }
+
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-autotestRival") >= 0)
             {
                 yield return RivalTour();

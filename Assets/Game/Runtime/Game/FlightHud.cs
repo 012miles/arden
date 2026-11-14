@@ -50,6 +50,9 @@ namespace Rocket
         /// <summary>Scenery screenshots: no HUD at all.</summary>
         public static bool HideHud;
 
+        /// <summary>Where the height-and-speed box is (the tutorial points at it).</summary>
+        public Rect TelemetryRect { get; private set; }
+
         public void OnGUI()
         {
             if (active == null || HideHud) return;
@@ -96,6 +99,7 @@ namespace Rocket
             else if (!easy) { Row(Words.T("Apoapsis", "Highest point", ""), "--"); Row(Words.T("Periapsis", "Lowest point", ""), "--"); }
             Row(Words.T("Pressure", "Air pressure", "Air"), body.HasAtmosphere ? $"{body.PressureAtm(alt) * 101.3:0.00} kPa" : Words.T("vacuum", "none (vacuum)", "none"), true);
             Row(Words.T("Dyn. pressure", "Air push", "Air push"), $"{v.dynPressure / 1000:0.0} kPa", true);
+            if (body.HasAtmosphere && alt < body.atmosphereHeight) Row(Words.T("Mach", "Speed of sound", ""), Words.Engineer ? $"{v.Mach:0.00}" : $"{v.Mach:0.0}x", true);
             Row(Words.T("G-force", "G-force", "G-force"), $"{v.gForce:0.0} g", true);
             Vector3d srfV = v.SurfaceRelVelocity;
             if (srfV.magnitude > 10 && body.HasAtmosphere && alt < body.atmosphereHeight && !v.HasDriveWheels)
@@ -119,6 +123,7 @@ namespace Rocket
             Row(Words.T("Status", "Status", "Doing"), status);
 
             var tr = new Rect(10, 10, 300, telemetry.Count * 21 + 16 + (easy ? 0 : 20));
+            TelemetryRect = tr;
             Ui.Box(tr);
             {
                 float x = tr.x + 12, y = tr.y + 8, lw = easy ? 104 : 120;
@@ -128,7 +133,7 @@ namespace Rocket
                     GUI.Label(new Rect(x + lw, y - 1, tr.width - lw - 20, 20), val, Ui.Bold);
                     y += 21;
                 }
-                if (!easy && GUI.Button(new Rect(tr.xMax - 70, tr.yMax - 24, 60, 18), HudMore ? "Less" : "More", Ui.ButtonSmall)) HudMore = !HudMore;
+                if (!easy && Ui.Press(new Rect(tr.xMax - 70, tr.yMax - 24, 60, 18), HudMore ? "Less" : "More", Ui.ButtonSmall)) HudMore = !HudMore;
             }
 
             // ---- Clock and warp
@@ -141,13 +146,13 @@ namespace Rocket
             if (!HelpVisible) warpText += $"   ·   {In.Name(K.F1)} keys";
             GUI.Label(new Rect(cr.x, cr.y + 26, cr.width, 20), warpText, Ui.Hint);
             // The clock opens the list of what's coming up.
-            if (GUI.Button(cr, GUIContent.none, GUIStyle.none)) { showEvents = !showEvents; if (showEvents) showVessels = showScience = false; }
+            if (Ui.Press(cr, GUIContent.none, GUIStyle.none)) { showEvents = !showEvents; if (showEvents) showVessels = showScience = false; }
             int others = U.vessels.Count - 1;
-            if (GUI.Button(new Rect(cr.xMax + 6, cr.y + 12, 120, 28), $"{Words.T("Vessels", "Vessels", "Ships")} ({others}) {In.Name(K.V)}", showVessels ? Ui.RowSel : Ui.ButtonSmall)) showVessels = !showVessels;
+            if (Ui.Press(new Rect(cr.xMax + 6, cr.y + 12, 120, 28), $"{Words.T("Vessels", "Vessels", "Ships")} ({others}) {In.Name(K.V)}", showVessels ? Ui.ButtonSmallSel : Ui.ButtonSmall)) showVessels = !showVessels;
             int held = 0;
             foreach (var p in v.parts) held += p.science.Count;
-            if (GUI.Button(new Rect(cr.x - 126, cr.y + 12, 120, 28), held > 0 ? $"Science ({held})" : "Science", showScience ? Ui.RowSel : Ui.ButtonSmall)) { showScience = !showScience; if (showScience) showEvents = false; }
-            if (v.HasMiningKit && GUI.Button(new Rect(cr.x - 252, cr.y + 12, 120, 28), "Mining", showMining ? Ui.RowSel : Ui.ButtonSmall)) showMining = !showMining;
+            if (Ui.Press(new Rect(cr.x - 126, cr.y + 12, 120, 28), held > 0 ? $"Science ({held})" : "Science", showScience ? Ui.ButtonSmallSel : Ui.ButtonSmall)) { showScience = !showScience; if (showScience) showEvents = false; }
+            if (v.HasMiningKit && Ui.Press(new Rect(cr.x - 252, cr.y + 12, 120, 28), "Mining", showMining ? Ui.ButtonSmallSel : Ui.ButtonSmall)) showMining = !showMining;
 
             // ---- Controls / gauges (bottom left): four bars, then only the lines that matter right now
             bool probe = v.IsControllable && v.CrewCount == 0;
@@ -202,12 +207,12 @@ namespace Rocket
                 float bw = (280f - 3f * buttons.Count) / (buttons.Count + 1), tx = kr.x + 10;
                 foreach (var (label, on, act) in buttons)
                 {
-                    if (GUI.Button(new Rect(tx, kr.yMax - 40, bw, 30), label, on ? Ui.RowSel : Ui.ButtonSmall)) act();
+                    if (Ui.Press(new Rect(tx, kr.yMax - 40, bw, 30), label, on ? Ui.ButtonSmallSel : Ui.ButtonSmall)) act();
                     tx += bw + 3;
                 }
                 var oldBg = GUI.backgroundColor;
                 GUI.backgroundColor = new Color(1f, 0.35f, 0.3f);
-                if (GUI.Button(new Rect(tx + 2, kr.yMax - 40, bw - 2, 30), Words.T("Abort", "Abort", "Eject"), Ui.ButtonSmall)) DoAbort();
+                if (Ui.Press(new Rect(tx + 2, kr.yMax - 40, bw - 2, 30), Words.T("Abort", "Abort", "Eject"), Ui.ButtonSmall)) DoAbort();
                 GUI.backgroundColor = oldBg;
             }
 
@@ -217,7 +222,7 @@ namespace Rocket
             if (node != null && node.valid) { float mh = laterNodes.Count > 0 ? 286 : 264; DrawManeuverPanel(new Rect(W - 390, rightY, 380, mh)); rightY += mh + 10; }
             else if (trajectory.Count > 0 && !v.landed && v.hasLaunched && !Words.Easy)
             {
-                if (GUI.Button(new Rect(W - 390, stagesBottom + 8, 380, 28), Words.T("Add maneuver at next apoapsis (or click your orbit in the map)", "Plan a burn at the highest point (or click your orbit in the map)", ""), Ui.ButtonSmall))
+                if (Ui.Press(new Rect(W - 390, stagesBottom + 8, 380, 28), Words.T("Add maneuver at next apoapsis (or click your orbit in the map)", "Plan a burn at the highest point (or click your orbit in the map)", ""), Ui.ButtonSmall))
                     AddNodeAtNextApsis();
                 rightY += 30;
             }
@@ -227,7 +232,7 @@ namespace Rocket
             if (U.career.IsCareer) DrawContractTracker(W, H);
 
             float popTop = 70;   // where pop-up panels and messages start: under the help bar when it's showing
-            if (HelpVisible)
+            if (HelpVisible && !paused)   // (milestone 32: the pause menu used to sit on top of it)
             {
                 string N(K k) => In.Name(k);
                 string warpKeys = $"{N(K.Comma)} {N(K.Period)} {N(K.Slash)}";
@@ -317,7 +322,7 @@ namespace Rocket
                          speedMode == SpeedMode.Orbit ? v.vel.magnitude :
                          HasTarget ? (v.AbsoluteVelocity(ut) - TargetAbsVel(ut)).magnitude : 0;
             string label = speedMode == SpeedMode.Target && !HasTarget ? "Target: none" : $"{speedMode}  {spd:0.0} m/s";
-            if (GUI.Button(new Rect(panel.x + 98, panel.y + 6, 210, 26), label, Ui.Button))
+            if (Ui.Press(new Rect(panel.x + 98, panel.y + 6, 210, 26), label, Ui.Button))
             {
                 speedModeManual = true;
                 speedMode = (SpeedMode)(((int)speedMode + 1) % 3);
@@ -352,14 +357,14 @@ namespace Rocket
             {
                 var (mode, text) = sasScratch[i];
                 var br = Words.Easy ? new Rect(panel.x + 6, panel.y + 40 + i * 58, 89, 52) : new Rect(panel.x + 6 + (i % 2) * 45, panel.y + 40 + (i / 2) * 40, 44, 36);
-                var style = v.sas == mode ? Ui.RowSel : Ui.ButtonSmall;
+                var style = v.sas == mode ? Ui.ButtonSmallSel : Ui.ButtonSmall;
                 var oldCol = GUI.color;
                 if (!v.CanHold(mode)) GUI.color = new Color(1f, 1f, 1f, 0.3f); // still clickable: it says what's needed
-                if (GUI.Button(br, text, style)) SetSas(mode);
+                if (Ui.Press(br, text, style)) SetSas(mode);
                 GUI.color = oldCol;
             }
             string sasName = Words.T("SAS", "SAS", "Steady");
-            if (GUI.Button(new Rect(panel.x + 6, panel.y + 6, 89, 26), v.sas == SasMode.Off ? $"{sasName} off" : $"{sasName} on", v.sas == SasMode.Off ? Ui.ButtonSmall : Ui.RowSel))
+            if (Ui.Press(new Rect(panel.x + 6, panel.y + 6, 89, 26), v.sas == SasMode.Off ? $"{sasName} off" : $"{sasName} on", v.sas == SasMode.Off ? Ui.ButtonSmall : Ui.ButtonSmallSel))
                 v.sas = v.sas == SasMode.Off ? SasMode.Stability : SasMode.Off;
 
             // Gauges on the right: atmosphere and heat
@@ -386,7 +391,7 @@ namespace Rocket
             GUI.Label(new Rect(r.x + 12, r.y + 26, r.width - 24, 20),
                 $"{Ui.Dist(dist)}   rel {relV.magnitude:0.0} m/s   {(closing >= 0 ? "closing" : "opening")} {Math.Abs(closing):0.0} m/s", Ui.Small);
             string ca = double.IsNaN(closestDist) ? "" : closestTime - ut < 1 ? $"Closest {Ui.Dist(closestDist)} right now" : $"Closest {Ui.Dist(closestDist)} in {Ui.Time(closestTime - ut)}";
-            if (GUI.Button(new Rect(r.xMax - 64, r.y + 6, 54, 20), "Clear", Ui.ButtonSmall)) { target = null; targetVessel = null; }
+            if (Ui.Press(new Rect(r.xMax - 64, r.y + 6, 54, 20), "Clear", Ui.ButtonSmall)) { target = null; targetVessel = null; }
             GUI.Label(new Rect(r.x + 12, r.y + 46, r.width - 24, 20), ca, Ui.Small);
         }
 
@@ -419,9 +424,9 @@ namespace Rocket
                     $"<color={c(lined)}>{Ui.Dist(dockDist)}  off-axis {dockLateral:0.00} m  angle {dockAngle:0} deg</color>", Ui.Small);
                 GUI.Label(new Rect(r.x + 12, cy + 36, 280, 20),
                     $"<color={c(slow)}>{(dockClosing >= 0 ? "closing" : "opening")} {Math.Abs(dockClosing):0.00} m/s</color>   latches within {VesselSim.DockRange:0.0} m", Ui.Small);
-                if (GUI.Button(new Rect(r.x + 12, cy + 58, 130, 22), v.sas == SasMode.DockAlign ? "Aligning (SAS)" : "Align ports (SAS)", v.sas == SasMode.DockAlign ? Ui.RowSel : Ui.ButtonSmall))
+                if (Ui.Press(new Rect(r.x + 12, cy + 58, 130, 22), v.sas == SasMode.DockAlign ? "Aligning (SAS)" : "Align ports (SAS)", v.sas == SasMode.DockAlign ? Ui.ButtonSmallSel : Ui.ButtonSmall))
                     SetSas(v.sas == SasMode.DockAlign ? SasMode.Stability : SasMode.DockAlign);
-                if (GUI.Button(new Rect(r.x + 150, cy + 58, 138, 22), v.rcsOn ? "RCS on: H/N I/K J/L" : "RCS off (R)", v.rcsOn ? Ui.RowSel : Ui.ButtonSmall)) ToggleRcs();
+                if (Ui.Press(new Rect(r.x + 150, cy + 58, 138, 22), v.rcsOn ? "RCS on: H/N I/K J/L" : "RCS off (R)", v.rcsOn ? Ui.ButtonSmallSel : Ui.ButtonSmall)) ToggleRcs();
                 cy += 86;
             }
             foreach (var p in docked)
@@ -429,7 +434,7 @@ namespace Rocket
                 bool rock = p.def.kind == PartKind.Rock || p.def.kind == PartKind.Grabber;
                 string other = p.dockedName ?? v.FindPart(p.dockedTo)?.dockedName ?? "vessel";
                 GUI.Label(new Rect(r.x + 12, cy + 3, 190, 20), rock ? $"<b>{other}</b>  <size=11>({v.FindPart(p.def.kind == PartKind.Rock ? p.index : p.dockedTo)?.def.dryMass:0} t)</size>" : $"Docked: <b>{other}</b>", Ui.Small);
-                if (GUI.Button(new Rect(r.xMax - 82, cy, 70, 22), rock ? "Release" : "Undock", Ui.ButtonSmall)) { Undock(p); return; }
+                if (Ui.Press(new Rect(r.xMax - 82, cy, 70, 22), rock ? "Release" : "Undock", Ui.ButtonSmall)) { Undock(p); return; }
                 cy += 28;
             }
             if (showCrew)
@@ -445,7 +450,7 @@ namespace Rocket
                     GUI.Label(new Rect(r.x + 12, cy, 200, 20), $"<b>{p.def.name}</b> {p.crew.Count}/{p.def.crew}", Ui.Small);
                     string people = p.crew.Count == 0 ? "empty" : string.Join(", ", p.crew.Select(n => $"{(p.crew.Count > 1 ? n.Split(' ')[0] : n)} <color=#9fc6e8>{Crew.Tag(v.CrewInfo(n))}</color>"));
                     GUI.Label(new Rect(r.x + 12, cy + 17, crewParts.Count > 1 ? 150 : 205, 20), people, Ui.Small);
-                    if (p.crew.Count > 0 && GUI.Button(new Rect(r.xMax - (crewParts.Count > 1 ? 134 : 82), cy + 4, crewParts.Count > 1 ? 48 : 70, 26), "EVA", Ui.ButtonSmall))
+                    if (p.crew.Count > 0 && Ui.Press(new Rect(r.xMax - (crewParts.Count > 1 ? 134 : 82), cy + 4, crewParts.Count > 1 ? 48 : 70, 26), "EVA", Ui.ButtonSmall))
                     {
                         GoEva(p);
                         return;
@@ -459,7 +464,7 @@ namespace Rocket
                             if (q.crew.Count < q.def.crew) to = q;
                         }
                         GUI.enabled = p.crew.Count > 0 && to != null;
-                        if (GUI.Button(new Rect(r.xMax - 82, cy + 4, 70, 26), "Move 1 >", Ui.ButtonSmall)) TransferCrew(p, to);
+                        if (Ui.Press(new Rect(r.xMax - 82, cy + 4, 70, 26), "Move 1 >", Ui.ButtonSmall)) TransferCrew(p, to);
                         GUI.enabled = true;
                     }
                     cy += 40;
@@ -494,12 +499,12 @@ namespace Rocket
             GUI.Label(new Rect(r.x + 12, cy, 280, 36), v.landed ? "W/S walk, A/D turn, SPACE jump, SHIFT jetpack up" : "W/S A/D and SHIFT/CTRL fly the jetpack, Q/E turn, T holds attitude", Ui.Small);
             cy += 36;
             GUI.enabled = boardTo != null;
-            if (GUI.Button(new Rect(r.x + 12, cy, 276, 26), boardTo != null ? $"Climb into {boardTo.name} (B)" : "Board: get within 3 m of a hatch", Ui.ButtonSmall)) { BoardNearest(); GUI.enabled = true; return; }
+            if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), boardTo != null ? $"Climb into {boardTo.name} (B)" : "Board: get within 3 m of a hatch", Ui.ButtonSmall)) { BoardNearest(); GUI.enabled = true; return; }
             GUI.enabled = true;
             cy += 30;
             if (v.landed)
             {
-                if (GUI.Button(new Rect(r.x + 12, cy, 276, 26), "Plant a flag (G)", Ui.ButtonSmall)) PlantFlag();
+                if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), "Plant a flag (G)", Ui.ButtonSmall)) PlantFlag();
                 cy += 30;
             }
             cy += CableRows(r, cy, true);
@@ -507,7 +512,7 @@ namespace Rocket
             {
                 string label = p.broken ? $"Fix the {p.def.name} on {vv.name}{(m.role == CrewRole.Engineer ? "" : " (engineer)")}" : $"Repack the {p.def.name} on {vv.name}";
                 GUI.enabled = !p.broken || m.role == CrewRole.Engineer;
-                if (GUI.Button(new Rect(r.x + 12, cy, 276, 26), label, Ui.ButtonSmall)) { if (p.broken) RepairPart(vv, p); else RepackChute(vv, p); }
+                if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), label, Ui.ButtonSmall)) { if (p.broken) RepairPart(vv, p); else RepackChute(vv, p); }
                 GUI.enabled = true;
                 cy += 30;
             }
@@ -529,7 +534,7 @@ namespace Rocket
             GUI.Label(new Rect(r.x + 12, r.y + 6, 200, 22), "Science", Ui.Header);
             GUI.Label(new Rect(r.x + 100, r.y + 9, r.width - 140, 20), $"Here: {Science.Describe(sit)} {(sit <= Situation.FlyingHigh && sit >= Situation.FlyingLow ? "over " : sit == Situation.Landed ? "of " : "")}{v.body.name}" +
                 (Science.Regional(sit) ? $", {Regions.Under(v, ut)}" : ""), Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showScience = false;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showScience = false;
             var list = Lab.On(v);
             bool radio = Lab.CanTransmit(v);
             var view = new Rect(r.x + 6, r.y + 34, r.width - 12, r.height - 64);
@@ -547,16 +552,16 @@ namespace Rocket
                     GUI.Label(new Rect(6, y + 21, view.width - 170, 20), d.title, Ui.Small);
                     GUI.Label(new Rect(6, y + 38, view.width - 165, 20), $"<color=#9fe8a8>{worth:0.0} sci home, {worth * tf:0.0} if sent{(tf > d.transmit + 1e-4f ? $" ({tf * 100:0}%, scientist)" : "")}</color>", Ui.Small);
                     GUI.enabled = radio;
-                    if (GUI.Button(new Rect(view.width - 154, y + 10, 62, 26), "Send", Ui.ButtonSmall)) { TransmitData(p, d); GUI.enabled = true; break; }
+                    if (Ui.Press(new Rect(view.width - 154, y + 10, 62, 26), "Send", Ui.ButtonSmall)) { TransmitData(p, d); GUI.enabled = true; break; }
                     GUI.enabled = true;
-                    if (GUI.Button(new Rect(view.width - 86, y + 10, 64, 26), "Discard", Ui.ButtonSmall)) { Lab.Discard(p, d); break; }
+                    if (Ui.Press(new Rect(view.width - 86, y + 10, 64, 26), "Discard", Ui.ButtonSmall)) { Lab.Discard(p, d); break; }
                 }
                 else if (p.used)
                 {
                     bool sci = v.BestLevel(CrewRole.Scientist) >= 0;
                     GUI.Label(new Rect(6, y + 22, view.width - 120, 20), sci ? "Used: your scientist can clean it out" : "Used: needs a scientist aboard to clean it out", Ui.Small);
                     GUI.enabled = sci;
-                    if (GUI.Button(new Rect(view.width - 86, y + 10, 64, 26), "Reset", Ui.Button)) Show(Lab.Reset(v, p), 3f);
+                    if (Ui.Press(new Rect(view.width - 86, y + 10, 64, 26), "Reset", Ui.Button)) Show(Lab.Reset(v, p), 3f);
                     GUI.enabled = true;
                 }
                 else
@@ -564,7 +569,7 @@ namespace Rocket
                     float worth = Lab.Preview(c, v, e, ut, p);
                     GUI.Label(new Rect(6, y + 22, view.width - 120, 20), worth < 0 ? "Nothing to measure here" : worth < 0.05f ? "Nothing new to learn here" : $"Worth up to {worth:0.0} science here", Ui.Small);
                     GUI.enabled = worth >= 0;
-                    if (GUI.Button(new Rect(view.width - 86, y + 10, 64, 26), "Run", Ui.Button)) RunExperiment(p, e);
+                    if (Ui.Press(new Rect(view.width - 86, y + 10, 64, 26), "Run", Ui.Button)) RunExperiment(p, e);
                     GUI.enabled = true;
                 }
                 y += 62;
@@ -591,7 +596,7 @@ namespace Rocket
             GUI.Label(new Rect(r.x + 12, r.y + 6, 200, 22), "Mining", Ui.Header);
             int eng = v.BestLevel(CrewRole.Engineer);
             if (machines) GUI.Label(new Rect(r.x + 100, r.y + 9, 280, 20), eng >= 0 ? $"<color=#9fc6e8>Engineer aboard: +{Crew.MiningBonus(eng) * 100:0}% output</color>" : "No engineer aboard (they add 20-70% output)", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showMining = false;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showMining = false;
             float cy = r.y + 32;
 
             // Ore under the vessel: exact with a drill on the ground, approximate where the survey has mapped it.
@@ -624,7 +629,7 @@ namespace Rocket
                 foreach (var (label, mode) in new[] { ("Off", 0), ("Fuel", 1), ("Monoprop", 2) })
                 {
                     float bw = mode == 2 ? 84 : 52;
-                    if (GUI.Button(new Rect(bx, cy - 2, bw, 22), label, p.convMode == mode ? Ui.RowSel : Ui.ButtonSmall)) { v.SetConverter(p, mode); Show($"{p.def.name}: {(mode == 0 ? "off" : mode == 1 ? "making fuel" : "making monopropellant")}", 2f); }
+                    if (Ui.Press(new Rect(bx, cy - 2, bw, 22), label, p.convMode == mode ? Ui.ButtonSmallSel : Ui.ButtonSmall)) { v.SetConverter(p, mode); Show($"{p.def.name}: {(mode == 0 ? "off" : mode == 1 ? "making fuel" : "making monopropellant")}", 2f); }
                     bx += bw + 4;
                 }
                 v.convNotes.TryGetValue(p.index, out string note);
@@ -696,7 +701,7 @@ namespace Rocket
             r.height = 38 + Mathf.Max(1, rows) * 30 + 6;
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 12, r.y + 6, 200, 22), Words.T("Coming up", "Coming up", "What's next"), Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 30, r.y + 8, 22, 20), "x", Ui.ButtonSmall)) showEvents = false;
+            if (Ui.Press(new Rect(r.xMax - 30, r.y + 8, 22, 20), "x", Ui.ButtonSmall)) showEvents = false;
             if (events.Count == 0) GUI.Label(new Rect(r.x + 12, r.y + 38, r.width - 24, 24), "Nothing planned. Set a maneuver or a target.", Ui.Small);
             double half = node != null && node.valid ? ManeuverNode.BurnTime(active, node.DeltaV) / 2 : 0;
             if (double.IsInfinity(half)) half = 0;
@@ -708,7 +713,7 @@ namespace Rocket
                 GUI.Label(new Rect(r.x + 296, y + 4, 90, 20), Ui.Time(e.ut - ut), Ui.Label);
                 double lead = FlightEvents.Lead(e, half);
                 GUI.enabled = e.ut - lead > ut + 1;
-                if (GUI.Button(new Rect(r.xMax - 64, y + 2, 54, 24), "Warp", Ui.ButtonSmall))
+                if (Ui.Press(new Rect(r.xMax - 64, y + 2, 54, 24), "Warp", Ui.ButtonSmall))
                 {
                     if (e.kind == 0) WarpToNode(); else WarpTo(e.ut - lead, e.title);
                 }
@@ -724,8 +729,8 @@ namespace Rocket
         {
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 12, r.y + 6, 200, 22), "Vessels", Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 150, r.y + 6, 110, 22), vesselListDebris ? "Hide debris" : "Show debris", Ui.ButtonSmall)) vesselListDebris = !vesselListDebris;
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showVessels = false;
+            if (Ui.Press(new Rect(r.xMax - 150, r.y + 6, 110, 22), vesselListDebris ? "Hide debris" : "Show debris", Ui.ButtonSmall)) vesselListDebris = !vesselListDebris;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showVessels = false;
             var list = new List<VesselSim>();
             foreach (var u in U.vessels) if (u != active && !u.destroyed && (vesselListDebris || !u.isDebris || u == targetVessel)) list.Add(u);
             list.Sort((a, b) => Distance(a).CompareTo(Distance(b)));
@@ -738,9 +743,9 @@ namespace Rocket
                 bool isT = u == targetVessel;
                 GUI.Label(new Rect(6, y + 2, 250, 20), $"<b>{u.name}</b>{(u.isDebris ? "  <size=11>(debris)</size>" : u.IsRock ? $"  <size=11>({u.parts[0].def.dryMass:0} t)</size>" : "")}", Ui.Label);
                 GUI.Label(new Rect(6, y + 22, 260, 20), $"{u.Situation(ut)}   {Ui.Dist(Distance(u))}", Ui.Small);
-                if (GUI.Button(new Rect(view.width - 150, y + 6, 64, 28), isT ? "Untarget" : "Target", isT ? Ui.RowSel : Ui.ButtonSmall)) SetTarget(u);
+                if (Ui.Press(new Rect(view.width - 150, y + 6, 64, 28), isT ? "Untarget" : "Target", isT ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetTarget(u);
                 GUI.enabled = (!u.isDebris || u.IsControllable) && !u.IsFlag && !u.IsRock;
-                if (GUI.Button(new Rect(view.width - 82, y + 6, 60, 28), "Fly", Ui.ButtonSmall)) { SwitchTo(u); showVessels = false; }
+                if (Ui.Press(new Rect(view.width - 82, y + 6, 60, 28), "Fly", Ui.ButtonSmall)) { SwitchTo(u); showVessels = false; }
                 GUI.enabled = true;
                 y += 50;
             }
@@ -789,7 +794,7 @@ namespace Rocket
             double toNode = node.ut - ut;
             double startIn = toNode - (double.IsInfinity(burn) ? 0 : burn / 2);
             GUI.Label(new Rect(r.x + 12, r.y + 6, 200, 22), "Maneuver", Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 70, r.y + 6, 60, 22), "Delete", Ui.ButtonSmall)) { DeleteNode(); return; }
+            if (Ui.Press(new Rect(r.xMax - 70, r.y + 6, 60, 22), "Delete", Ui.ButtonSmall)) { DeleteNode(); return; }
             bool burning = startIn < 0;
             double remaining = node.Remaining(v, ut, burning).magnitude;
             GUI.Label(new Rect(r.x + 12, r.y + 30, r.width - 24, 20),
@@ -807,19 +812,19 @@ namespace Rocket
             bx += 44;
             foreach (var (txt, d) in new[] { ("-1m", -60.0), ("-10s", -10.0), ("+10s", 10.0), ("+1m", 60.0) })
             {
-                if (GUI.Button(new Rect(bx, y + 2, 48, 22), txt, Ui.ButtonSmall)) { node.ut = Math.Max(ut + 5, node.ut + d); node.Update(trajectory); }
+                if (Ui.Press(new Rect(bx, y + 2, 48, 22), txt, Ui.ButtonSmall)) { node.ut = Math.Max(ut + 5, node.ut + d); node.Update(trajectory); }
                 bx += 52;
             }
-            if (trajectory.Count > 0 && trajectory[0].orbit.IsElliptic && GUI.Button(new Rect(bx, y + 2, 92, 22), "+1 orbit", Ui.ButtonSmall))
+            if (trajectory.Count > 0 && trajectory[0].orbit.IsElliptic && Ui.Press(new Rect(bx, y + 2, 92, 22), "+1 orbit", Ui.ButtonSmall))
             {
                 node.ut += trajectory[0].orbit.Period;
                 node.Update(trajectory);
             }
             y += 28;
-            if (GUI.Button(new Rect(r.x + 12, y + 2, 170, 26), "Warp to maneuver", Ui.Button)) WarpToNode();
-            if (GUI.Button(new Rect(r.x + 190, y + 2, 178, 26), "Point at it (SAS)", Ui.Button)) SetSas(SasMode.Maneuver);
+            if (Ui.Press(new Rect(r.x + 12, y + 2, 170, 26), "Warp to maneuver", Ui.Button)) WarpToNode();
+            if (Ui.Press(new Rect(r.x + 190, y + 2, 178, 26), "Point at it (SAS)", Ui.Button)) SetSas(SasMode.Maneuver);
             y += 32;
-            if (GUI.Button(new Rect(r.x + 12, y + 2, 356, 26), autoBurn ? "Auto-burn ON (the computer flies it; X stops)" : "Auto-burn: let the computer fly it", autoBurn ? Ui.RowSel : Ui.Button)) ToggleAutoBurn();
+            if (Ui.Press(new Rect(r.x + 12, y + 2, 356, 26), autoBurn ? "Auto-burn ON (the computer flies it; X stops)" : "Auto-burn: let the computer fly it", autoBurn ? Ui.ButtonSel : Ui.Button)) ToggleAutoBurn();
             if (laterNodes.Count > 0)
             {
                 var nx = laterNodes[0];
@@ -840,14 +845,14 @@ namespace Rocket
             float bx = r.x + 88;
             foreach (var (txt, d) in new[] { ("-10", -10.0), ("-1", -1.0), ("-0.1", -0.1) })
             {
-                if (GUI.Button(new Rect(bx, y + 1, 34, 22), txt, Ui.ButtonSmall)) { value += d; node.Update(trajectory); }
+                if (Ui.Press(new Rect(bx, y + 1, 34, 22), txt, Ui.ButtonSmall)) { value += d; node.Update(trajectory); }
                 bx += 36;
             }
             GUI.Label(new Rect(bx + 2, y + 2, 60, 20), $"{value:0.0}", Ui.Bold);
             bx += 62;
             foreach (var (txt, d) in new[] { ("+0.1", 0.1), ("+1", 1.0), ("+10", 10.0) })
             {
-                if (GUI.Button(new Rect(bx, y + 1, 34, 22), txt, Ui.ButtonSmall)) { value += d; node.Update(trajectory); }
+                if (Ui.Press(new Rect(bx, y + 1, 34, 22), txt, Ui.ButtonSmall)) { value += d; node.Update(trajectory); }
                 bx += 36;
             }
             y += 26;
@@ -885,27 +890,27 @@ namespace Rocket
             if (paused && !active.destroyed)
             {
                 float hw0 = (r.width - 88) / 2;
-                if (GUI.Button(new Rect(r.x + 40, y, hw0, 30), "Resume", Ui.Button)) paused = false;
-                if (GUI.Button(new Rect(r.x + 48 + hw0, y, hw0, 30), "Photo mode (F2)", Ui.Button)) { paused = false; TogglePhoto(); return; }
+                if (Ui.Press(new Rect(r.x + 40, y, hw0, 30), "Resume", Ui.Button)) paused = false;
+                if (Ui.Press(new Rect(r.x + 48 + hw0, y, hw0, 30), "Photo mode (F2)", Ui.Button)) { paused = false; TogglePhoto(); return; }
                 y += 36;
                 float vol = FlightAudio.Volume;
                 GUI.Label(new Rect(r.x + 40, y + 5, 130, 22), $"Sound: {(vol < 0.01f ? "off" : $"{vol * 100:0}%")}", Ui.Label);
-                if (GUI.Button(new Rect(r.xMax - 150, y, 50, 28), "-", Ui.Button)) FlightAudio.Volume = Mathf.Round((vol - 0.1f) * 10) / 10;
-                if (GUI.Button(new Rect(r.xMax - 94, y, 50, 28), "+", Ui.Button)) FlightAudio.Volume = Mathf.Round((vol + 0.1f) * 10) / 10;
+                if (Ui.Press(new Rect(r.xMax - 150, y, 50, 28), "-", Ui.Button)) FlightAudio.Volume = Mathf.Round((vol - 0.1f) * 10) / 10;
+                if (Ui.Press(new Rect(r.xMax - 94, y, 50, 28), "+", Ui.Button)) FlightAudio.Volume = Mathf.Round((vol + 0.1f) * 10) / 10;
                 y += 36;
                 float mus = GameAudio.MusicVolume;
                 GUI.Label(new Rect(r.x + 40, y + 5, 130, 22), $"Music: {(mus < 0.01f ? "off" : $"{mus * 100:0}%")}", Ui.Label);
-                if (GUI.Button(new Rect(r.xMax - 150, y, 50, 28), "-", Ui.Button)) GameAudio.MusicVolume = Mathf.Round((mus - 0.1f) * 10) / 10;
-                if (GUI.Button(new Rect(r.xMax - 94, y, 50, 28), "+", Ui.Button)) GameAudio.MusicVolume = Mathf.Round((mus + 0.1f) * 10) / 10;
+                if (Ui.Press(new Rect(r.xMax - 150, y, 50, 28), "-", Ui.Button)) GameAudio.MusicVolume = Mathf.Round((mus - 0.1f) * 10) / 10;
+                if (Ui.Press(new Rect(r.xMax - 94, y, 50, 28), "+", Ui.Button)) GameAudio.MusicVolume = Mathf.Round((mus + 0.1f) * 10) / 10;
                 y += 36;
                 float hw = (r.width - 88) / 2;
-                if (GUI.Button(new Rect(r.x + 40, y, hw, 30), "Quicksave (F5)", Ui.Button)) { QuickSave(); paused = false; }
+                if (Ui.Press(new Rect(r.x + 40, y, hw, 30), "Quicksave (F5)", Ui.Button)) { QuickSave(); paused = false; }
                 GUI.enabled = HasQuicksave;
-                if (GUI.Button(new Rect(r.x + 48 + hw, y, hw, 30), "Quickload (F9)", Ui.Button)) { QuickLoad(); GUI.enabled = true; return; }
+                if (Ui.Press(new Rect(r.x + 48 + hw, y, hw, 30), "Quickload (F9)", Ui.Button)) { QuickLoad(); GUI.enabled = true; return; }
                 GUI.enabled = true;
                 y += 36;
                 bool guideOn = Guide.Showing(U.career.guide);
-                if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), guideOn ? "Hide the first-flight guide" : "Show the first-flight guide", Ui.Button))
+                if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), guideOn ? "Hide the first-flight guide" : "Show the first-flight guide", Ui.Button))
                 {
                     U.career.guide = guideOn ? Guide.Closed : active.hasLaunched ? Guide.Climb : Guide.Ignite;
                     U.Save();
@@ -915,42 +920,42 @@ namespace Rocket
                 Ui.WordsPicker(r.x + 40, y, (r.width - 88) / 3);
                 y += 36;
                 float hw2 = (r.width - 88) / 2;
-                if (GUI.Button(new Rect(r.x + 40, y, hw2, 30), "How to play", Ui.Button)) showHowTo = true;
-                if (GUI.Button(new Rect(r.x + 48 + hw2, y, hw2, 30), $"Badges ({U.career.badges.Count})", Ui.Button)) showBadges = true;
+                if (Ui.Press(new Rect(r.x + 40, y, hw2, 30), "How to play", Ui.Button)) showHowTo = true;
+                if (Ui.Press(new Rect(r.x + 48 + hw2, y, hw2, 30), $"Badges ({U.career.badges.Count})", Ui.Button)) showBadges = true;
                 y += 36;
                 GUI.enabled = CanReplay;
-                if (GUI.Button(new Rect(r.x + 40, y, hw2, 30), "Watch replay", Ui.Button)) { StartReplay(); GUI.enabled = true; return; }
+                if (Ui.Press(new Rect(r.x + 40, y, hw2, 30), "Watch replay", Ui.Button)) { StartReplay(); GUI.enabled = true; return; }
                 GUI.enabled = PracticeAllowed;
-                if (GUI.Button(new Rect(r.x + 48 + hw2, y, hw2, 30), PracticeAllowed ? "Practice tools" : "Practice (sandbox)", Ui.Button)) { paused = false; showPractice = true; GUI.enabled = true; return; }
+                if (Ui.Press(new Rect(r.x + 48 + hw2, y, hw2, 30), PracticeAllowed ? "Practice tools" : "Practice (sandbox)", Ui.Button)) { paused = false; showPractice = true; GUI.enabled = true; return; }
                 GUI.enabled = true;
                 y += 36;
             }
             if (active.destroyed && CanReplay)
             {
-                if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), "Watch the replay", Ui.Button)) { StartReplay(); return; }
+                if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Watch the replay", Ui.Button)) { StartReplay(); return; }
                 y += 36;
             }
             if (active.destroyed && HasQuicksave)
             {
-                if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), "Load the quicksave (F9)", Ui.Button)) { QuickLoad(); return; }
+                if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Load the quicksave (F9)", Ui.Button)) { QuickLoad(); return; }
                 y += 36;
             }
             if (CanRevert)
             {
-                if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), "Revert to launch", Ui.Button)) { root.Revert(design, launchRunway); return; }
+                if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Revert to launch", Ui.Button)) { root.Revert(design, launchRunway); return; }
                 y += 36;
             }
             if (CanRecover)
             {
-                if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), $"Recover {active.name}", Ui.Button)) { Recover(); return; }
+                if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), $"Recover {active.name}", Ui.Button)) { Recover(); return; }
                 y += 36;
             }
             else if (active.destroyed && U.vessels.Count > 1)
             {
-                if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), "Fly another vessel (V)", Ui.Button)) showVessels = true;
+                if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Fly another vessel (V)", Ui.Button)) showVessels = true;
                 y += 36;
             }
-            if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), active.destroyed || active.landed ? "Back to the builder" : "Back to the builder (it stays out there)", Ui.Button))
+            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), active.destroyed || active.landed ? "Back to the builder" : "Back to the builder (it stays out there)", Ui.Button))
                 root.EnterHangar();
         }
     }

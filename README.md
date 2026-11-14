@@ -12,7 +12,8 @@ Made by captaincarl24
 - **Crew**: Ardlings with jobs and experience, spacewalks, flag planting and climbing back in.
 - **Career**: science, money, contracts and an upgradeable space centre, plus achievements, a story, replays, photo mode (F2) and weather.
 - **Three difficulty levels**: Easy, Standard and Engineer, with explanations that match.
-- **Multiplayer**: up to 4 players on the same network share one rocket as builder, pilot, engineer and mission control.
+- **Multiplayer**: up to 4 players on the same network share one rocket as builder, pilot, engineer and mission control. Host or join from
+  one screen.
 - **Mission Design**: plan a whole mission around a science goal, balancing mass, power, money, data, radio contact and time. Then launch it, get a scored report, compare two designs side by side, see which real NASA missions are like yours, and race other teams on the same mission.
 
 ## The worlds
@@ -38,7 +39,22 @@ Ready-to-play builds go in this repo's **Releases** page.
 
   The `xattr` step is needed because the app isn't signed with an Apple developer certificate.
 
-How to play is in the game itself: **How to play** on the title screen covers every part, and **Controls** lets you change the keys.
+How to play is in the game itself: the first game starts an **interactive tutorial** (File > Play the tutorial in the builder plays it
+again), **How to play** on the title screen covers every part, and **Controls** lets you change the keys.
+
+### Builder
+
+| Key / mouse | What it does |
+| --- | --- |
+| Click a part in the list | Take it in your hand (it stays there after you place it, for more copies) |
+| Click on the rocket | Stick the part on (green dots are free stack nodes) |
+| Right-click or Esc | Put down what you're holding (a part picked up off the rocket goes back) |
+| Backspace / Delete | Delete the part under the mouse |
+| Ctrl+Z / Cmd+Z | Undo (Ctrl+Shift+Z or Ctrl+Y to redo) |
+| X / R / C | Symmetry count / radial or mirror / angle snap |
+| Right-drag, scroll | Turn the view, zoom |
+
+The search box at the top of the parts list finds parts by name or kind, and **Presets** has 22 ready-made rockets.
 
 ### Main keys (flight)
 

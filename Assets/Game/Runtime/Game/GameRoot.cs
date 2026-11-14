@@ -157,7 +157,7 @@ namespace Rocket
             if (e.type == EventType.MouseDown && e.button == 0 && Ui.MouseOverUI(In.MousePosition)) GameAudio.I?.Click();
             if (inMission) { mission.OnGUI(); return; }
             if (inMenu) menu.OnGUI();
-            else if (inFlight) flight.OnGUI();
+            else if (inFlight) { flight.OnGUI(); if (!FlightMode.HideHud && !flight.photoMode) Tutorial.DrawFlight(flight); }
             else hangar.OnGUI();
             if (!inMenu && universe != null && !FlightMode.HideHud && !(inFlight && flight != null && flight.photoMode)) Badges.DrawToast(universe.career, Ui.W);   // achievements (milestone 23)
         }

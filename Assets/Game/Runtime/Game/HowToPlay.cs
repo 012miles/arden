@@ -42,7 +42,9 @@ namespace Rocket
                 case 1: return
                     "Pick a part from the list on the left, then click on your rocket to attach it. Green dots show where parts can stack; " +
                     "side parts (fins, solar panels, legs) stick onto the surface. Symmetry puts on several copies at once, evenly around the rocket.\n\n" +
-                    "Right-drag to turn the view and scroll to zoom. Right-click a part for its options. Ctrl+Z undoes.\n\n" +
+                    "A part stays in your hand after you stick it on, so you can add more; right-click or ESC puts it down. Type in the search box to find a part. " +
+                    "Backspace deletes the part under the mouse. Right-drag to turn the view and scroll to zoom. Right-click a part for its options. " +
+                    "Ctrl+Z (Cmd+Z on a Mac) undoes. File > Play the tutorial shows you round step by step.\n\n" +
                     "The panel on the right shows your stages and each one's speed budget: how much its engines can change your speed. " +
                     "Getting into orbit takes about 3,400 m/s; going to Tal and back about 5,500.\n\n" +
                     "Keep the centre of mass (yellow) ahead of the centre of lift (blue) so the rocket flies nose first, like an arrow. " +
@@ -174,7 +176,9 @@ namespace Rocket
                 case 1: return
                     "Pick parts from the list on the left and click on your rocket to attach them. Green dots are free stack nodes; " +
                     "side parts (fins, solar panels, legs) go on the surface. Symmetry places several at once.\n\n" +
-                    "Right-drag to turn the view, scroll to zoom. Right-click a part for its options. Ctrl+Z undoes.\n\n" +
+                    "A part stays in your hand after you place it (right-click or ESC puts it down); a part picked up off the rocket goes back if you let go. " +
+                    "Search the parts list by name or kind. Backspace (or Delete) removes the part under the mouse. Right-drag to turn the view, scroll to zoom. " +
+                    "Right-click a part for its options. Ctrl+Z (Cmd+Z on a Mac) undoes, Ctrl+Shift+Z redoes. File > Play the tutorial for a guided tour.\n\n" +
                     "The panel on the right shows your stages and how much delta-v (change of speed) each one has. " +
                     "Getting to orbit takes about 3,300-3,500 m/s; to Tal and back about 5,500.\n\n" +
                     "Keep the centre of mass (yellow) above the centre of lift (blue) so the rocket flies nose first. " +
@@ -233,13 +237,13 @@ namespace Rocket
         {
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 26), "How to play", Ui.Header);
-            bool open = !GUI.Button(new Rect(r.xMax - 40, r.y + 10, 28, 24), "x", Ui.ButtonSmall);
+            bool open = !Ui.Press(new Rect(r.xMax - 40, r.y + 10, 28, 24), "x", Ui.ButtonSmall);
             GUI.Label(new Rect(r.xMax - 380, r.y + 14, 60, 22), "Words", Ui.Small);
             Ui.WordsPicker(r.xMax - 330, r.y + 8, 92);
             float ty = r.y + 48;
             for (int i = 0; i < Topics.Length; i++)
             {
-                if (GUI.Button(new Rect(r.x + 14, ty, 170, 30), TopicName(i), topic == i ? Ui.RowSel : Ui.ButtonSmall)) topic = i;
+                if (Ui.Press(new Rect(r.x + 14, ty, 170, 30), TopicName(i), topic == i ? Ui.ButtonSmallSel : Ui.ButtonSmall)) topic = i;
                 ty += 34;
             }
             var page = new Rect(r.x + 200, r.y + 48, (r.width - 216) * 0.93f, r.height - 64);

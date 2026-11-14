@@ -17,7 +17,8 @@ namespace Rocket
             Log($"rocket room: {room.Error ?? "open"}, code {room.State.code}, {(camp ? "campaign" : "sandbox")}");
             root.EnterCoop(room);
             if (camp) Log($"campaign save: '{SaveSlots.NameOf(SaveSlots.Current)}', career {root.universe.career.IsCareer}, money {root.universe.career.funds:N0}");
-            yield return WaitFor(() => room.State.players.Count == 4, 90f, "three players");
+            int want = int.TryParse(Arg("-coopPlayers"), out int wn) ? Mathf.Clamp(wn, 2, 4) : 4;
+            yield return WaitFor(() => room.State.players.Count == want, 90f, $"{want - 1} more players");
             Log($"players: {string.Join(", ", room.State.players.Select(p => p.name + ":" + p.roles))}");
             // build: start from the starter rocket
             root.hangar.SetDesignFromNet(camp ? VesselDesign.FirstFlight() : VesselDesign.Default());
@@ -30,6 +31,7 @@ namespace Rocket
             Coop.Current.Launch(root.hangar.design, false, 0);
             yield return WaitFor(() => root.inFlight, 20f, "the launch");
             Log($"launched: goal {room.State.goal}");
+            if (Coop.Current.Has(Coop.Pilot)) { yield return new WaitForSecondsRealtime(2f); root.flight.active.throttle = 1; root.flight.SetSas(SasMode.Stability); }   // a small team: the host flies too
             yield return new WaitForSecondsRealtime(14f);
             root.flight.SetCamera(160f, 8f, 60f);
             yield return new WaitForSecondsRealtime(1f);
@@ -106,7 +108,8 @@ namespace Rocket
             if (!Coop.Active) yield break;
             var c = Coop.Current;
             var room = c.room;
-            yield return WaitFor(() => room.State.players.Count == 4 && !string.IsNullOrEmpty(room.State.designJson), 90f, "the team and the rocket");
+            int want = int.TryParse(Arg("-coopPlayers"), out int wn) ? Mathf.Clamp(wn, 2, 4) : 4;
+            yield return WaitFor(() => room.State.players.Count == want && !string.IsNullOrEmpty(room.State.designJson), 90f, "the team and the rocket");
             yield return new WaitForSecondsRealtime(2f + room.MyId % 3);
             bool pilot = c.Has(Coop.Pilot), eng = c.Has(Coop.Engineer), ctl = c.Has(Coop.Control);
             Log($"{name}: jobs {room.Me.roles}" + (room.State.campaign ? $"; campaign, the host's money on my screen {root.universe.career.funds:N0}, career {root.universe.career.IsCareer}" : ""));
@@ -136,8 +139,13 @@ namespace Rocket
             yield return new WaitForSecondsRealtime(2f);
             yield return Shot($"455_{name.ToLower()}_after");
             Log($"{name}: back to building; {room.State.summary}" + (room.State.campaign ? $" (money now {root.universe.career.funds:N0})" : ""));
-            yield return new WaitForSecondsRealtime(3f);
-            root.LeaveCoop();
+            // milestone 32: the host leaves first; this player should land on the multiplayer screen, told why
+            yield return WaitFor(() => !Coop.Active, 30f, "the host to leave");
+            yield return new WaitForSecondsRealtime(1.5f);
+            Log($"{name}: after the host left: on the multiplayer screen {root.inMission}, in a room {Coop.Active}");
+            yield return Shot($"457_{name.ToLower()}_host_left");
+            if (Coop.Active) root.LeaveCoop();
+            if (root.inMission) root.LeaveMission();
         }
     }
 }

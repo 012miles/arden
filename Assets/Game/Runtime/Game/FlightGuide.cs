@@ -48,7 +48,7 @@ namespace Rocket
         float DrawGuide(float W, float y)
         {
             var c = U.career;
-            if (!Guide.Showing(c.guide) || active == null || active.IsEva) return y;
+            if (!Guide.Showing(c.guide) || active == null || active.IsEva || Tutorial.Active) return y;   // (the tutorial's box says it instead)
             var s = GuideNow();
             string text = Guide.Text(c.guide, s, c.IsCareer);
             var r = new Rect(W - 390, y, 380, 30 + Ui.Small.CalcHeight(new GUIContent(text), 336) + 12);
@@ -56,9 +56,9 @@ namespace Rocket
             if (done) r.height += 30;
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 12, r.y + 6, r.width - 50, 22), Guide.Title(c.guide), Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 30, r.y + 6, 22, 20), "x", Ui.ButtonSmall)) CloseGuide();
+            if (Ui.Press(new Rect(r.xMax - 30, r.y + 6, 22, 20), "x", Ui.ButtonSmall)) CloseGuide();
             GUI.Label(new Rect(r.x + 12, r.y + 30, 336, r.height - 34), text, Ui.Small);
-            if (done && GUI.Button(new Rect(r.xMax - 110, r.yMax - 32, 100, 24), "Got it", Ui.ButtonSmall)) CloseGuide();
+            if (done && Ui.Press(new Rect(r.xMax - 110, r.yMax - 32, 100, 24), "Got it", Ui.ButtonSmall)) CloseGuide();
             return r.yMax;
         }
 

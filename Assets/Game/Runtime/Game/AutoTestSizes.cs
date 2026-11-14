@@ -14,7 +14,8 @@ namespace Rocket
         IEnumerator SizesTour()
         {
             var root = GameRoot.I;
-            var sizes = new[] { (1024, 768), (1280, 1024), (1280, 720), (1920, 1200), (2560, 1080) };
+            // milestone 32: MacBook shapes too (13" and 15" Airs are about 1.54:1, older MacBooks 16:10, Surface-style 3:2)
+            var sizes = new[] { (1024, 768), (1280, 1024), (1280, 720), (1440, 932), (1680, 1050), (1500, 1000), (1920, 1200), (2560, 1080) };
             int problems = 0;
 
             IEnumerator Check(string name, bool shot)
@@ -37,6 +38,21 @@ namespace Rocket
                 root.EnterHangar();
                 var hg = root.hangar;
                 yield return Check($"200_{tag}_builder", true);
+                if (w == 1440)
+                {
+                    // the same window in Easy and Engineer words (different labels, different widths)
+                    var was = Words.Level;
+                    Words.Level = WordLevel.Easy;
+                    yield return Check($"200_{tag}_builder_easy", true);
+                    Words.Level = WordLevel.Engineer;
+                    yield return Check($"200_{tag}_builder_engineer", false);
+                    Words.Level = was;
+                    root.ShowMission();
+                    yield return Check($"200_{tag}_lobby", true);
+                    root.LeaveMission();
+                    root.EnterHangar();
+                    hg = root.hangar;
+                }
                 hg.ShowMissions(true);
                 yield return Check($"201_{tag}_missions", shoot);
                 hg.ShowTech(true);

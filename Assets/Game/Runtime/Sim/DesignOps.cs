@@ -243,6 +243,44 @@ namespace Rocket
             return roots;
         }
 
+        /// <summary>
+        /// Milestone 32: everything that goes when part i is deleted or picked up: it and its symmetry copies, with all
+        /// that hangs from them, but never the root (index 0). A root that shared a symmetry id with other parts used to
+        /// be deleted along with them, which broke the rocket.
+        /// </summary>
+        public static HashSet<int> RemovalSet(VesselDesign d, int i)
+        {
+            var kill = new HashSet<int>();
+            if (i <= 0 || i >= d.nodes.Count) return kill;
+            foreach (int g in SymmetryGroup(d, i))
+            {
+                if (g == 0) continue;
+                foreach (int k in Subtree(d, g)) kill.Add(k);
+            }
+            kill.Remove(0);
+            return kill;
+        }
+
+        /// <summary>
+        /// Checks a design's tree (for tests): one root at index 0, every other part's parent an earlier-or-later valid
+        /// index that leads back to the root without loops. Returns null when it's sound, or what's wrong.
+        /// </summary>
+        public static string TreeProblem(VesselDesign d)
+        {
+            int n = d.nodes.Count;
+            if (n == 0) return null;
+            if (d.nodes[0].parent != -1) return "the first part isn't the root";
+            for (int i = 1; i < n; i++)
+            {
+                int p = d.nodes[i].parent;
+                if (p < 0 || p >= n || p == i) return $"part {i} ({d.nodes[i].id}) has a bad parent {p}";
+                int steps = 0;
+                for (int k = i; k != 0; k = d.nodes[k].parent)
+                    if (++steps > n || d.nodes[k].parent < 0) return $"part {i} ({d.nodes[i].id}) doesn't lead back to the root";
+            }
+            return null;
+        }
+
         public static List<int> SymmetryGroup(VesselDesign d, int i)
         {
             int s = d.nodes[i].sym;

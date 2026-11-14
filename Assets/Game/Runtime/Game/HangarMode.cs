@@ -37,6 +37,8 @@ namespace Rocket
             design = d;
             selected = -1;
             held = null;
+            heldUndo = null;
+            ClearGhosts();   // (milestone 32: the see-through part that followed the mouse used to stay behind)
             menuPart = -1;
             Rebuild();
         }
@@ -49,6 +51,19 @@ namespace Rocket
         bool mirror, snap = true;
 
         List<PartNode> held;
+        /// <summary>
+        /// Milestone 32: where the part in your hand came from. A new part (from the list) stays in your hand after you
+        /// place it, so you can keep adding copies; one picked up off the rocket goes back where it was if you let go
+        /// (ESC or right-click), and is only deleted on purpose (Backspace, or dropped on the parts list).
+        /// </summary>
+        enum HeldFrom { New, Picked }
+        HeldFrom heldFrom;
+        List<PartNode> heldTemplate;   // a fresh copy of a new part, for the next one
+        string heldUndo;               // the rocket before the part was picked up, to put it back
+        bool stickyTipShown;
+        readonly List<string> redo = new List<string>();
+        string partSearch = "";
+        float clearArmedUntil;         // Backspace on the root part asks twice before clearing the whole rocket
         readonly List<VesselView> ghosts = new List<VesselView>();
         Quaternion heldExtra = Quaternion.identity;
         bool placeValid;
@@ -71,7 +86,45 @@ namespace Rocket
         string toast;
         float toastUntil;
         PartDef hoverDef;
-        Rect partsRect;
+        Rect partsRect, partsListRect;
+        // Where things are on the screen, for the interactive tutorial (milestone 32)
+        public Rect PartsPanelRect => partsRect;
+        public Rect SearchRect { get; private set; }
+        public Rect StagePanelRect { get; private set; }
+        public Rect LaunchRect { get; private set; }
+        public Rect PresetsRect { get; private set; }
+        public Rect UndoRect { get; private set; }
+        public bool Holding => held != null;
+        /// <summary>The tutorial filters the parts list to what the current step needs.</summary>
+        public string TutorialSearch { get => partSearch; set { partSearch = value ?? ""; partsScroll = Vector2.zero; } }
+        /// <summary>The tutorial's "Start fresh": an empty hangar (undo brings the old rocket back).</summary>
+        public void TutorialClear()
+        {
+            PushUndo();
+            DropHeldQuietly();
+            design = new VesselDesign { name = "My Rocket" };
+            selected = -1;
+            if (planeView) SetView(false); else Rebuild();
+        }
+        public string HeldId => held != null && held.Count > 0 ? held[0].id : null;
+        /// <summary>The rocket on the screen (GUI units), or an empty rect.</summary>
+        public Rect RocketScreenRect()
+        {
+            if (view == null || design.nodes.Count == 0 || Cam == null) return new Rect(Ui.W * 0.5f - 60, Ui.H * 0.4f, 120, 200);
+            var b = viewBounds;
+            float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+            for (int k = 0; k < 8; k++)
+            {
+                var c = new Vector3((k & 1) == 0 ? b.min.x : b.max.x, (k & 2) == 0 ? b.min.y : b.max.y, (k & 4) == 0 ? b.min.z : b.max.z);
+                var sp = Cam.WorldToScreenPoint(c);
+                if (sp.z <= 0) continue;
+                x0 = Mathf.Min(x0, sp.x); x1 = Mathf.Max(x1, sp.x); y0 = Mathf.Min(y0, sp.y); y1 = Mathf.Max(y1, sp.y);
+            }
+            if (x1 < x0) return new Rect(Ui.W * 0.5f - 60, Ui.H * 0.4f, 120, 200);
+            var r = Rect.MinMaxRect(x0 / Ui.Scale, (Screen.height - y1) / Ui.Scale, x1 / Ui.Scale, (Screen.height - y0) / Ui.Scale);
+            r = Rect.MinMaxRect(Mathf.Max(r.xMin - 12, partsRect.xMax + 4), Mathf.Max(r.yMin - 12, 92), Mathf.Min(r.xMax + 12, Ui.W - 390), Mathf.Min(r.yMax + 12, Ui.H - 8));
+            return r;
+        }
 
         int Symmetry => SymSteps[symIndex];
         Camera Cam => root.nearCam;
@@ -92,7 +145,9 @@ namespace Rocket
         {
             design = d.Clone();
             selected = -1;
-            held = null;
+            DropHeldQuietly();
+            undo.Clear();
+            redo.Clear();
             hall = default;
             runwayLaunch = design.IsPlane;
             try { launchPad = Mathf.Clamp(PlayerPrefs.GetInt("launchPad", 0), 0, LaunchSite.Pads.Length - 1); } catch { launchPad = 0; }
@@ -1148,17 +1203,44 @@ namespace Rocket
         {
             undo.Add(JsonUtility.ToJson(design));
             if (undo.Count > 60) undo.RemoveAt(0);
+            redo.Clear();
         }
 
         void Undo()
         {
             if (undo.Count == 0) { Toast("Nothing to undo"); return; }
+            DropHeldQuietly();
+            redo.Add(JsonUtility.ToJson(design));
             design = JsonUtility.FromJson<VesselDesign>(undo[undo.Count - 1]);
             design.Upgrade();
             undo.RemoveAt(undo.Count - 1);
             selected = -1;
             Rebuild();
         }
+
+        void Redo()
+        {
+            if (redo.Count == 0) { Toast("Nothing to redo"); return; }
+            DropHeldQuietly();
+            undo.Add(JsonUtility.ToJson(design));
+            design = JsonUtility.FromJson<VesselDesign>(redo[redo.Count - 1]);
+            design.Upgrade();
+            redo.RemoveAt(redo.Count - 1);
+            selected = -1;
+            Rebuild();
+        }
+
+        /// <summary>Lets go of whatever's in your hand without changing the rocket (undo and redo bring back a whole rocket).</summary>
+        void DropHeldQuietly()
+        {
+            held = null;
+            heldUndo = null;
+            heldTemplate = null;
+            ClearGhosts();
+        }
+
+        /// <summary>The parts that go together with part i (its symmetry copies), never the root: the root is the rocket.</summary>
+        List<int> GroupNoRoot(int i) => DesignOps.SymmetryGroup(design, i).Where(g => g != 0).ToList();
 
         void Toast(string s) { toast = s; toastUntil = Time.time + 3f; }
 
@@ -1178,7 +1260,7 @@ namespace Rocket
             Story.Update(root.universe);
             GUI.Label(new Rect(r.x + 16, r.y + 10, 400, 26), "The story", Ui.Header);
             GUI.Label(new Rect(r.x + 16, r.y + 36, r.width - 140, 20), Story.Finished(c) ? "All done! The rest of space is yours." : $"Mission {c.storyStep + 1} of {Story.Missions.Length}. Mission control briefs each one when you fly.", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 96, r.y + 10, 80, 28), "Close", Ui.ButtonSmall)) return false;
+            if (Ui.Press(new Rect(r.xMax - 96, r.y + 10, 80, 28), "Close", Ui.ButtonSmall)) return false;
             float colW = (r.width - 48) / 2, top = r.y + 66;
             float[] y = { top, top };
             for (int ch = 0; ch < Story.Chapters.Length; ch++)
@@ -1233,7 +1315,7 @@ namespace Rocket
             var u = root.universe;
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 12, r.y + 6, 240, 22), "Vessels in flight", Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showVessels = false;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 6, 24, 22), "x", Ui.ButtonSmall)) showVessels = false;
             GUI.Label(new Rect(r.x + 12, r.y + 28, r.width - 24, 20), $"Universe time {Ui.Time(u.ut)}", Ui.Small);
             var list = u.vessels.Where(v => !v.destroyed).OrderBy(v => v.isDebris).ThenBy(v => v.name).ToList();
             var view = new Rect(r.x + 6, r.y + 52, r.width - 12, r.height - 96);
@@ -1245,7 +1327,7 @@ namespace Rocket
                 GUI.Label(new Rect(6, y + 2, 230, 20), $"<b>{v.name}</b>{(v.isDebris ? "  <size=11>(debris)</size>" : "")}", Ui.Label);
                 GUI.Label(new Rect(6, y + 22, 240, 20), v.Situation(u.ut), Ui.Small);
                 bool home = v.landed && v.body == root.home;
-                if (GUI.Button(new Rect(view.width - 166, y + 6, 76, 28), home ? "Recover" : "Delete", Ui.ButtonSmall))
+                if (Ui.Press(new Rect(view.width - 166, y + 6, 76, 28), home ? "Recover" : "Delete", Ui.ButtonSmall))
                 {
                     if (!home) u.career.OnVesselLost(v, false);
                     string msg = home ? u.career.Recover(v, u.ut, root.bodies) : $"{v.name} deleted";
@@ -1258,15 +1340,15 @@ namespace Rocket
                     return;
                 }
                 GUI.enabled = v.IsControllable;
-                if (GUI.Button(new Rect(view.width - 84, y + 6, 62, 28), "Fly", Ui.Button)) { GUI.enabled = true; GUI.EndScrollView(); root.Fly(v); return; }
+                if (Ui.Press(new Rect(view.width - 84, y + 6, 62, 28), "Fly", Ui.Button)) { GUI.enabled = true; GUI.EndScrollView(); root.Fly(v); return; }
                 GUI.enabled = true;
                 y += 50;
             }
             GUI.EndScrollView();
             if (!confirmNewGame)
             {
-                if (GUI.Button(new Rect(r.x + 12, r.yMax - 36, 150, 26), "Main menu", Ui.ButtonSmall)) { root.ShowMenu(); return; }
-                if (list.Any(v => v.isDebris) && GUI.Button(new Rect(r.x + 170, r.yMax - 36, 150, 26), "Clear all debris", Ui.ButtonSmall))
+                if (Ui.Press(new Rect(r.x + 12, r.yMax - 36, 150, 26), "Main menu", Ui.ButtonSmall)) { root.ShowMenu(); return; }
+                if (list.Any(v => v.isDebris) && Ui.Press(new Rect(r.x + 170, r.yMax - 36, 150, 26), "Clear all debris", Ui.ButtonSmall))
                 {
                     u.vessels.RemoveAll(v => v.isDebris);
                     u.Save();
@@ -1275,8 +1357,8 @@ namespace Rocket
             else
             {
                 GUI.Label(new Rect(r.x + 12, r.yMax - 34, 170, 22), "<color=#ff9070>Delete every vessel?</color>", Ui.Label);
-                if (GUI.Button(new Rect(r.x + 186, r.yMax - 36, 70, 26), "Yes", Ui.ButtonSmall)) { u.Reset(GameMode.Sandbox); u.career.chosen = false; confirmNewGame = false; showVessels = false; }
-                if (GUI.Button(new Rect(r.x + 262, r.yMax - 36, 70, 26), "No", Ui.ButtonSmall)) confirmNewGame = false;
+                if (Ui.Press(new Rect(r.x + 186, r.yMax - 36, 70, 26), "Yes", Ui.ButtonSmall)) { u.Reset(GameMode.Sandbox); u.career.chosen = false; confirmNewGame = false; showVessels = false; }
+                if (Ui.Press(new Rect(r.x + 262, r.yMax - 36, 70, 26), "No", Ui.ButtonSmall)) confirmNewGame = false;
             }
         }
 
@@ -1290,9 +1372,13 @@ namespace Rocket
             return sub;
         }
 
-        void Hold(List<PartNode> sub)
+        /// <summary>Takes a part (or subassembly) in your hand. Anything already there is put back first.</summary>
+        void Hold(List<PartNode> sub, HeldFrom from = HeldFrom.New)
         {
+            if (held != null) CancelHeld();
             held = Normalize(sub);
+            heldFrom = from;
+            heldTemplate = from == HeldFrom.New ? held.Select(n => n.Copy()).ToList() : null;
             heldExtra = Quaternion.identity;
             tool = Tool.Place;
             menuPart = -1;
@@ -1305,32 +1391,55 @@ namespace Rocket
             ghosts.Clear();
         }
 
-        void DiscardHeld()
+        /// <summary>
+        /// ESC or right-click with a part in your hand: a part picked up off the rocket goes back where it was; a new part
+        /// just goes back on the shelf. (Before milestone 32 a picked-up part was thrown away, and clicking the root part
+        /// picked up the whole rocket, so one stray click on the parts list made the rocket vanish.)
+        /// </summary>
+        void CancelHeld()
         {
-            held = null;
-            ClearGhosts();
+            if (held == null) return;
+            if (heldFrom == HeldFrom.Picked && heldUndo != null)
+            {
+                string back = heldUndo;
+                DropHeldQuietly();
+                design = JsonUtility.FromJson<VesselDesign>(back);
+                design.Upgrade();
+                if (undo.Count > 0 && undo[undo.Count - 1] == back) undo.RemoveAt(undo.Count - 1);   // nothing changed after all
+                Rebuild();
+                return;
+            }
+            DropHeldQuietly();
+        }
+
+        /// <summary>Backspace with a part in your hand, or dropping it on the parts list: a picked-up part is deleted (undo brings it back).</summary>
+        void DeleteHeld()
+        {
+            if (held == null) return;
+            bool picked = heldFrom == HeldFrom.Picked;
+            DropHeldQuietly();
+            if (picked) Toast(Words.T("Removed  ·  Ctrl+Z (Cmd+Z on a Mac) brings it back", "Removed  ·  Ctrl+Z (Cmd+Z on a Mac) brings it back", "Taken off  ·  Ctrl+Z (Cmd+Z on a Mac) puts it back"));
         }
 
         void PickUp(int i)
         {
+            if (i <= 0)
+            {
+                // The root holds everything else: picking it up would lift the whole rocket off the floor.
+                Toast(Words.T("That's the root part: the rest of the rocket hangs from it, so it stays put. Right-click it for options.",
+                    "That's the root part: the rest of the rocket hangs from it, so it stays put. Right-click it for options.",
+                    "That's the main part: everything else is stuck to it, so it stays put."));
+                return;
+            }
+            string before = JsonUtility.ToJson(design);
             PushUndo();
-            if (i == 0)
-            {
-                var all = design.nodes.Select(n => n.Copy()).ToList();
-                design.nodes.Clear();
-                Hold(all);
-            }
-            else
-            {
-                var group = DesignOps.SymmetryGroup(design, i);
-                var sub = DesignOps.Extract(design, i);
-                var kill = new HashSet<int>();
-                foreach (int g in group) foreach (int k in DesignOps.Subtree(design, g)) kill.Add(k);
-                DesignOps.Remove(design, kill);
-                int idx = Array.IndexOf(SymSteps, group.Count);
-                if (group.Count > 1 && idx >= 0) symIndex = idx;
-                Hold(sub);
-            }
+            var group = GroupNoRoot(i);
+            var sub = DesignOps.Extract(design, i);
+            DesignOps.Remove(design, DesignOps.RemovalSet(design, i));
+            int idx = Array.IndexOf(SymSteps, group.Count);
+            if (group.Count > 1 && idx >= 0) symIndex = idx;
+            Hold(sub, HeldFrom.Picked);
+            heldUndo = before;
             design.manualStaging = false;
             selected = -1;
             Rebuild();
@@ -1340,11 +1449,31 @@ namespace Rocket
         {
             PushUndo();
             bool surface = placeAttach == Attach.Surface;
+            bool first = design.nodes.Count == 0;
             DesignOps.InsertSymmetric(design, held, placeParent, placeAttach, placePos, placeRot, surface ? Symmetry : 1, surface && mirror);
             if (design.manualStaging) { design.manualStaging = false; Toast("Staging reset to automatic"); }
             DesignOps.ApplyDefaultGroups(design);
-            DiscardHeld();
+            // A new part stays in your hand for the next one (not after the very first part: that's the rocket's root)
+            bool again = heldFrom == HeldFrom.New && heldTemplate != null && !first;
+            var template = heldTemplate;
+            var extra = heldExtra;
+            DropHeldQuietly();
             Rebuild();
+            Tutorial.Placed(design);
+            if (again)
+            {
+                held = template.Select(n => n.Copy()).ToList();
+                heldTemplate = template;
+                heldFrom = HeldFrom.New;
+                heldExtra = extra;
+                if (!stickyTipShown)
+                {
+                    stickyTipShown = true;
+                    Toast(Words.T("Still holding it: click again to add another  ·  right-click or ESC to put it down",
+                        "Still holding it: click again to add another  ·  right-click or ESC to put it down",
+                        "You've still got it: click to stick on another  ·  right-click or ESC to let go"));
+                }
+            }
         }
 
         void ComputePlacement()
@@ -1362,8 +1491,8 @@ namespace Rocket
                 placeRot = Quaternion.identity;
                 return;
             }
-            // 1) Snap to a free stack node near the mouse.
-            float best = 30f * Ui.Scale;
+            // 1) Snap to a free stack node near the mouse (milestone 32: a bigger catch area, so parts are easier to stack).
+            float best = 48f * Ui.Scale;
             for (int i = 0; i < design.nodes.Count; i++)
             {
                 var n = design.nodes[i];
@@ -1516,19 +1645,21 @@ namespace Rocket
             if (In.LeftDown)
             {
                 Vector2 gui = new Vector2(In.MousePosition.x / Ui.Scale, (Screen.height - In.MousePosition.y) / Ui.Scale);
-                if (held != null && partsRect.Contains(gui)) { DiscardHeld(); Toast("Part removed"); }
+                if (held != null && partsListRect.Contains(gui)) DeleteHeld();   // dropped back on the list
                 else if (!overUi && menuPart < 0)
                 {
                     if (held != null)
                     {
                         if (placeValid) Place();
-                        else Toast("Move over a green node or the side of a part to attach.");
+                        else Toast(Words.T("Move over a green dot or the side of a part to attach it.", "Move over a green dot or the side of a part to attach it.", "Move it onto a green dot or the side of your rocket."));
                     }
                     else if (hover >= 0) ClickPart(hover);
                     else selected = -1;
                 }
             }
-            if (In.RightUp && !overUi && held == null && (In.MousePosition - rightDownPos).magnitude < 5f && hover >= 0)
+            bool rightClick = In.RightUp && !overUi && (In.MousePosition - rightDownPos).magnitude < 5f;
+            if (rightClick && held != null) CancelHeld();   // right-click puts down what you're holding
+            else if (rightClick && hover >= 0)
             {
                 menuPart = hover;
                 menuPos = new Vector2(In.MousePosition.x / Ui.Scale, (Screen.height - In.MousePosition.y) / Ui.Scale);
@@ -1561,18 +1692,17 @@ namespace Rocket
 
         void HandleKeys()
         {
-            bool ctrl = In.Held(K.LeftCtrl), shift = In.Held(K.LeftShift);
-            if (ctrl && In.Down(K.Z)) { Undo(); return; }
-            if (In.Down(K.X)) { symIndex = (symIndex + (shift ? SymSteps.Length - 1 : 1)) % SymSteps.Length; Toast($"Symmetry {Symmetry}x"); }
+            bool ctrl = In.Cmd, shift = In.Held(K.LeftShift);
+            // Undo: Ctrl+Z (Cmd+Z on a Mac); redo: Ctrl+Shift+Z or Ctrl+Y
+            if (ctrl && In.Down(K.Z)) { if (shift) Redo(); else Undo(); return; }
+            if (ctrl && In.Down(K.Y)) { Redo(); return; }
+            if (ctrl) return;   // Ctrl/Cmd + a letter isn't a builder key
+            if (In.Down(K.X)) { symIndex = (symIndex + (shift ? SymSteps.Length - 1 : 1)) % SymSteps.Length; Toast(Words.Easy ? $"{Symmetry} at once" : $"Symmetry {Symmetry}x"); }
             if (In.Down(K.R)) { mirror = !mirror; Toast(mirror ? "Mirror symmetry" : "Radial symmetry"); }
             if (In.Down(K.C)) { snap = !snap; Toast(snap ? "Angle snap on" : "Angle snap off"); }
-            if (In.Down(K.Escape)) { if (held != null) DiscardHeld(); else { selected = -1; menuPart = -1; Rebuild(); } }
-            if (In.Down(K.Delete))
-            {
-                if (held != null) DiscardHeld();
-                else if (selected > 0) { DeleteGroup(selected); selected = -1; }
-                else if (hover > 0) DeleteGroup(hover);
-            }
+            if (In.Down(K.Escape)) { if (held != null) CancelHeld(); else { selected = -1; menuPart = -1; Rebuild(); } }
+            // Delete: Backspace (the Mac's delete key) or Delete
+            if (In.Down(K.Backspace) || In.Down(K.Delete)) DeletePressed();
 
             float step = snap ? 15f : 5f;
             Quaternion r = Quaternion.identity;
@@ -1599,6 +1729,69 @@ namespace Rocket
             }
         }
 
+        /// <summary>
+        /// Backspace or Delete (milestone 32: Backspace is the Mac's delete key): the part in your hand goes in the bin; else
+        /// the selected part, or the one under the mouse; the root (the whole rocket) only on a second press, and undo
+        /// brings it all back.
+        /// </summary>
+        void DeletePressed()
+        {
+            if (held != null) DeleteHeld();
+            else if (selected > 0) { DeleteGroup(selected); selected = -1; }
+            else if (hover > 0) DeleteGroup(hover);
+            else if ((hover == 0 || selected == 0) && design.nodes.Count > 0)
+            {
+                if (Time.unscaledTime < clearArmedUntil)
+                {
+                    PushUndo();
+                    design.nodes.Clear();
+                    design.manualStaging = false;
+                    selected = -1;
+                    clearArmedUntil = 0;
+                    Rebuild();
+                    Toast(Words.T("Rocket cleared  ·  Ctrl+Z (Cmd+Z) brings it back", "Rocket cleared  ·  Ctrl+Z (Cmd+Z) brings it back", "All gone  ·  Ctrl+Z (Cmd+Z) brings it back"));
+                }
+                else
+                {
+                    clearArmedUntil = Time.unscaledTime + 2.5f;
+                    Toast(Words.T("That's the root part: press Backspace again to clear the whole rocket", "That's the root part: press Backspace again to clear the whole rocket", "That's the main part: press Backspace again to start over"));
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------- hooks for the builder autotest (milestone 32)
+
+        public string TestJson => JsonUtility.ToJson(design);
+        public int TestHeldCount => held?.Count ?? 0;
+        public void TestHold(string id) => Hold(new List<PartNode> { new PartNode { id = id } });
+        public void TestPickUp(int i) => PickUp(i);
+        public void TestCancel() => CancelHeld();
+        public void TestUndo() => Undo();
+        public void TestRedo() => Redo();
+        public void TestDelete(int underMouse) { hover = underMouse; selected = -1; DeletePressed(); hover = -1; }
+        public void TestShowPresets(bool on) { showPresets = on; showFile = false; }
+        public void TestShowFile(bool on) { showFile = on; showPresets = false; }
+        public void TestPresetStarter() { PushUndo(); DropHeldQuietly(); design = VesselDesign.Default(); selected = -1; SetView(false); }
+
+        /// <summary>Puts what's in your hand down as a click would: as the first part, or on the stack node under or over a part.</summary>
+        public bool TestPlace(int parent, bool below)
+        {
+            if (held == null) return false;
+            var hdef = PartCatalog.Get(held[0].id);
+            if (design.nodes.Count == 0) { placeAttach = Attach.Root; placeParent = -1; placePos = Vector3.zero; placeRot = Quaternion.identity; }
+            else
+            {
+                var n = design.nodes[parent];
+                var d = PartCatalog.Get(n.id);
+                if (below) { if (!DesignOps.BottomFree(design, parent)) return false; placeAttach = Attach.Below; placePos = DesignOps.BottomNode(n, d); }
+                else { if (!DesignOps.TopFree(design, parent)) return false; placeAttach = Attach.Above; placePos = n.pos + DesignOps.Axis(n) * hdef.length; }
+                placeParent = parent;
+                placeRot = n.rot;
+            }
+            placeValid = true;
+            Place();
+            return true;
+        }
         void Nudge(Vector3 offLocal, Quaternion rotLocal)
         {
             PushUndo();
@@ -1610,9 +1803,7 @@ namespace Rocket
         {
             if (i <= 0) return;
             PushUndo();
-            var kill = new HashSet<int>();
-            foreach (int g in DesignOps.SymmetryGroup(design, i)) foreach (int k in DesignOps.Subtree(design, g)) kill.Add(k);
-            DesignOps.Remove(design, kill);
+            DesignOps.Remove(design, DesignOps.RemovalSet(design, i));   // (never the root: see RemovalSet)
             design.manualStaging = false;
             Rebuild();
         }
@@ -1644,16 +1835,23 @@ namespace Rocket
             if (Coop.Active && spectate) { DrawCoopWatch(W, H); return; }
             DrawBuilder(W, H);
             if (Coop.Active && !(showTech || showMissions || showCenter || showBadges || showStory)) DrawCoopBuilder(W, H);   // (not over a full-screen career page)
+            else if (!Coop.Active && root.universe.career.chosen && !(showTech || showMissions || showCenter || showBadges || showStory)) Tutorial.DrawBuilder(this);
         }
 
-        /// <summary>A rocket room, the builder's own screen: the team and their comments beside the rocket.</summary>
+        /// <summary>
+        /// A rocket room, the builder's own screen: the team, their comments and the chat in one column beside the stages
+        /// (milestone 32: stacked so they no longer overlap each other).
+        /// </summary>
         void DrawCoopBuilder(float W, float H)
         {
             var c = Coop.Current;
-            float x = W - 380 - 350;
-            c.DrawTeam(new Rect(x, 96, 340, 30 + c.room.State.players.Count * 20 + 78), false);
-            c.DrawBuildPanel(new Rect(x, 96 + 34 + c.room.State.players.Count * 20 + 82, 340, H - 430), design);
-            c.DrawChat(new Rect(x, H - 160, 340, 80));
+            float x = W - 380 - 350, top = 96;
+            float teamH = c.TeamHeight(false);
+            c.DrawTeam(new Rect(x, top, 340, teamH), false);
+            float chatH = 92;
+            float buildY = top + teamH + 6, buildH = H - 10 - chatH - 6 - buildY;
+            c.DrawBuildPanel(new Rect(x, buildY, 340, buildH), design);
+            c.DrawChat(new Rect(x, H - 10 - chatH, 340, chatH));
             if (!string.IsNullOrEmpty(c.room.State.summary)) GUI.Label(new Rect(300, 96, x - 310, 40), c.room.State.summary, new GUIStyle(Ui.Small) { wordWrap = true });
         }
 
@@ -1663,16 +1861,16 @@ namespace Rocket
             var c = Coop.Current;
             Ui.Box(new Rect(0, 0, W, 52));
             GUI.Label(new Rect(14, 8, 600, 30), $"ROCKET ROOM  <size=14>· {c.Holder(Coop.Builder)} is building \"{design.name}\"</size>", Ui.Title);
-            if (GUI.Button(new Rect(W - 150, 10, 136, 32), "Leave the room", Ui.Button)) { root.LeaveCoop(); return; }
+            if (Ui.Press(new Rect(W - 150, 10, 136, 32), "Leave the room", Ui.Button)) { root.LeaveCoop(); return; }
             if (!c.Campaign) GUI.Label(new Rect(640, 16, W - 820, 22), "Click a part of the rocket to comment on it. Right-drag to look round, scroll to zoom.", Ui.Small);
             else GUI.Label(new Rect(380, H - 56, W - 780, 22), "Click a part of the rocket to comment on it. Right-drag to look round, scroll to zoom.", Ui.Small);
-            float th = 30 + c.room.State.players.Count * 20 + 78;
+            float th = c.TeamHeight(false);
             c.DrawTeam(new Rect(10, 60, 360, th), false);
             c.DrawBuildPanel(new Rect(10, 60 + th + 6, 360, H - 60 - th - 110), design);
             c.DrawChat(new Rect(10, H - 98, 360, 88));
             // the stages, readable but not clickable (an invisible button over them takes the clicks first)
             var sp = new Rect(W - 380, 60, 370, H - 70);
-            GUI.Button(sp, GUIContent.none, GUIStyle.none);
+            Ui.Press(sp, GUIContent.none, GUIStyle.none);
             DrawStagePanel(sp);
             if (!string.IsNullOrEmpty(c.room.State.summary)) GUI.Label(new Rect(380, 60, W - 780, 40), c.room.State.summary, new GUIStyle(Ui.Small) { wordWrap = true });
             if (c.notePart >= 0 && c.notePart < design.nodes.Count) GUI.Label(new Rect(380, H - 34, W - 780, 22), $"Commenting on the {PartCatalog.Get(design.nodes[c.notePart].id)?.name}", Ui.Small);
@@ -1689,12 +1887,12 @@ namespace Rocket
             if (c.IsHost)
             {
                 x -= 116;
-                if (GUI.Button(new Rect(x, 10, 110, 32), "Facilities", showCenter ? Ui.RowSel : Ui.Button)) { showCenter = !showCenter; showTech = showMissions = false; }
+                if (Ui.Press(new Rect(x, 10, 110, 32), "Facilities", showCenter ? Ui.ButtonSel : Ui.Button)) { showCenter = !showCenter; showTech = showMissions = false; }
                 int offers = career.Offered.Count();
                 x -= 116;
-                if (GUI.Button(new Rect(x, 10, 110, 32), offers > 0 ? $"Missions ({offers})" : "Missions", showMissions ? Ui.RowSel : Ui.Button)) { showMissions = !showMissions; showTech = showCenter = false; }
+                if (Ui.Press(new Rect(x, 10, 110, 32), offers > 0 ? $"Missions ({offers})" : "Missions", showMissions ? Ui.ButtonSel : Ui.Button)) { showMissions = !showMissions; showTech = showCenter = false; }
                 x -= 106;
-                if (GUI.Button(new Rect(x, 10, 100, 32), Words.T("Tech tree", "Research", "New parts"), showTech ? Ui.RowSel : Ui.Button)) { showTech = !showTech; showMissions = showCenter = false; }
+                if (Ui.Press(new Rect(x, 10, 100, 32), Words.T("Tech tree", "Research", "New parts"), showTech ? Ui.ButtonSel : Ui.Button)) { showTech = !showTech; showMissions = showCenter = false; }
             }
             else showTech = showMissions = showCenter = false;
             GUI.Label(new Rect(x - 330, 16, 324, 22), $"<color=#ffd56a>Campaign</color>   Money <b>{career.funds:N0}</b>   Science <b>{career.science:0}</b>", Ui.Small);
@@ -1714,107 +1912,161 @@ namespace Rocket
                 GUI.Label(new Rect(W / 2 - 400, 60, 800, Mathf.Max(30, Ui.BigCenter.CalcHeight(new GUIContent(Words.Say(toast)), 800))), Words.Say(toast), Ui.BigCenter);
         }
 
+        /// <summary>One button in the builder's second row of the top bar (milestone 32: it moves into "More" when the row is full).</summary>
+        struct BarButton { public string label; public float w; public bool sel; public int keep; public Action act; }
+        bool showMore;
+        float checklistBottom;
+
         void DrawBuilder(float W, float H)
         {
-
-            // Top bar (milestone 24: tidier). Row 1: title, name, rocket/plane, money; file, undo, menu, launch site, LAUNCH.
-            Ui.Box(new Rect(0, 0, W, 88));
             var career = root.universe.career;
-            GUI.Label(new Rect(14, 8, 220, 30), planeView ? Words.T("PLANE BUILDER", "PLANE BUILDER", "BUILD A PLANE") : Words.T("ROCKET BUILDER", "ROCKET BUILDER", "BUILD A ROCKET"), Ui.Title);
-            GUI.Label(new Rect(240, 14, 50, 24), "Name", Ui.Small);
-            string newName = GUI.TextField(new Rect(282, 10, 200, 26), design.name, 40, Ui.Field);
-            if (newName != design.name) design.name = newName;
-            if (Event.current.type == EventType.MouseDown && !new Rect(282, 10, 200, 26).Contains(Event.current.mousePosition)) GUIUtility.keyboardControl = 0;
-            if (GUI.Button(new Rect(494, 8, 76, 30), "Rocket", !planeView ? Ui.RowSel : Ui.Button)) SetView(false);
-            if (GUI.Button(new Rect(572, 8, 66, 30), "Plane", planeView ? Ui.RowSel : Ui.Button)) SetView(true);
-            if (career.IsCareer)
-                GUI.Label(new Rect(654, 13, 330, 22), Words.T($"Funds <b>{career.funds:N0}</b>   Science <b>{career.science:0.0}</b>   Rep <b>{career.reputation:0}</b>",
-                    $"Funds <b>{career.funds:N0}</b>   Science <b>{career.science:0.0}</b>   Fame <b>{career.reputation:0}</b>",
-                    $"Money <b>{career.funds:N0}</b>   Science <b>{career.science:0}</b>   Stars <b>{career.reputation:0}</b>"), Ui.Label);
-            else GUI.Label(new Rect(654, 15, 260, 22), Words.T("Sandbox: every part, no money", "Sandbox: every part, no money", "Free play: every part"), Ui.Small);
+            bool easy = Words.Easy, coop = Coop.Active;
+            // the open middle between the parts list and the stages (and the team's panel in a rocket room)
+            float midL = 300, midR = coop ? W - 740 : W - 390;
 
+            // Top bar (milestone 24: tidier; milestone 32: fits any width). Row 1: title, name, rocket/plane, money on the
+            // left; file, undo, menu, launch site and LAUNCH on the right.
+            Ui.Box(new Rect(0, 0, W, 88));
             string careerProblem = career.LaunchProblem(design, runwayLaunch);
             float bx = W - 10 - 150;
-            GUI.enabled = validation == null && careerProblem == null && design.nodes.Count > 0 && (!Coop.Active || Coop.Current.AllReady);
-            if (GUI.Button(new Rect(bx, 6, 150, 34), career.IsCareer ? $"LAUNCH  {career.LaunchCost(design):N0}" : "LAUNCH  >", Ui.Button))
+            LaunchRect = new Rect(bx, 6, 150, 34);
+            GUI.enabled = validation == null && careerProblem == null && design.nodes.Count > 0 && (!coop || Coop.Current.AllReady);
+            if (Ui.Press(LaunchRect, career.IsCareer ? $"LAUNCH  {career.LaunchCost(design):N0}" : "LAUNCH  ▸", Ui.Button))
             {
-                if (Coop.Active) Coop.Current.Launch(design, runwayLaunch, launchPad);
-                else root.Launch(design, runwayLaunch, launchPad);
+                if (coop) Coop.Current.Launch(design, runwayLaunch, launchPad);
+                else { Tutorial.Launched(); root.Launch(design, runwayLaunch, launchPad); }
                 return;
             }
             GUI.enabled = true;
-            bx -= 136;
-            string fromLabel = runwayLaunch ? "From: Runway" : "From: " + LaunchSite.Pads[launchPad].name;
-            if (!Coop.Active && GUI.Button(new Rect(bx - 40, 8, 170, 30), fromLabel, Ui.Button))
+            if (!coop)
             {
-                // the main pad, the two beach pads, the north pad, then the runway, and round again
-                if (runwayLaunch) { runwayLaunch = false; launchPad = 0; }
-                else if (launchPad < LaunchSite.Pads.Length - 1) launchPad++;
-                else runwayLaunch = true;
-                try { PlayerPrefs.SetInt("launchPad", launchPad); } catch { }
-                Toast(runwayLaunch ? (design.IsPlane ? "Launching from the runway" : "Launching from the runway (this design has no landing gear)")
-                                   : $"Launching from {LaunchSite.Pads[launchPad].name.ToLowerInvariant()}" + (launchPad > 0 ? " (rolled out from its own hall)" : ""));
+                bx -= 176;
+                string fromLabel = runwayLaunch ? "From: Runway" : "From: " + LaunchSite.Pads[launchPad].name;
+                if (Ui.Press(new Rect(bx, 8, 170, 30), fromLabel, Ui.Button))
+                {
+                    // the main pad, the two beach pads, the north pad, then the runway, and round again
+                    if (runwayLaunch) { runwayLaunch = false; launchPad = 0; }
+                    else if (launchPad < LaunchSite.Pads.Length - 1) launchPad++;
+                    else runwayLaunch = true;
+                    try { PlayerPrefs.SetInt("launchPad", launchPad); } catch { }
+                    Toast(runwayLaunch ? (design.IsPlane ? "Launching from the runway" : "Launching from the runway (this design has no landing gear)")
+                                       : $"Launching from {LaunchSite.Pads[launchPad].name.ToLowerInvariant()}" + (launchPad > 0 ? " (rolled out from its own hall)" : ""));
+                }
             }
-            bx -= 40;
             bx -= 70;
-            if (GUI.Button(new Rect(bx, 8, 64, 30), Coop.Active ? "Leave" : "Menu", Ui.Button)) { if (Coop.Active) root.LeaveCoop(); else root.ShowMenu(); return; }
+            if (Ui.Press(new Rect(bx, 8, 64, 30), coop ? "Leave" : "Menu", Ui.Button)) { if (coop) root.LeaveCoop(); else root.ShowMenu(); return; }
             bx -= 70;
-            if (GUI.Button(new Rect(bx, 8, 64, 30), "Undo", Ui.Button)) Undo();
+            UndoRect = new Rect(bx, 8, 64, 30);
+            if (Ui.Press(UndoRect, "Undo", Ui.Button)) Undo();
             bx -= 86;
             float fileX = bx;
-            if (GUI.Button(new Rect(bx, 8, 80, 30), "File  v", showFile ? Ui.RowSel : Ui.Button)) { showFile = !showFile; showLoad = false; showVessels = false; }
+            if (Ui.Press(new Rect(bx, 8, 80, 30), "File ▾", showFile ? Ui.ButtonSel : Ui.Button)) { showFile = !showFile; showLoad = false; showVessels = false; showMore = false; }
+            float row1Right = bx - 10;
 
-            // Row 2: build tools, symmetry, snap, markers, presets, crew; career screens on the right
-            float x = 14;
-            foreach (Tool t in Enum.GetValues(typeof(Tool)))
+            GUI.Label(new Rect(14, 8, 220, 30), planeView ? Words.T("PLANE BUILDER", "PLANE BUILDER", "BUILD A PLANE") : Words.T("ROCKET BUILDER", "ROCKET BUILDER", "BUILD A ROCKET"), Ui.Title);
+            GUI.Label(new Rect(240, 14, 50, 24), "Name", Ui.Small);
+            string newName = GUI.TextField(new Rect(282, 10, 190, 26), design.name, 40, Ui.Field);
+            if (newName != design.name) design.name = newName;
+            if (Ui.Press(new Rect(482, 8, 76, 30), "Rocket", !planeView ? Ui.ButtonSel : Ui.Button)) SetView(false);
+            if (Ui.Press(new Rect(560, 8, 66, 30), "Plane", planeView ? Ui.ButtonSel : Ui.Button)) SetView(true);
+            float moneyW = row1Right - 638;
+            if (moneyW > 90)
             {
-                if (GUI.Button(new Rect(x, 50, 70, 30), t.ToString(), tool == t ? Ui.RowSel : Ui.Button)) { tool = t; selected = -1; Rebuild(); }
-                x += 74;
+                var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
+                string money = career.IsCareer
+                    ? Words.T($"Funds <b>{career.funds:N0}</b>   Science <b>{career.science:0.0}</b>   Rep <b>{career.reputation:0}</b>",
+                        $"Funds <b>{career.funds:N0}</b>   Science <b>{career.science:0.0}</b>   Fame <b>{career.reputation:0}</b>",
+                        $"Money <b>{career.funds:N0}</b>   Science <b>{career.science:0}</b>   Stars <b>{career.reputation:0}</b>")
+                    : Words.T("Sandbox: every part, no money", "Sandbox: every part, no money", "Free play: every part");
+                GUI.Label(new Rect(638, 15, moneyW, 22), money, clip);
             }
-            x += 12;
-            if (GUI.Button(new Rect(x, 50, 96, 30), $"Symmetry {Symmetry}x", Ui.Button)) symIndex = (symIndex + 1) % SymSteps.Length;
-            x += 100;
-            if (GUI.Button(new Rect(x, 50, 74, 30), mirror ? "Mirror" : "Radial", Ui.Button)) mirror = !mirror;
-            x += 78;
-            if (GUI.Button(new Rect(x, 50, 84, 30), snap ? "Snap on" : "Snap off", snap ? Ui.RowSel : Ui.Button)) snap = !snap;
-            x += 88;
-            if (GUI.Button(new Rect(x, 50, 96, 30), markers ? "Markers on" : "Markers off", markers ? Ui.RowSel : Ui.Button)) markers = !markers;
-            x += 112;
-            if (GUI.Button(new Rect(x, 50, 96, 30), "Presets  v", showPresets ? Ui.RowSel : Ui.Button)) { showPresets = !showPresets; showFile = false; }
+
+            // Row 2, left: build tools (not in Easy: it's just click to pick up, click to stick on), symmetry, presets, crew
+            float x = 14;
+            if (!easy)
+            {
+                foreach (Tool t in Enum.GetValues(typeof(Tool)))
+                {
+                    if (Ui.Press(new Rect(x, 50, 68, 30), t.ToString(), tool == t ? Ui.ButtonSel : Ui.Button)) { tool = t; selected = -1; Rebuild(); }
+                    x += 72;
+                }
+                x += 10;
+            }
+            else if (tool != Tool.Place) { tool = Tool.Place; selected = -1; }
+            if (Ui.Press(new Rect(x, 50, 104, 30), easy ? (Symmetry == 1 ? "One at a time" : $"{Symmetry} at once") : $"Symmetry {Symmetry}x", Symmetry > 1 ? Ui.ButtonSel : Ui.Button))
+                symIndex = (symIndex + 1) % (easy ? 4 : SymSteps.Length);
+            x += 108;
+            if (!easy)
+            {
+                if (Ui.Press(new Rect(x, 50, 72, 30), mirror ? "Mirror" : "Radial", Ui.Button)) mirror = !mirror;
+                x += 76;
+                if (Ui.Press(new Rect(x, 50, 82, 30), snap ? "Snap on" : "Snap off", snap ? Ui.ButtonSel : Ui.Button)) snap = !snap;
+                x += 86;
+                if (Ui.Press(new Rect(x, 50, 96, 30), markers ? "Markers on" : "Markers off", markers ? Ui.ButtonSel : Ui.Button)) markers = !markers;
+                x += 104;
+            }
+            PresetsRect = new Rect(x, 50, 96, 30);
+            if (Ui.Press(PresetsRect, "Presets ▾", showPresets ? Ui.ButtonSel : Ui.Button)) { showPresets = !showPresets; showFile = false; showMore = false; }
             float presetsX = x;
             x += 100;
             float crewX = x;
             bool seats = career.LaunchSeats(design) > 0;
-            if (seats && GUI.Button(new Rect(x, 50, 76, 30), "Crew  v", showCrew ? Ui.RowSel : Ui.Button)) { showCrew = !showCrew; showPresets = false; }
+            if (seats && Ui.Press(new Rect(x, 50, 76, 30), "Crew ▾", showCrew ? Ui.ButtonSel : Ui.Button)) { showCrew = !showCrew; showPresets = false; showMore = false; }
             if (!seats) showCrew = false;
-            float rx = W - 10;
-            rx -= 90;
-            if (GUI.Button(new Rect(rx, 50, 90, 30), $"Badges {career.badges.Count}", showBadges ? Ui.RowSel : Ui.Button)) { showBadges = !showBadges; showTech = showMissions = showCenter = false; }
-            if (career.IsCareer && Coop.Active && !Coop.Current.IsHost) { showTech = showMissions = showCenter = false; }
-            if (career.IsCareer && (!Coop.Active || Coop.Current.IsHost))      // a campaign room: research, missions and facilities are the host's to run
+            if (seats) x += 80;
+
+            // Row 2, right: the career screens and the rest. What doesn't fit goes into "More".
+            if (career.IsCareer && coop && !Coop.Current.IsHost) { showTech = showMissions = showCenter = false; }
+            var bar = new List<BarButton>();   // right to left
+            bar.Add(new BarButton { label = $"Badges {career.badges.Count}", w = 90, sel = showBadges, keep = 1, act = () => { showBadges = !showBadges; showTech = showMissions = showCenter = false; } });
+            if (career.IsCareer && (!coop || Coop.Current.IsHost))      // a campaign room: research, missions and facilities are the host's to run
             {
-                rx -= 126;
-                if (GUI.Button(new Rect(rx, 50, 120, 30), "Facilities", showCenter ? Ui.RowSel : Ui.Button)) { showCenter = !showCenter; showTech = showMissions = false; showBadges = false; }
                 int offers = career.Offered.Count();
-                rx -= 116;
-                if (GUI.Button(new Rect(rx, 50, 110, 30), offers > 0 ? $"Missions ({offers})" : "Missions", showMissions ? Ui.RowSel : Ui.Button)) { showMissions = !showMissions; showTech = false; showCenter = false; showBadges = false; }
-                rx -= 106;
-                if (GUI.Button(new Rect(rx, 50, 100, 30), Words.T("Tech tree", "Research", "New parts"), showTech ? Ui.RowSel : Ui.Button)) { showTech = !showTech; showMissions = false; showCenter = false; showBadges = false; }
+                bar.Add(new BarButton { label = "Facilities", w = 104, sel = showCenter, keep = 3, act = () => { showCenter = !showCenter; showTech = showMissions = false; showBadges = false; } });
+                bar.Add(new BarButton { label = offers > 0 ? $"Missions ({offers})" : "Missions", w = 110, sel = showMissions, keep = 4, act = () => { showMissions = !showMissions; showTech = false; showCenter = false; showBadges = false; } });
+                bar.Add(new BarButton { label = Words.T("Tech tree", "Research", "New parts"), w = 100, sel = showTech, keep = 4, act = () => { showTech = !showTech; showMissions = false; showCenter = false; showBadges = false; } });
             }
-            rx -= 126;
-            if (!Coop.Active && GUI.Button(new Rect(rx, 50, 120, 30), "Space Centre", Ui.Button)) { root.ShowCentre(); return; }   // the site from the air (milestone 25)
-            if (FlightMode.StoryOn && !Coop.Active)
+            bool goCentre = false;
+            if (!coop) bar.Add(new BarButton { label = "Space Centre", w = 116, sel = false, keep = 2, act = () => goCentre = true });
+            if (FlightMode.StoryOn && !coop) bar.Add(new BarButton { label = "Story", w = 76, sel = showStory, keep = 1, act = () => { showStory = !showStory; showTech = showMissions = showCenter = showBadges = false; } });
+            var more = new List<BarButton>();
+            float Width(List<BarButton> l) => l.Sum(b => b.w + 6) + (more.Count > 0 ? 90 : 0);
+            while (bar.Count > 0 && W - 10 - Width(bar) < x + 6)
             {
-                rx -= 86;
-                if (GUI.Button(new Rect(rx, 50, 80, 30), "Story", showStory ? Ui.RowSel : Ui.Button)) { showStory = !showStory; showTech = showMissions = showCenter = showBadges = false; }
+                int k = 0;
+                for (int i = 1; i < bar.Count; i++) if (bar[i].keep < bar[k].keep || (bar[i].keep == bar[k].keep && i > k)) k = i;
+                more.Insert(0, bar[k]);
+                bar.RemoveAt(k);
             }
+            float rx = W - 10;
+            float moreX = -1;
+            if (more.Count > 0)
+            {
+                rx -= 84;
+                moreX = rx;
+                if (Ui.Press(new Rect(rx, 50, 84, 30), "More ▾", showMore ? Ui.ButtonSel : Ui.Button)) { showMore = !showMore; showFile = showPresets = showCrew = false; }
+                rx -= 6;
+            }
+            else showMore = false;
+            foreach (var b in bar)
+            {
+                rx -= b.w;
+                if (Ui.Press(new Rect(rx, 50, b.w, 30), b.label, b.sel ? Ui.ButtonSel : Ui.Button)) b.act();
+                rx -= 6;
+            }
+            if (goCentre) { root.ShowCentre(); return; }   // the site from the air (milestone 25)
 
             partsRect = new Rect(10, 96, 280, H - 106);
             DrawPartsPanel(partsRect);
-            DrawStagePanel(new Rect(W - 380, 96, 370, H - 106));
-            if (markers) DrawCenterMarkers();
+            StagePanelRect = new Rect(W - 380, 96, 370, H - 106);
+            DrawStagePanel(StagePanelRect);
+            if (markers && !easy && !showVessels && !showLoad) DrawCenterMarkers();   // (a menu dropping over the legend hides it)
             if (held != null) DrawNodeMarkers();
             if (menuPart >= 0 && menuPart < design.nodes.Count) DrawPartMenu();
+            checklistBottom = 0;
+            if (easy && !coop && !planeView && !design.IsPlane && !design.IsRover && !Tutorial.Active)
+                DrawChecklist(new Rect(midL, 96, Mathf.Min(350, midR - midL - 10), 0));
+            DrawHoverTip(midL, midR);
 
             string blocker = validation ?? careerProblem;
             float guideBottom = H - 36;
@@ -1822,28 +2074,39 @@ namespace Rocket
             {
                 var lines = blocker != null ? new List<string> { blocker } : warnings;
                 float wh = 34 + lines.Count * 19;
-                var wr = new Rect(300, H - 36 - wh, W - 690, wh);
+                var wr = new Rect(midL, H - 36 - wh, midR - midL - 10, wh);
                 guideBottom = wr.y - 6;
                 Ui.Box(wr);
                 GUI.Label(new Rect(wr.x + 10, wr.y + 5, 300, 20), blocker != null ? "Can't launch yet" : Words.T("Engineer's report", "Engineer's report", "Tips"), Ui.Header);
+                var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
                 for (int i = 0; i < lines.Count; i++)
-                    GUI.Label(new Rect(wr.x + 10, wr.y + 28 + i * 19, wr.width - 20, 18), $"<color={(blocker != null ? "#ff8070" : "#ffc860")}>! {Words.Say(lines[i])}</color>", Ui.Small);
+                    GUI.Label(new Rect(wr.x + 10, wr.y + 28 + i * 19, wr.width - 20, 18), $"<color={(blocker != null ? "#ff8070" : "#ffc860")}>! {Words.Say(lines[i])}</color>", clip);
             }
 
             string hint = held != null
-                ? "Click to attach  ·  W/S A/D Q/E rotate  ·  X symmetry  ·  R radial/mirror  ·  C snap  ·  drop on the parts list or ESC to discard"
-                : tool == Tool.Place ? "Click a part to pick it up  ·  right-click a part for options  ·  right-drag rotate  ·  scroll zoom  ·  shift+scroll up/down  ·  Ctrl+Z undo"
+                ? (easy ? "Click on your rocket to stick it on  ·  click again for another  ·  right-click or ESC to let go  ·  Backspace to bin it"
+                        : "Click to attach (it stays in your hand for more)  ·  right-click or ESC to put it down  ·  W/S A/D Q/E rotate  ·  X symmetry  ·  R radial/mirror")
+                : tool == Tool.Place ? (easy ? "Click a part on your rocket to move it  ·  Backspace deletes the part under the mouse  ·  right-drag to look round  ·  scroll to zoom"
+                        : "Click a part to pick it up  ·  Backspace deletes  ·  right-click for options  ·  right-drag rotate  ·  scroll zoom  ·  Ctrl/Cmd+Z undo")
                 : tool == Tool.Offset ? "Click a part, then W/S up/down, A/D sideways, Q/E in/out (shift = bigger steps)"
                 : tool == Tool.Rotate ? "Click a part, then W/S A/D Q/E to rotate it (C toggles 15 deg snap)"
                 : "Click the part that should be the root (the part everything else hangs from)";
-            GUI.Label(new Rect(300, H - 30, W - 690, 22), Words.Say(hint), Ui.Hint);
-            if (career.chosen && Guide.Showing(career.guide)) DrawGuide(W, guideBottom);
+            GUI.Label(new Rect(midL, H - 30, midR - midL - 10, 22), Words.Say(hint), new GUIStyle(Ui.Hint) { wordWrap = false, clipping = TextClipping.Clip });
+            if (career.chosen && Guide.Showing(career.guide) && !Tutorial.Active) DrawGuide(midL, midR, guideBottom);
 
-            if (showFile) DrawFileMenu(new Rect(fileX - 60, 44, 200, 4 * 34 + 12));
-            if (showLoad) DrawLoad(new Rect(fileX - 120, 44, 260, 300));
-            if (showVessels) DrawVessels(new Rect(fileX - 320, 92, 430, 420));
-            if (showPresets) DrawPresets(new Rect(presetsX, 84, 230, 12 * 32 + 12));
+            if (showFile) DrawFileMenu(new Rect(Mathf.Min(fileX - 60, W - 210), 44, 200, (coop ? 3 : 5) * 34 + 12));
+            if (showLoad) DrawLoad(new Rect(Mathf.Min(fileX - 120, W - 270), 44, 260, 300));
+            if (showVessels) DrawVessels(new Rect(Mathf.Clamp(fileX - 320, 10, W - 440), 92, 430, 420));
+            if (showPresets) DrawPresets(new Rect(presetsX, 84, 250, Mathf.Min(H - 94, 22 * 30 + 12)));
             if (showCrew) DrawCrew(crewX);
+            if (showMore && moreX > 0)
+            {
+                var mr = new Rect(Mathf.Min(moreX - 60, W - 160), 84, 150, more.Count * 34 + 10);
+                Ui.Box(mr);
+                for (int i = 0; i < more.Count; i++)
+                    if (Ui.Press(new Rect(mr.x + 6, mr.y + 6 + i * 34, mr.width - 12, 30), more[i].label, more[i].sel ? Ui.ButtonSel : Ui.Button)) { more[i].act(); showMore = false; }
+                if (goCentre) { root.ShowCentre(); return; }
+            }
             if ((showTech || showMissions || showCenter) && career.IsCareer)
             {
                 // Dim the builder behind the career screens.
@@ -1868,10 +2131,59 @@ namespace Rocket
             }
             if (newsQueue.Count > 0 && Time.time >= toastUntil) Toast(newsQueue.Dequeue());
             if (!string.IsNullOrEmpty(toast) && Time.time < toastUntil)
-                GUI.Label(new Rect(W / 2 - 400, 100, 800, Mathf.Max(30, Ui.BigCenter.CalcHeight(new GUIContent(Words.Say(toast)), 800))), Words.Say(toast), Ui.BigCenter);
+            {
+                // over the open middle, below the Easy checklist when it's showing
+                float tw = Mathf.Min(800, midR - midL - 10), ty = checklistBottom > 0 ? checklistBottom + 10 : 100;
+                GUI.Label(new Rect(midL + (midR - midL - 10 - tw) / 2, ty, tw, Mathf.Max(30, Ui.BigCenter.CalcHeight(new GUIContent(Words.Say(toast)), tw))), Words.Say(toast), Ui.BigCenter);
+            }
             if (!career.chosen) DrawModeChoice(W, H);
         }
 
+        /// <summary>
+        /// Easy words (milestone 32): what the rocket still needs, ticked off as you build, each with a "Show me" that
+        /// finds the right parts in the list.
+        /// </summary>
+        void DrawChecklist(Rect area)
+        {
+            var items = BuildHelp.Checklist(design, reports);
+            if (items.Count == 0) return;
+            bool all = items.All(i => i.done);
+            float h = 34 + items.Count * 26 + (all ? 24 : 0);
+            var r = new Rect(area.x, area.y, area.width, h);
+            checklistBottom = r.yMax;
+            Ui.Box(r);
+            GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, 22), all ? "Your rocket is ready!" : "What your rocket needs", Ui.Header);
+            float y = r.y + 32;
+            var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
+            foreach (var it in items)
+            {
+                GUI.Label(new Rect(r.x + 10, y + 2, 22, 20), it.done ? "<color=#7dff8a>✓</color>" : "<color=#ffc860>•</color>", Ui.Label);
+                GUI.Label(new Rect(r.x + 32, y + 2, r.width - (it.done || it.search == null ? 44 : 120), 20), it.done ? $"<color=#9aa4ad>{it.text}</color>" : it.text, clip);
+                if (!it.done && it.search != null && Ui.Press(new Rect(r.xMax - 84, y, 76, 22), "Show me", Ui.ButtonSmall))
+                {
+                    partSearch = it.search;
+                    partsScroll = Vector2.zero;
+                }
+                y += 26;
+            }
+            if (all) GUI.Label(new Rect(r.x + 10, y + 2, r.width - 20, 20), "Press <b>LAUNCH</b> at the top right.", Ui.Small);
+        }
+
+        /// <summary>Pointing at a part of the rocket: what it is and what it's for (in Easy words, what it does in plain words).</summary>
+        void DrawHoverTip(float midL, float midR)
+        {
+            if (hover < 0 || hover >= design.nodes.Count || held != null || menuPart >= 0 || spectate) return;
+            var def = PartCatalog.Get(design.nodes[hover].id);
+            if (def == null) return;
+            string text = Words.Easy ? BuildHelp.Tip(def) : Words.Say(def.description);
+            if (string.IsNullOrEmpty(text)) return;
+            var m = new Vector2(In.MousePosition.x / Ui.Scale, (Screen.height - In.MousePosition.y) / Ui.Scale);
+            float w = 280, th = Ui.Small.CalcHeight(new GUIContent(text), w - 20);
+            var r = new Rect(Mathf.Clamp(m.x + 18, midL, midR - w - 4), Mathf.Clamp(m.y + 14, 92, Ui.H - th - 46), w, th + 36);
+            Ui.Box(r);
+            GUI.Label(new Rect(r.x + 10, r.y + 6, w - 20, 20), def.name + (hover == 0 ? (Words.Easy ? "  (main part)" : "  (root)") : ""), Ui.Bold);
+            GUI.Label(new Rect(r.x + 10, r.y + 28, w - 20, th), text, Ui.Small);
+        }
         // ---------------------------------------------------------------- presets, career screens
 
         bool showPresets, showTech, showMissions, showCenter, showCrew, showBadges, showFile;
@@ -1883,14 +2195,15 @@ namespace Rocket
             float y = r.y + 6;
             foreach (var (label, act) in new (string, Action)[]
             {
-                (Words.T("New design", "New design", "Start a new rocket"), () => { PushUndo(); design = new VesselDesign { name = "New Rocket" }; selected = -1; Rebuild(); }),
+                (Words.T("New design", "New design", "Start a new rocket"), () => { PushUndo(); DropHeldQuietly(); design = new VesselDesign { name = "New Rocket" }; selected = -1; Rebuild(); }),
                 (Words.T("Load a design...", "Load a design...", "Open a saved rocket"), () => { showLoad = true; saved = DesignStore.List(); }),
                 (Words.T("Save this design", "Save this design", "Save this rocket"), () => { DesignStore.Save(design); Toast($"Saved \"{design.name}\""); }),
                 ($"{Words.T("Vessels out there", "Vessels out there", "Ships out there")} ({root.universe.vessels.Count})", () => { showVessels = true; showLoad = false; }),
+                ("Play the tutorial", () => Tutorial.Start()),
             })
             {
-                if (Coop.Active && label.StartsWith(Words.T("Vessels out there", "Vessels out there", "Ships out there"))) continue;   // the room's ships are the host's
-                if (GUI.Button(new Rect(r.x + 6, y, r.width - 12, 30), label, Ui.ButtonSmall)) { showFile = false; act(); }
+                if (Coop.Active && (label.StartsWith(Words.T("Vessels out there", "Vessels out there", "Ships out there")) || label == "Play the tutorial")) continue;   // the room's ships are the host's
+                if (Ui.Press(new Rect(r.x + 6, y, r.width - 12, 30), label, Ui.ButtonSmall)) { showFile = false; act(); }
                 y += 34;
             }
         }
@@ -1916,8 +2229,8 @@ namespace Rocket
                 string who = m == null ? "<color=#ff8070>nobody free</color>" : $"<b>{m.name}</b>  <color=#9fc6e8>{Crew.Tag(m)}</color>";
                 GUI.Label(new Rect(r.x + 12, y + 1, 50, 20), $"Seat {s + 1}", Ui.Small);
                 GUI.Label(new Rect(r.x + 62, y, r.width - 186, 20), who + (string.IsNullOrEmpty(c.crewPlan[s]) ? "  <size=11>(auto)</size>" : ""), Ui.Small);
-                if (GUI.Button(new Rect(r.xMax - 120, y - 2, 56, 22), "Next", Ui.ButtonSmall)) CycleSeat(c, s);
-                if (GUI.Button(new Rect(r.xMax - 60, y - 2, 50, 22), "Auto", Ui.ButtonSmall)) { c.crewPlan[s] = ""; Rebuild(); }
+                if (Ui.Press(new Rect(r.xMax - 120, y - 2, 56, 22), "Next", Ui.ButtonSmall)) CycleSeat(c, s);
+                if (Ui.Press(new Rect(r.xMax - 60, y - 2, 50, 22), "Auto", Ui.ButtonSmall)) { c.crewPlan[s] = ""; Rebuild(); }
                 y += 26;
             }
             GUI.Label(new Rect(r.x + 12, r.yMax - 26, r.width - 24, 20),
@@ -1937,49 +2250,47 @@ namespace Rocket
         readonly Queue<string> newsQueue = new Queue<string>();
         Vector2 techScroll, missionScroll;
 
+        Vector2 presetScroll;
         void DrawPresets(Rect r)
         {
             Ui.Box(r);
-            float y = r.y + 6;
-            if (presetCache == null)
-                presetCache = new List<(string, VesselDesign)>
-                {
-                    ("First flight", VesselDesign.FirstFlight()), ("Starter rocket", VesselDesign.Default()), ("Side boosters", VesselDesign.Broadside()), ("Moon rocket", VesselDesign.Longshot()),
-                    ("Plane", VesselDesign.Kite()), ("Docking ferry", VesselDesign.Ferry()), ("Station (Outpost)", VesselDesign.Outpost()),
-                    ("Tal miner (Prospector)", VesselDesign.Prospector()), ("Rover (Tumbler)", VesselDesign.Rover()),
-                    ("Ochre probe (Wayfarer)", VesselDesign.Wayfarer()), ("Wanderer tug (Wrangler)", VesselDesign.Wrangler()), ("Brume probe (Long Haul)", VesselDesign.LongHaul()),
-                };
+            if (presetCache == null) presetCache = Presets.All();
             var career = root.universe.career;
+            var view = new Rect(r.x + 4, r.y + 6, r.width - 8, r.height - 12);
+            presetScroll = GUI.BeginScrollView(view, presetScroll, new Rect(0, 0, view.width - 18, presetCache.Count * 30));
+            float y = 0;
             foreach (var (label, preset) in presetCache)
             {
                 bool open = preset.nodes.All(n => career.IsUnlocked(n.id));
                 string tag = career.IsCareer ? (open ? $"  {Prices.Of(preset):N0}" : "  (needs research)") : "";
-                if (GUI.Button(new Rect(r.x + 6, y, r.width - 12, 28), label + tag, Ui.ButtonSmall))
+                if (Ui.Press(new Rect(2, y, view.width - 22, 26), label + tag, Ui.ButtonSmall))
                 {
                     PushUndo();
+                    DropHeldQuietly();
                     design = preset.Clone();
                     selected = -1;
                     runwayLaunch = design.IsPlane || design.IsRover; // rovers get the runway to drive on
                     SetView(design.IsPlane);
                     showPresets = false;
+                    Tutorial.Placed(design);
                 }
-                y += 32;
+                y += 30;
             }
+            GUI.EndScrollView();
         }
-
         /// <summary>The first-flight guide in the builder: the next thing to do (launch), or how the last flight went.</summary>
-        void DrawGuide(float W, float bottom)
+        void DrawGuide(float midL, float midR, float bottom)
         {
             var c = root.universe.career;
             string text = Guide.Text(c.guide, new GuideState { airTop = root.home.atmosphereHeight, maxAlt = root.flight != null ? root.flight.GuideMaxAlt : 0, orbitDv = Guide.OrbitDv }, c.IsCareer);
-            float w = Mathf.Min(560, W - 710), tw = w - 24;
+            float w = Mathf.Min(560, midR - midL - 20), tw = w - 24;
             float h = 32 + Ui.Small.CalcHeight(new GUIContent(text), tw) + 6;
             bool done = Guide.Finished(c.guide);
             if (done) h += 28;
-            var r = new Rect(300 + (W - 690 - w) / 2, bottom - h, w, h);
+            var r = new Rect(midL + (midR - midL - 10 - w) / 2, bottom - h, w, h);
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 12, r.y + 6, w - 50, 22), Guide.Title(c.guide), Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 30, r.y + 6, 22, 20), "x", Ui.ButtonSmall) || (done && GUI.Button(new Rect(r.xMax - 110, r.yMax - 30, 100, 24), "Got it", Ui.ButtonSmall)))
+            if (Ui.Press(new Rect(r.xMax - 30, r.y + 6, 22, 20), "x", Ui.ButtonSmall) || (done && Ui.Press(new Rect(r.xMax - 110, r.yMax - 30, 100, 24), "Got it", Ui.ButtonSmall)))
             {
                 if (!done) Toast("Guide closed: the ESC menu in flight brings it back");
                 c.guide = Guide.Closed;
@@ -1996,9 +2307,9 @@ namespace Rocket
             Ui.Box(new Rect(0, 0, W, H));
             Ui.Box(r);
             GUI.Label(new Rect(r.x, r.y + 16, r.width, 30), "How do you want to play?", Ui.BigCenter);
-            if (GUI.Button(new Rect(r.x + 30, r.y + 70, 270, 50), "Career", Ui.Button)) { u.Reset(GameMode.Career); u.Save(); Enter(VesselDesign.FirstFlight()); Toast("Career started: open Missions to pick your first contracts"); }
+            if (Ui.Press(new Rect(r.x + 30, r.y + 70, 270, 50), "Career", Ui.Button)) { u.Reset(GameMode.Career); u.Save(); Enter(VesselDesign.FirstFlight()); Toast("Career started: open Missions to pick your first contracts"); }
             GUI.Label(new Rect(r.x + 30, r.y + 126, 270, 120), "Run a space program. Contracts pay for rockets, science unlocks new parts in a 9-tier tech tree, records and reputation open bigger missions. Starts a fresh universe.", Ui.Small);
-            if (GUI.Button(new Rect(r.x + 340, r.y + 70, 270, 50), "Sandbox", Ui.Button)) { u.career.Start(GameMode.Sandbox); u.Save(); }
+            if (Ui.Press(new Rect(r.x + 340, r.y + 70, 270, 50), "Sandbox", Ui.Button)) { u.career.Start(GameMode.Sandbox); u.Save(); }
             GUI.Label(new Rect(r.x + 340, r.y + 126, 270, 120), $"Every part, no money, no contracts: build and fly anything.{(u.vessels.Count > 0 ? $" Keeps the {u.vessels.Count} vessel(s) already out there." : "")}", Ui.Small);
         }
 
@@ -2008,7 +2319,7 @@ namespace Rocket
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 14, r.y + 8, 400, 24), "Research", Ui.Header);
             GUI.Label(new Rect(r.x + 120, r.y + 11, 600, 22), $"Science to spend: <b>{c.science:0.0}</b>. Each node needs one of the nodes before it.", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 8, 24, 22), "x", Ui.ButtonSmall)) showTech = false;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 8, 24, 22), "x", Ui.ButtonSmall)) showTech = false;
             const int tiers = 9;
             var view = new Rect(r.x + 6, r.y + 38, r.width - 12, r.height - 44);
             // Nodes shrink to fit the tallest tier when there's room, and the tree scrolls when there isn't.
@@ -2041,7 +2352,7 @@ namespace Rocket
                         if (!reachable) GUI.Label(new Rect(box.x + 8, box.yMax - 66, box.width - 16, 32), $"Needs {string.Join(" or ", n.requires.Select(q => TechTree.Get(q)?.name))}", Ui.Small);
                         GUI.enabled = can;
                         string lbl = can ? $"Research ({n.cost:0})" : $"{n.cost:0} science";
-                        if (GUI.Button(new Rect(box.x + 6, box.yMax - 34, box.width - 12, 28), lbl, Ui.ButtonSmall) && c.Research(n)) { Rebuild(); root.universe.Save(); }
+                        if (Ui.Press(new Rect(box.x + 6, box.yMax - 34, box.width - 12, 28), lbl, Ui.ButtonSmall) && c.Research(n)) { Rebuild(); root.universe.Save(); }
                         GUI.enabled = true;
                     }
                     y += nodeH + 8;
@@ -2061,7 +2372,7 @@ namespace Rocket
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 14, r.y + 8, 300, 24), "Facilities", Ui.Header);
             GUI.Label(new Rect(r.x + 150, r.y + 11, 700, 22), $"Funds {c.funds:N0}   Science {c.science:0.0}   Reputation {c.reputation:0}", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 8, 24, 22), "x", Ui.ButtonSmall)) showCenter = false;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 8, 24, 22), "x", Ui.ButtonSmall)) showCenter = false;
             float colW = (r.width - 48) / 3;
             float x0 = r.x + 12, top = r.y + 40;
 
@@ -2081,7 +2392,7 @@ namespace Rocket
                     GUI.Label(new Rect(box.x + 10, box.y + 45, box.width - 140, 20), $"<color=#9fc6e8>Next: {Facilities.Effect(f, lvl + 1)}</color>", Ui.Small);
                     double cost = c.UpgradeCost(f);
                     GUI.enabled = c.funds >= cost;
-                    if (GUI.Button(new Rect(box.xMax - 124, box.y + 40, 116, 26), $"Upgrade {cost:N0}", Ui.ButtonSmall) && c.Upgrade(f)) { Rebuild(); root.universe.Save(); }
+                    if (Ui.Press(new Rect(box.xMax - 124, box.y + 40, 116, 26), $"Upgrade {cost:N0}", Ui.ButtonSmall) && c.Upgrade(f)) { Rebuild(); root.universe.Save(); }
                     GUI.enabled = true;
                 }
                 else GUI.Label(new Rect(box.x + 10, box.y + 45, box.width - 20, 20), "<color=#7dff8a>Fully upgraded</color>", Ui.Small);
@@ -2102,11 +2413,11 @@ namespace Rocket
                 GUI.color = old;
                 GUI.Label(new Rect(box.x + 10, box.y + 5, box.width - 20, 20), $"<b>{s.name}</b>{(on ? "  <color=#7dff8a>active</color>" : "")}", Ui.Label);
                 GUI.Label(new Rect(box.x + 10, box.y + 25, box.width - 20, 36), Words.Say(s.description), Ui.Small);
-                if (on) { if (GUI.Button(new Rect(box.x + 10, box.y + 62, 110, 24), "End it", Ui.ButtonSmall)) { c.Deactivate(s); root.universe.Save(); } }
+                if (on) { if (Ui.Press(new Rect(box.x + 10, box.y + 62, 110, 24), "End it", Ui.ButtonSmall)) { c.Deactivate(s); root.universe.Save(); } }
                 else
                 {
                     GUI.enabled = c.CanActivate(s);
-                    if (GUI.Button(new Rect(box.x + 10, box.y + 62, 160, 24), $"Start ({s.setupCost:N0})", Ui.ButtonSmall)) { c.Activate(s); Rebuild(); root.universe.Save(); }
+                    if (Ui.Press(new Rect(box.x + 10, box.y + 62, 160, 24), $"Start ({s.setupCost:N0})", Ui.ButtonSmall)) { c.Activate(s); Rebuild(); root.universe.Save(); }
                     GUI.enabled = true;
                     if (c.strategies.Count >= c.StrategySlots) GUI.Label(new Rect(box.x + 180, box.y + 66, box.width - 190, 20), "No free slot", Ui.Small);
                 }
@@ -2122,7 +2433,7 @@ namespace Rocket
             float hx = x2 + 120;
             foreach (var role in new[] { CrewRole.Pilot, CrewRole.Engineer, CrewRole.Scientist })
             {
-                if (GUI.Button(new Rect(hx, top + 18, 80, 24), Crew.RoleName(role), Ui.ButtonSmall)) { Toast(c.Hire(role)); Rebuild(); root.universe.Save(); }
+                if (Ui.Press(new Rect(hx, top + 18, 80, 24), Crew.RoleName(role), Ui.ButtonSmall)) { Toast(c.Hire(role)); Rebuild(); root.universe.Save(); }
                 hx += 84;
             }
             GUI.enabled = true;
@@ -2152,7 +2463,7 @@ namespace Rocket
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 14, r.y + 8, 400, 24), "Mission control", Ui.Header);
             GUI.Label(new Rect(r.x + 170, r.y + 11, 600, 22), $"Funds {c.funds:N0}   Science {c.science:0.0}   Reputation {c.reputation:0} (better pay as it grows)", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 34, r.y + 8, 24, 22), "x", Ui.ButtonSmall)) showMissions = false;
+            if (Ui.Press(new Rect(r.xMax - 34, r.y + 8, 24, 22), "x", Ui.ButtonSmall)) showMissions = false;
             float colW = (r.width - 36) / 2;
             var left = new Rect(r.x + 12, r.y + 40, colW, r.height - 52);
             var right = new Rect(left.xMax + 12, r.y + 40, colW, r.height - 52);
@@ -2166,9 +2477,9 @@ namespace Rocket
                 GUI.Label(new Rect(box.x + 10, box.y + 26, box.width - 20, 36), Words.Say(k.description), Ui.Small);
                 GUI.Label(new Rect(box.x + 10, box.y + 62, box.width - 20, 20), k.RewardText + $"   ·   {k.deadline / 86400:0} days", Ui.Small);
                 GUI.enabled = c.Active.Count() < c.ActiveLimit;
-                if (GUI.Button(new Rect(box.x + 10, box.y + 82, 90, 24), "Accept", Ui.ButtonSmall) && c.Accept(k, ut)) { root.universe.SpawnRescues(root.bodies); root.universe.Save(); }
+                if (Ui.Press(new Rect(box.x + 10, box.y + 82, 90, 24), "Accept", Ui.ButtonSmall) && c.Accept(k, ut)) { root.universe.SpawnRescues(root.bodies); root.universe.Save(); }
                 GUI.enabled = true;
-                if (GUI.Button(new Rect(box.x + 106, box.y + 82, 90, 24), "Decline", Ui.ButtonSmall)) { c.Decline(k); c.RefreshOffers(ut); root.universe.Save(); }
+                if (Ui.Press(new Rect(box.x + 106, box.y + 82, 90, 24), "Decline", Ui.ButtonSmall)) { c.Decline(k); c.RefreshOffers(ut); root.universe.Save(); }
                 GUI.Label(new Rect(box.x + 206, box.y + 86, box.width - 216, 20), $"fail: -{k.penalty:N0}", Ui.Small);
                 y += 118;
             }
@@ -2284,62 +2595,85 @@ namespace Rocket
             Ui.Line(new Rect(gx - 5, gy - 5, 10, 10), new Color(0.4f, 1f, 0.5f, 0.9f));
         }
 
+        /// <summary>
+        /// The parts list (milestone 32: a search box at the top; taller cards so the second line isn't cut off). A part
+        /// clicked here stays in your hand after you stick it on, for more copies.
+        /// </summary>
         void DrawPartsPanel(Rect r)
         {
             Ui.Box(r);
-            GUI.Label(new Rect(r.x + 10, r.y + 6, r.width, 24), "Parts", Ui.Header);
+            GUI.Label(new Rect(r.x + 10, r.y + 6, 80, 24), "Parts", Ui.Header);
+            // search
+            SearchRect = new Rect(r.x + 70, r.y + 6, r.width - 80, 26);
+            GUI.SetNextControlName("partSearch");
+            partSearch = GUI.TextField(new Rect(SearchRect.x, SearchRect.y, SearchRect.width - (string.IsNullOrEmpty(partSearch) ? 0 : 28), SearchRect.height), partSearch ?? "", 30, Ui.Field);
+            if (string.IsNullOrEmpty(partSearch) && GUI.GetNameOfFocusedControl() != "partSearch")
+                GUI.Label(new Rect(SearchRect.x + 8, SearchRect.y + 3, SearchRect.width - 10, 20), "<color=#7f8a94>Search parts...</color>", Ui.Small);
+            if (!string.IsNullOrEmpty(partSearch) && Ui.Press(new Rect(SearchRect.xMax - 26, SearchRect.y + 1, 24, 24), "×", Ui.ButtonSmall)) { partSearch = ""; GUIUtility.keyboardControl = 0; }
+
             float infoH = 110;
-            var viewRect = new Rect(r.x + 4, r.y + 32, r.width - 8, r.height - 38 - infoH);
-            float contentH = 0;
-            var cats = new List<string>();
+            var viewRect = new Rect(r.x + 4, r.y + 38, r.width - 8, r.height - 44 - infoH);
+            partsListRect = viewRect;
             var career = root.universe.career;
             int locked = 0;
+            var cats = new List<string>();
+            var shownDefs = new List<PartDef>();
+            var seen = new HashSet<string>();
             foreach (var kind in CategoryOrder)
                 foreach (var def in PartCatalog.All.Where(p => p.kind == kind))
                 {
                     if (!career.IsUnlocked(def.id)) { locked++; continue; }
-                    if (!cats.Contains(def.Category)) { cats.Add(def.Category); contentH += 24; }
-                    contentH += 50;
+                    if (!BuildHelp.Matches(def, partSearch) || !seen.Add(def.id)) continue;
+                    shownDefs.Add(def);
+                    if (!cats.Contains(def.Category)) cats.Add(def.Category);
                 }
-            if (locked > 0) contentH += 40;
-            contentH += 30 + subs.Length * 30;
+            bool searching = !string.IsNullOrWhiteSpace(partSearch);
+            var subsShown = searching ? subs.Where(s => s.ToLowerInvariant().Contains(partSearch.Trim().ToLowerInvariant())).ToArray() : subs;
+            float contentH = cats.Count * 24 + shownDefs.Count * 54 + (locked > 0 && !searching ? 40 : 0) + (searching && shownDefs.Count == 0 ? 40 : 0)
+                + (searching && subsShown.Length == 0 ? 0 : 30 + subsShown.Length * 30);
             partsScroll = GUI.BeginScrollView(viewRect, partsScroll, new Rect(0, 0, viewRect.width - 18, contentH));
             float y = 0;
             hoverDef = null;
-            var shown = new HashSet<string>();
+            if (searching && shownDefs.Count == 0)
+            {
+                GUI.Label(new Rect(4, y + 4, viewRect.width - 24, 36), $"No parts match \"{partSearch.Trim()}\".", Ui.Small);
+                y += 40;
+            }
             foreach (string cat in cats)
             {
                 GUI.Label(new Rect(4, y + 2, 240, 20), cat.ToUpperInvariant(), Ui.Small);
                 y += 24;
-                foreach (var kind in CategoryOrder)
-                    foreach (var def in PartCatalog.All.Where(p => p.kind == kind && p.Category == cat && career.IsUnlocked(p.id)))
-                    {
-                        if (!shown.Add(def.id)) continue;
-                        var br = new Rect(2, y, viewRect.width - 22, 46);
-                        if (GUI.Button(br, GUIContent.none, Ui.Button)) Hold(new List<PartNode> { new PartNode { id = def.id } });
-                        GUI.Label(new Rect(br.x + 8, br.y + 2, br.width - 10, 20), def.name, Ui.Bold);
-                        if (career.IsCareer) GUI.Label(new Rect(br.xMax - 64, br.y + 3, 60, 20), $"{Prices.Of(def):N0}", Ui.Small);
-                        GUI.Label(new Rect(br.x + 8, br.y + 23, br.width - 14, 18), Words.PartLine(def), Ui.SmallLine);
-                        if (br.Contains(Event.current.mousePosition)) hoverDef = def;
-                        y += 50;
-                    }
+                foreach (var def in shownDefs.Where(p => p.Category == cat))
+                {
+                    var br = new Rect(2, y, viewRect.width - 22, 50);
+                    bool inHand = held != null && heldFrom == HeldFrom.New && held.Count == 1 && held[0].id == def.id;
+                    if (Ui.Press(br, GUIContent.none, inHand ? Ui.ButtonSel : Ui.Button)) Hold(new List<PartNode> { new PartNode { id = def.id } });
+                    GUI.Label(new Rect(br.x + 8, br.y + 3, br.width - (career.IsCareer ? 74 : 12), 20), def.name, Ui.Bold);
+                    if (career.IsCareer) GUI.Label(new Rect(br.xMax - 64, br.y + 4, 60, 20), $"{Prices.Of(def):N0}", Ui.Small);
+                    GUI.Label(new Rect(br.x + 8, br.y + 25, br.width - 14, 20), Words.Easy ? BuildHelp.Tip(def) : Words.PartLine(def), Ui.SmallLine);
+                    if (br.Contains(Event.current.mousePosition)) hoverDef = def;
+                    y += 54;
+                }
             }
-            if (locked > 0)
+            if (locked > 0 && !searching)
             {
-                GUI.Label(new Rect(4, y + 4, 240, 36), $"{locked} more parts to research in the Tech tree.", Ui.Small);
+                GUI.Label(new Rect(4, y + 4, 240, 36), $"{locked} more parts to research in the {Words.T("Tech tree", "Research screen", "New parts screen")}.", Ui.Small);
                 y += 40;
             }
-            GUI.Label(new Rect(4, y + 6, 240, 20), "SUBASSEMBLIES", Ui.Small);
-            y += 28;
-            if (subs.Length == 0) GUI.Label(new Rect(8, y, 240, 20), "Right-click a part > Save as subassembly", Ui.Small);
-            foreach (var s in subs)
+            if (!searching || subsShown.Length > 0)
             {
-                if (GUI.Button(new Rect(2, y, viewRect.width - 22, 26), s, Ui.Button))
+                GUI.Label(new Rect(4, y + 6, 240, 20), "SUBASSEMBLIES", Ui.Small);
+                y += 28;
+                if (subsShown.Length == 0) GUI.Label(new Rect(8, y, 240, 20), "Right-click a part > Save as subassembly", Ui.Small);
+                foreach (var s in subsShown)
                 {
-                    var nodes = SubStore.Load(s);
-                    if (nodes != null && nodes.Count > 0) Hold(nodes);
+                    if (Ui.Press(new Rect(2, y, viewRect.width - 22, 26), s, Ui.Button))
+                    {
+                        var nodes = SubStore.Load(s);
+                        if (nodes != null && nodes.Count > 0) Hold(nodes);
+                    }
+                    y += 30;
                 }
-                y += 30;
             }
             GUI.EndScrollView();
 
@@ -2348,18 +2682,17 @@ namespace Rocket
             if (showDef != null)
             {
                 GUI.Label(new Rect(info.x, info.y, info.width, 20), showDef.name, Ui.Bold);
-                GUI.Label(new Rect(info.x, info.y + 20, info.width, info.height - 20), Words.Easy ? Words.PartLine(showDef) : Words.Say(showDef.description) + "\n" + Words.PartLine(showDef), Ui.Small);
+                GUI.Label(new Rect(info.x, info.y + 20, info.width, info.height - 20), Words.Easy ? BuildHelp.Tip(showDef) + "\n" + Words.PartLine(showDef) : Words.Say(showDef.description) + "\n" + Words.PartLine(showDef), Ui.Small);
             }
-            else GUI.Label(new Rect(info.x, info.y, info.width, info.height), Words.T("Click a part to pick it up, then click on your rocket to attach it. Green dots are free stack nodes.",
-                "Click a part to pick it up, then click on your rocket to attach it. Green dots show where parts can stack.",
-                "Click a part, then click on your rocket to stick it on. Green dots show where it can go."), Ui.Small);
+            else GUI.Label(new Rect(info.x, info.y, info.width, info.height), Words.T("Click a part to pick it up, then click on your rocket to attach it. It stays in your hand for more; right-click to put it down. Green dots are free stack nodes.",
+                "Click a part to pick it up, then click on your rocket to attach it. It stays in your hand for more; right-click to put it down. Green dots show where parts can stack.",
+                "Click a part, then click on your rocket to stick it on. Click again for another one. Right-click to let go. Green dots show where it can go."), Ui.Small);
         }
-
         void DrawStagePanel(Rect r)
         {
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 10, r.y + 6, 260, 24), Words.T("Staging and delta-v", "Stages and speed budget", "Steps"), Ui.Header);
-            if (design.manualStaging && GUI.Button(new Rect(r.xMax - 110, r.y + 6, 100, 22), "Auto staging", Ui.ButtonSmall))
+            if (design.manualStaging && Ui.Press(new Rect(r.xMax - 110, r.y + 6, 100, 22), "Auto staging", Ui.ButtonSmall))
             {
                 PushUndo();
                 design.manualStaging = false;
@@ -2384,8 +2717,8 @@ namespace Rocket
                     if (i >= defs.Count || defs[i] == null) continue;
                     string verb = st.decouple.Contains(i) ? Words.T("Decouple", "Separate", "Split off") : st.ignite.Contains(i) ? Words.T("Ignite", "Start", "Start") : st.chutes.Contains(i) ? Words.T("Deploy", "Open", "Open") : Words.T("Jettison", "Drop", "Drop");
                     GUI.Label(new Rect(14, y, 250, 20), $"{verb} {defs[i].name}", Ui.Small);
-                    if (GUI.Button(new Rect(viewRect.width - 76, y, 26, 20), "^", Ui.ButtonSmall)) { MoveStage(i, -1); GUI.EndScrollView(); return; }
-                    if (GUI.Button(new Rect(viewRect.width - 48, y, 26, 20), "v", Ui.ButtonSmall)) { MoveStage(i, +1); GUI.EndScrollView(); return; }
+                    if (Ui.Press(new Rect(viewRect.width - 76, y, 26, 20), "^", Ui.ButtonSmall)) { MoveStage(i, -1); GUI.EndScrollView(); return; }
+                    if (Ui.Press(new Rect(viewRect.width - 48, y, 26, 20), "v", Ui.ButtonSmall)) { MoveStage(i, +1); GUI.EndScrollView(); return; }
                     y += 22;
                 }
                 y += 22;
@@ -2413,14 +2746,14 @@ namespace Rocket
             var r = new Rect(Mathf.Min(menuPos.x + 10, Ui.W - 330), Mathf.Min(menuPos.y, Ui.H - 360), 320, 350);
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 10, r.y + 6, 260, 22), def.name, Ui.Header);
-            if (GUI.Button(new Rect(r.xMax - 30, r.y + 6, 22, 22), "x", Ui.ButtonSmall)) { menuPart = -1; return; }
+            if (Ui.Press(new Rect(r.xMax - 30, r.y + 6, 22, 22), "x", Ui.ButtonSmall)) { menuPart = -1; return; }
             var group = DesignOps.SymmetryGroup(design, menuPart);
             GUI.Label(new Rect(r.x + 10, r.y + 30, 300, 40), def.StatsLine + (group.Count > 1 ? $"\nIn a {group.Count}x symmetry group" : ""), Ui.Small);
             float y = r.y + 74;
             if (def.variants > 0)
             {
                 GUI.Label(new Rect(r.x + 10, y + 3, 60, 20), "Paint", Ui.Small);
-                if (GUI.Button(new Rect(r.x + 70, y, 140, 24), PartCatalog.PaintNames[n.variant % PartCatalog.PaintNames.Length] + "  >", Ui.Button))
+                if (Ui.Press(new Rect(r.x + 70, y, 140, 24), PartCatalog.PaintNames[n.variant % PartCatalog.PaintNames.Length] + "  >", Ui.Button))
                 {
                     PushUndo();
                     int v = (n.variant + 1) % Mathf.Min(def.variants, PartCatalog.Paints.Length);
@@ -2436,7 +2769,7 @@ namespace Rocket
                 int col = g % 7, row = g / 7;
                 var br = new Rect(r.x + 10 + col * 43, y + row * 30, 40, 26);
                 bool on = (n.groups & Groups.Bit(g)) != 0;
-                if (GUI.Button(br, g < 10 ? Groups.Name(g) : Groups.Name(g).Substring(0, Math.Min(5, Groups.Name(g).Length)), on ? Ui.RowSel : Ui.ButtonSmall))
+                if (Ui.Press(br, g < 10 ? Groups.Name(g) : Groups.Name(g).Substring(0, Math.Min(5, Groups.Name(g).Length)), on ? Ui.ButtonSmallSel : Ui.ButtonSmall))
                 {
                     PushUndo();
                     foreach (int gi in group) design.nodes[gi].groups ^= Groups.Bit(g);
@@ -2445,7 +2778,7 @@ namespace Rocket
                 }
             }
             y += 30 * ((Groups.Count + 6) / 7) + 6;
-            if (GUI.Button(new Rect(r.x + 10, y, 145, 28), "Save as subassembly", Ui.ButtonSmall))
+            if (Ui.Press(new Rect(r.x + 10, y, 145, 28), "Save as subassembly", Ui.ButtonSmall))
             {
                 var sub = DesignOps.Extract(design, menuPart);
                 string name = $"{def.name} assembly {DateTime.Now:HHmmss}";
@@ -2453,14 +2786,26 @@ namespace Rocket
                 subs = SubStore.List();
                 Toast($"Saved \"{name}\"");
             }
-            if (GUI.Button(new Rect(r.x + 165, y, 145, 28), menuPart == 0 ? "Pick up all" : "Delete", Ui.ButtonSmall))
+            bool armed = Time.unscaledTime < clearArmedUntil;
+            if (Ui.Press(new Rect(r.x + 165, y, 145, 28), menuPart == 0 ? (armed ? "Sure? Clear it all" : "Clear the rocket") : "Delete  (Backspace)", menuPart == 0 && armed ? Ui.ButtonSmallSel : Ui.ButtonSmall))
             {
-                if (menuPart == 0) PickUp(0); else DeleteGroup(menuPart);
+                if (menuPart == 0)
+                {
+                    // the root holds the whole rocket: ask twice, and undo brings it back
+                    if (!armed) { clearArmedUntil = Time.unscaledTime + 3f; return; }
+                    PushUndo();
+                    design.nodes.Clear();
+                    design.manualStaging = false;
+                    clearArmedUntil = 0;
+                    Rebuild();
+                    Toast("Rocket cleared  ·  Ctrl+Z (Cmd+Z) brings it back");
+                }
+                else DeleteGroup(menuPart);
                 menuPart = -1;
                 return;
             }
             y += 34;
-            if (GUI.Button(new Rect(r.x + 10, y, 300, 28), "Make this the root part", Ui.ButtonSmall))
+            if (Ui.Press(new Rect(r.x + 10, y, 300, 28), "Make this the root part", Ui.ButtonSmall))
             {
                 PushUndo();
                 DesignOps.Reroot(design, menuPart);
@@ -2477,10 +2822,10 @@ namespace Rocket
             if (saved.Length == 0) GUI.Label(new Rect(r.x + 10, y, r.width - 20, 40), "Nothing saved yet. Use Save to keep a design.", Ui.Small);
             foreach (var name in saved)
             {
-                if (GUI.Button(new Rect(r.x + 10, y, r.width - 20, 26), name, Ui.Button))
+                if (Ui.Press(new Rect(r.x + 10, y, r.width - 20, 26), name, Ui.Button))
                 {
                     var d = DesignStore.Load(name);
-                    if (d != null) { PushUndo(); design = d; selected = -1; runwayLaunch = design.IsPlane; SetView(design.IsPlane); }
+                    if (d != null) { PushUndo(); DropHeldQuietly(); design = d; selected = -1; runwayLaunch = design.IsPlane; SetView(design.IsPlane); }
                     showLoad = false;
                 }
                 y += 30;

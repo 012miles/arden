@@ -216,7 +216,19 @@ namespace Rocket
         public void Update()
         {
             room.Update(Time.unscaledDeltaTime);
-            if (!room.Connected) { if (room.Error != null) { var e = room.Error; root.LeaveCoop(); root.menu.ShowPage("main"); Debug.Log("Room closed: " + e); } return; }
+            if (!room.Connected)
+            {
+                if (room.Error != null)
+                {
+                    // back to the multiplayer screen, saying why (milestone 32: it used to drop you on the title screen without a word)
+                    var e = room.Error;
+                    root.LeaveCoop();
+                    root.ShowMission();
+                    root.mission.Notice(e);
+                    Debug.Log("Room closed: " + e);
+                }
+                return;
+            }
             if (room.State.activity != 1) return;
             ShareCareer();
             var hangar = root.hangar;
@@ -301,35 +313,59 @@ namespace Rocket
         public int notePart = -1;
         Vector2 noteScroll;
 
-        /// <summary>The team, each player's jobs and whether they're ready (top right in the builder and in flight).</summary>
+        /// <summary>How tall the team panel is (it grows with the players, and with the job buttons when they're open).</summary>
+        public float TeamHeight(bool flying) => 30 + room.State.players.Count * 20 + 48 + (!flying && room.State.players.Count > 1 ? (showJobs ? 30 : 26) : 0);
+        bool showJobs;
+
+        /// <summary>
+        /// The team, each player's jobs and whether they're ready (top right in the builder and in flight). Milestone 32:
+        /// the four job buttons only show after "Change jobs", so there's less to look at.
+        /// </summary>
         public void DrawTeam(Rect r, bool flying)
         {
             Ui.Box(r); Ui.Box(r);
             GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 20, 22), $"<b>{room.State.room}</b>  ·  code <color=#ffd56a>{room.State.code}</color>", Ui.Small);
             float y = r.y + 28;
+            var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
             foreach (var p in room.State.players)
             {
                 string jobs = string.Join(", ", Enumerable.Range(0, 4).Where(k => p.Has((MRole)k)).Select(k => RoleNames[k]));
-                GUI.Label(new Rect(r.x + 10, y, r.width - 20, 20), $"{(p.ready && !flying ? "<color=#7dff8a>✓</color> " : "")}<b>{p.name}</b>{(p.id == room.MyId ? " (you)" : "")}: {jobs}", Ui.Small);
+                GUI.Label(new Rect(r.x + 10, y, r.width - 20, 20), $"{(p.ready && !flying ? "<color=#7dff8a>✓</color> " : "")}<b>{p.name}</b>{(p.id == room.MyId ? " (you)" : "")}: {jobs}", clip);
                 for (int k = 0; k < 4; k++) if (p.Has((MRole)k)) Ui.Line(new Rect(r.x + 4, y + 4, 3, 12), RoleColor[k]);
                 y += 20;
             }
-            GUI.Label(new Rect(r.x + 10, y + 2, r.width - 20, 44), $"<color=#9fc6e8>Your job:</color> {MyJobs(flying)}", new GUIStyle(Ui.Small) { wordWrap = true });
+            // one job: what it involves; several (a small team): just their names, so it fits
+            int jobCount = Enumerable.Range(0, 4).Count(Has);
+            string jobText = jobCount <= 1 ? $"<color=#9fc6e8>Your job:</color> {MyJobs(flying)}" : $"<color=#9fc6e8>Your jobs:</color> {string.Join(", ", Enumerable.Range(0, 4).Where(Has).Select(k => RoleNames[k]))}";
+            GUI.Label(new Rect(r.x + 10, y + 2, r.width - 20, 44), jobText, new GUIStyle(Ui.Small) { wordWrap = true });
             if (!flying && room.State.players.Count > 1)
             {
-                // swap jobs while building
-                float bw = (r.width - 20) / 4f;
-                for (int k = 0; k < 4; k++)
+                if (!showJobs)
                 {
-                    bool mine = Has(k);
-                    var br = new Rect(r.x + 10 + k * bw, r.yMax - 26, bw - 4, 22);
-                    if (GUI.Button(br, RoleNames[k].Split(' ')[0], mine ? Ui.RowSel : Ui.ButtonSmall) && !mine) room.TakeRole((MRole)k);
-                    Ui.Line(new Rect(br.x, br.yMax - 2, br.width, 2), RoleColor[k]);
+                    if (Ui.Press(new Rect(r.x + 10, r.yMax - 26, 120, 22), "Change jobs", Ui.ButtonSmall)) showJobs = true;
+                }
+                else
+                {
+                    // take a job (whoever had it gets one of yours, so nobody's left with nothing to do)
+                    float bw = (r.width - 20 - 30) / 4f;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        bool mine = Has(k);
+                        var br = new Rect(r.x + 10 + k * bw, r.yMax - 28, bw - 4, 24);
+                        if (Ui.Press(br, RoleNames[k].Split(' ')[0], mine ? Ui.ButtonSmallSel : Ui.ButtonSmall) && !mine) { room.TakeRole((MRole)k); showJobs = false; }
+                        Ui.Line(new Rect(br.x, br.yMax - 2, br.width, 2), RoleColor[k]);
+                    }
+                    if (Ui.Press(new Rect(r.xMax - 36, r.yMax - 28, 26, 24), "×", Ui.ButtonSmall)) showJobs = false;
                 }
             }
         }
 
-        /// <summary>Building: comments on the rocket, suggestions, the goal and launch site, ready. Builder ticks comments off.</summary>
+        static readonly string[] QuickNotesShort = { "Add more fuel", "It needs a parachute", "Add fins", "Looks great!" };
+
+        /// <summary>
+        /// Building: comments on the rocket, the goal and launch site, ready. The builder ticks comments off. Milestone 32:
+        /// fewer quick comments, and the goal and launch site are plain words for everyone but mission control.
+        /// </summary>
         public void DrawBuildPanel(Rect r, VesselDesign d)
         {
             Ui.Box(r); Ui.Box(r);
@@ -339,27 +375,33 @@ namespace Rocket
             // the goal and where from (mission control picks)
             var goal = Goal(room.State.goal);
             bool control = Has(Control);
-            GUI.Label(new Rect(r.x + 10, y + 4, 60, 20), "Goal", Ui.Small);
-            GUI.enabled = control;
-            if (GUI.Button(new Rect(r.x + 60, y, r.width - 70, 26), goal.name + (control ? "  ▸" : ""), Ui.ButtonSmall))
-            {
-                int gi = Array.FindIndex(Goals, g => g.id == goal.id);
-                room.Send(new NetMsg { t = "goal", b = Goals[(gi + 1) % Goals.Length].id });
-            }
-            y += 30;
-            GUI.Label(new Rect(r.x + 10, y + 4, 60, 20), "From", Ui.Small);
             string from = room.State.runway ? "Runway" : LaunchSite.Pads[Mathf.Clamp(room.State.pad, 0, LaunchSite.Pads.Length - 1)].name;
-            if (GUI.Button(new Rect(r.x + 60, y, r.width - 70, 26), from + (control ? "  ▸" : ""), Ui.ButtonSmall))
+            if (control)
             {
-                int next = room.State.runway ? 0 : room.State.pad + 1;
-                room.Send(new NetMsg { t = "pad", n = next >= LaunchSite.Pads.Length ? -1 : next });
+                GUI.Label(new Rect(r.x + 10, y + 4, 60, 20), "Goal", Ui.Small);
+                if (Ui.Press(new Rect(r.x + 60, y, r.width - 70, 26), goal.name + "  ▸", Ui.ButtonSmall))
+                {
+                    int gi = Array.FindIndex(Goals, g => g.id == goal.id);
+                    room.Send(new NetMsg { t = "goal", b = Goals[(gi + 1) % Goals.Length].id });
+                }
+                y += 30;
+                GUI.Label(new Rect(r.x + 10, y + 4, 60, 20), "From", Ui.Small);
+                if (Ui.Press(new Rect(r.x + 60, y, r.width - 70, 26), from + "  ▸", Ui.ButtonSmall))
+                {
+                    int next = room.State.runway ? 0 : room.State.pad + 1;
+                    room.Send(new NetMsg { t = "pad", n = next >= LaunchSite.Pads.Length ? -1 : next });
+                }
+                y += 34;
             }
-            GUI.enabled = true;
-            if (!control) GUI.Label(new Rect(r.x + 10, y + 28, r.width - 20, 18), $"<color=#8a929c>(mission control's choice: {Holder(Control)})</color>", Ui.Small);
-            y += 50;
+            else
+            {
+                GUI.Label(new Rect(r.x + 10, y, r.width - 20, 40), $"Goal: <b>{goal.name}</b>   ·   from the <b>{from.ToLowerInvariant()}</b>\n<color=#8a929c>(mission control picks: {Holder(Control)})</color>", new GUIStyle(Ui.Small) { wordWrap = true });
+                y += 44;
+            }
             // the comments
             var notes = room.State.notes;
-            var listRect = new Rect(r.x + 6, y, r.width - 12, r.yMax - y - (builder ? 46 : 150));
+            float bottomH = builder ? 46 : 120;
+            var listRect = new Rect(r.x + 6, y, r.width - 12, Mathf.Max(30, r.yMax - y - bottomH));
             var st = new GUIStyle(Ui.Small) { wordWrap = true };
             float total = 0;
             foreach (var n in notes) total += st.CalcHeight(new GUIContent(NoteLine(n, d)), listRect.width - 90) + 8;
@@ -373,34 +415,38 @@ namespace Rocket
                 GUI.Label(new Rect(4, ny, listRect.width - 94, h), line, st);
                 if (builder && n.state == 0)
                 {
-                    if (GUI.Button(new Rect(listRect.width - 86, ny, 34, 22), "✓", Ui.ButtonSmall)) room.Send(new NetMsg { t = "noteState", n = n.id, on = true });
-                    if (GUI.Button(new Rect(listRect.width - 48, ny, 30, 22), "✗", Ui.ButtonSmall)) room.Send(new NetMsg { t = "noteState", n = n.id, on = false });
+                    if (Ui.Press(new Rect(listRect.width - 86, ny, 34, 22), "✓", Ui.ButtonSmall)) room.Send(new NetMsg { t = "noteState", n = n.id, on = true });
+                    if (Ui.Press(new Rect(listRect.width - 48, ny, 30, 22), "✗", Ui.ButtonSmall)) room.Send(new NetMsg { t = "noteState", n = n.id, on = false });
                 }
                 ny += h + 8;
             }
             GUI.EndScrollView();
             if (!builder)
             {
-                float by = r.yMax - 146;
-                string onWhat = notePart >= 0 && d != null && notePart < d.nodes.Count ? $"On the <b>{PartCatalog.Get(d.nodes[notePart].id)?.name ?? "part"}</b> (click empty space for the whole rocket):" : "On the whole rocket (or click a part first):";
-                GUI.Label(new Rect(r.x + 10, by, r.width - 20, 20), onWhat, Ui.Small);
-                noteText = GUI.TextField(new Rect(r.x + 10, by + 22, r.width - 90, 28), noteText ?? "", 140, Ui.Field);
+                float by = r.yMax - bottomH + 4;
+                string onWhat = notePart >= 0 && d != null && notePart < d.nodes.Count ? $"On the <b>{PartCatalog.Get(d.nodes[notePart].id)?.name ?? "part"}</b>:" : "On the whole rocket (click a part first to pick one):";
+                GUI.Label(new Rect(r.x + 10, by, r.width - 20, 20), onWhat, new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip });
+                noteText = GUI.TextField(new Rect(r.x + 10, by + 20, r.width - 90, 26), noteText ?? "", 140, Ui.Field);
                 bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter) && !string.IsNullOrWhiteSpace(noteText);
-                if ((GUI.Button(new Rect(r.xMax - 74, by + 22, 64, 28), "Send", Ui.ButtonSmall) || enter) && !string.IsNullOrWhiteSpace(noteText)) { room.Send(new NetMsg { t = "note", n = notePart, a = noteText }); noteText = ""; }
-                float qx = r.x + 10, qy = by + 56;
-                foreach (var q in QuickNotes)
+                if ((Ui.Press(new Rect(r.xMax - 74, by + 20, 64, 26), "Send", Ui.ButtonSmall) || enter) && !string.IsNullOrWhiteSpace(noteText))
+                {
+                    room.Send(new NetMsg { t = "note", n = notePart, a = noteText });
+                    noteText = "";
+                    GUIUtility.keyboardControl = 0;   // back to the game (the keys work again)
+                }
+                float qx = r.x + 10, qy = by + 50;
+                foreach (var q in QuickNotesShort)
                 {
                     float w = Ui.Small.CalcSize(new GUIContent(q)).x + 16;
-                    if (qx + w > r.xMax - 10) { qx = r.x + 10; qy += 26; }
-                    if (GUI.Button(new Rect(qx, qy, w, 22), q, Ui.ButtonSmall)) room.Send(new NetMsg { t = "note", n = notePart, a = q });
+                    if (qx + w > r.xMax - 10) break;
+                    if (Ui.Press(new Rect(qx, qy, w, 22), q, Ui.ButtonSmall)) room.Send(new NetMsg { t = "note", n = notePart, a = q });
                     qx += w + 4;
                 }
                 var me = room.Me;
-                if (me != null && GUI.Button(new Rect(r.x + 10, r.yMax - 38, r.width - 20, 30), me.ready ? "Ready to launch ✓ (click to undo)" : "Ready to launch", me.ready ? Ui.RowSel : Ui.Button)) room.Ready(!me.ready);
+                if (me != null && Ui.Press(new Rect(r.x + 10, r.yMax - 36, r.width - 20, 30), me.ready ? "Ready to launch ✓  (click to undo)" : "I'm ready to launch", me.ready ? Ui.ButtonSel : Ui.Button)) room.Ready(!me.ready);
             }
-            else GUI.Label(new Rect(r.x + 10, r.yMax - 40, r.width - 20, 36), AllReady ? "<color=#7dff8a>Everyone's ready: LAUNCH when you are.</color>" : $"Waiting for: {NotReady}", new GUIStyle(Ui.Small) { wordWrap = true });
+            else GUI.Label(new Rect(r.x + 10, r.yMax - 40, r.width - 20, 36), room.State.players.Count <= 1 ? "<color=#7dff8a>Playing alone: LAUNCH when you're ready.</color>" : AllReady ? "<color=#7dff8a>Everyone's ready: LAUNCH when you are.</color>" : $"Waiting for: {NotReady}", new GUIStyle(Ui.Small) { wordWrap = true });
         }
-
         string NoteLine(CoopNote n, VesselDesign d)
         {
             var p = room.State.Player(n.from);
@@ -419,7 +465,12 @@ namespace Rocket
             for (int i = Math.Max(0, chat.Count - 3); i < chat.Count; i++) { GUI.Label(new Rect(r.x + 8, y, r.width - 16, 18), chat[i], clip); y += 18; }
             chatText = GUI.TextField(new Rect(r.x + 8, r.yMax - 30, r.width - 80, 24), chatText ?? "", 120, Ui.Field);
             bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter) && !string.IsNullOrWhiteSpace(chatText);
-            if ((GUI.Button(new Rect(r.xMax - 66, r.yMax - 30, 58, 24), "Send", Ui.ButtonSmall) || enter) && !string.IsNullOrWhiteSpace(chatText)) { room.Chat(chatText); chatText = ""; }
+            if ((Ui.Press(new Rect(r.xMax - 66, r.yMax - 30, 58, 24), "Send", Ui.ButtonSmall) || enter) && !string.IsNullOrWhiteSpace(chatText))
+            {
+                room.Chat(chatText);
+                chatText = "";
+                GUIUtility.keyboardControl = 0;   // sent: the game's keys work again (milestone 32: in flight they used to stage and steer while you typed)
+            }
         }
     }
 }

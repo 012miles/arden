@@ -133,38 +133,38 @@ namespace Rocket
             bool changed = false;
             // filter
             GUI.Label(new Rect(x, y + 4, 44, 22), "Look", Ui.Small);
-            if (GUI.Button(new Rect(x + 44, y, 26, 26), "<", Ui.ButtonSmall)) { photoFilter = (photoFilter + PhotoFilters.Length - 1) % PhotoFilters.Length; changed = true; }
+            if (Ui.Press(new Rect(x + 44, y, 26, 26), "<", Ui.ButtonSmall)) { photoFilter = (photoFilter + PhotoFilters.Length - 1) % PhotoFilters.Length; changed = true; }
             GUI.Label(new Rect(x + 72, y + 3, 118, 22), PhotoFilters[photoFilter], Ui.Center);
-            if (GUI.Button(new Rect(x + 192, y, 26, 26), ">", Ui.ButtonSmall)) { photoFilter = (photoFilter + 1) % PhotoFilters.Length; changed = true; }
+            if (Ui.Press(new Rect(x + 192, y, 26, 26), ">", Ui.ButtonSmall)) { photoFilter = (photoFilter + 1) % PhotoFilters.Length; changed = true; }
             x += 234;
             // time of day
             GUI.Label(new Rect(x, y + 4, 44, 22), "Time", Ui.Small);
-            if (GUI.Button(new Rect(x + 44, y, 26, 26), "-", Ui.ButtonSmall)) photoShift = Mathf.Max(-12f, photoShift - 0.5f);
+            if (Ui.Press(new Rect(x + 44, y, 26, 26), "-", Ui.ButtonSmall)) photoShift = Mathf.Max(-12f, photoShift - 0.5f);
             GUI.Label(new Rect(x + 72, y + 3, 74, 22), Mathf.Abs(photoShift) < 0.01f ? "now" : $"{(photoShift > 0 ? "+" : "")}{photoShift:0.#} h", Ui.Center);
-            if (GUI.Button(new Rect(x + 148, y, 26, 26), "+", Ui.ButtonSmall)) photoShift = Mathf.Min(12f, photoShift + 0.5f);
+            if (Ui.Press(new Rect(x + 148, y, 26, 26), "+", Ui.ButtonSmall)) photoShift = Mathf.Min(12f, photoShift + 0.5f);
             x += 190;
             // zoom
             GUI.Label(new Rect(x, y + 4, 44, 22), "Zoom", Ui.Small);
-            if (GUI.Button(new Rect(x + 44, y, 26, 26), "-", Ui.ButtonSmall)) photoFov = Mathf.Min(100f, photoFov + 5f);
+            if (Ui.Press(new Rect(x + 44, y, 26, 26), "-", Ui.ButtonSmall)) photoFov = Mathf.Min(100f, photoFov + 5f);
             GUI.Label(new Rect(x + 72, y + 3, 54, 22), $"{60f / photoFov:0.0}x", Ui.Center);
-            if (GUI.Button(new Rect(x + 128, y, 26, 26), "+", Ui.ButtonSmall)) photoFov = Mathf.Max(10f, photoFov - 5f);
+            if (Ui.Press(new Rect(x + 128, y, 26, 26), "+", Ui.ButtonSmall)) photoFov = Mathf.Max(10f, photoFov - 5f);
             x += 170;
             // brightness
             GUI.Label(new Rect(x, y + 4, 60, 22), "Bright", Ui.Small);
-            if (GUI.Button(new Rect(x + 54, y, 26, 26), "-", Ui.ButtonSmall)) { photoBright = Mathf.Max(-2f, photoBright - 0.25f); changed = true; }
+            if (Ui.Press(new Rect(x + 54, y, 26, 26), "-", Ui.ButtonSmall)) { photoBright = Mathf.Max(-2f, photoBright - 0.25f); changed = true; }
             GUI.Label(new Rect(x + 82, y + 3, 44, 22), $"{(photoBright > 0 ? "+" : "")}{photoBright:0.##}", Ui.Center);
-            if (GUI.Button(new Rect(x + 128, y, 26, 26), "+", Ui.ButtonSmall)) { photoBright = Mathf.Min(2f, photoBright + 0.25f); changed = true; }
+            if (Ui.Press(new Rect(x + 128, y, 26, 26), "+", Ui.ButtonSmall)) { photoBright = Mathf.Min(2f, photoBright + 0.25f); changed = true; }
             if (changed) RenderEnv.SetPhotoLook(photoFilter, photoBright);
 
             y = r.y + 54;
             x = r.x + 14;
-            if (GUI.Button(new Rect(x, y, 190, 32), "Take picture (SPACE)", Ui.Button)) TakePhoto();
-            if (GUI.Button(new Rect(x + 198, y, 150, 32), "Open photos", Ui.Button))
+            if (Ui.Press(new Rect(x, y, 190, 32), "Take picture (SPACE)", Ui.Button)) TakePhoto();
+            if (Ui.Press(new Rect(x + 198, y, 150, 32), "Open photos", Ui.Button))
             {
                 try { Directory.CreateDirectory(PhotoFolder); Application.OpenURL("file:///" + PhotoFolder.Replace('\\', '/')); } catch { }
             }
-            if (GUI.Button(new Rect(x + 356, y, 110, 32), "Hide (H)", Ui.Button)) photoPanelHidden = true;
-            if (GUI.Button(new Rect(x + 474, y, 110, 32), "Back (F2)", Ui.Button)) { TogglePhoto(); return; }
+            if (Ui.Press(new Rect(x + 356, y, 110, 32), "Hide (H)", Ui.Button)) photoPanelHidden = true;
+            if (Ui.Press(new Rect(x + 474, y, 110, 32), "Back (F2)", Ui.Button)) { TogglePhoto(); return; }
             GUI.Label(new Rect(x + 596, y - 2, r.width - 610, 40), "WASD move, Q/E down/up, SHIFT faster\nright-drag to turn, scroll closer/further", Ui.Small);
         }
     }

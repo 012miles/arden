@@ -555,6 +555,65 @@ captaincarl24: "review the resource and check if our game matches; also remove t
 - **New company name**: captaincarl24 (app ID `com.captaincarl24.ardenspaceprogram`). Unity keeps saves in a folder named company/game, so the first launch copies saves, designs, sub-assemblies and photos from this game's folder under the old company name (the old folder stays as a backup; test runs aren't copied). Settings kept by Unity itself (volumes, changed keys, the countdown, rollout and story switches, the last pad) start from their defaults once.
 - 1 new test (the folder copy).
 
+### Milestone 32: an easier builder, an interface that fits, a tutorial, steadier multiplayer (2026-11-14)
+captaincarl24: "make it easier to build ... sometimes the entire rocket likes to disappear, run your system and find every single bug", the
+interface overlapping on a 15" MacBook Air, off-centre button text, a parts search, 10 more presets, an interactive tutorial, Backspace to
+delete, parts staying selected, more parts, better physics, Easy-mode building help, and "fix multiplayer ... insanely buggy and too much buttons".
+
+**Builder bugs found and fixed**
+- **The vanishing rocket**: clicking the root part picked up the *whole rocket*; the next click on the parts list (or ESC) threw it away
+  without a word. The root now stays put (it explains why); "Pick up all" became "Clear the rocket", which asks twice.
+- A part picked up off the rocket is no longer thrown away when you let go: ESC or right-click puts it back where it was; choosing another
+  part from the list puts it back too. Deleting is on purpose: Backspace, or dropping it on the parts list (undo brings it back).
+- Deleting a symmetry group whose ids the root shared deleted the root as well, breaking the rocket (`DesignOps.RemovalSet` never includes it).
+- The see-through "ghost" part stayed behind in rocket rooms when the builder's rocket arrived; it's cleared now.
+- 3,000 random edits (add, symmetry, delete, move, re-root, save/load) never break a rocket's tree (`DesignOps.TreeProblem`).
+
+**Easier building**
+- A part you add from the list stays in your hand for more copies (right-click or ESC puts it down). Backspace (the Mac's delete key) deletes;
+  Cmd+Z undoes on a Mac as well as Ctrl+Z; Ctrl+Shift+Z / Ctrl+Y redo. Stack nodes catch the mouse from further away (48 px).
+- **Search** at the top of the parts list (name, kind, category, description; several words narrow it down). Taller part cards: the second
+  line isn't cut off any more.
+- **Easy words**: no Offset/Rotate/Root tools, mirror, snap or marker buttons; "One at a time / 2 at once" instead of Symmetry; a
+  **checklist** (capsule, tank, engine, parachute, fins, strong enough to take off) with "Show me" buttons that find the parts; plain-words
+  tips on every part card and when pointing at a part of the rocket (`BuildHelp`).
+- **10 more presets** (22 in all, scrolling): Sky Hopper, Science Hopper, Abort test, Twin Booster, Orbiter, Tal Lander, Satellite launcher,
+  Big Lift, Quad Booster, Station Core. Each is checked to be valid, lift off (push/weight 1.15+) and have the speed budget for its job.
+- **10 more parts**: FT-3, FT-2L and FT-16L tanks, Swift Sustainer and Condor Vacuum Engine, Flint and Blaze solid boosters, a 2.6 m nose
+  cone, a 2.6/1.3 adapter and a big radial fin, with prices and places in the tech tree.
+
+**The interface**
+- It fits any screen by itself: the layout space is never smaller than 1480 x 900, scaled to the window; the size setting is Auto / 90% /
+  80% / 70% (sizes over 100% overlapped, so old ones read as Auto).
+- The builder's top bar fits the width: what doesn't fit moves into "More ▾". (At MacBook shapes the second row used to overlap.) The money
+  line clips instead of running under the buttons; warnings, hints and the guide stay in the open middle.
+- Switched-on buttons (the tool in use, the chosen option) had their text in the top-left corner (they used the list-row style); they have
+  their own centred style now, and every button's text is centred with even padding.
+- Clicking anywhere leaves a text box; while you type, the game's keys stay quiet (typing in the flight chat used to stage the rocket).
+- The layout check now sees every button (`Ui.Press`) and reports buttons landing on buttons; the window-size tour adds MacBook shapes.
+
+**Interactive tutorial** (`Tutorial`): the first game opens a box that points at each part of the screen, dims the rest and waits for you:
+the parts list, the search, put down a capsule, a tank, an engine and a parachute (the list filters itself to the right parts), the stages,
+undo, LAUNCH; then in flight light the engine, read height and speed, steer, open and close the map. Skip any time; File > Play the tutorial
+plays it again. A rocket already in the hangar? Start fresh, or fly that one.
+
+**Physics**: drag now rises through the speed of sound (x1.45 just past Mach 1, easing back to normal by Mach 3) with the speed of sound
+falling with height, so max Q is the roughest part of a launch, as in real life. Reentry and aerocapture (far faster) are unchanged, and the
+planners' drag forecasts use the plain drag. The flight display shows the Mach number (under More).
+
+**Multiplayer**
+- One screen instead of three: your name once, host a game on the left (campaign/sandbox, rocket/mission design), the games on your network
+  on the right with Join, and a code box. It listens the whole time it's open.
+- The host's game no longer freezes when a player's connection is slow: each connection has its own sending thread and queue; flight frames
+  that back up are skipped. Both ends send a heartbeat, so a player whose Wi-Fi drops (or laptop sleeps) is noticed in 15 s.
+- Jobs are kept when someone joins or leaves (they used to be dealt out again from scratch); taking a job never leaves anyone with none.
+- A room that closes takes you back to the multiplayer screen saying why (it used to drop you on the title screen). Rooms are announced on
+  each network's own broadcast address too, and stay listed through a lost announcement or two.
+- A crash at the end of a rocket room's flight (the flight recording looking at a ship being taken apart) is fixed.
+- Fewer buttons: the job buttons hide behind "Change jobs"; four quick comments instead of seven; the goal and launch site are plain words for
+  everyone but mission control; the team, comments and chat no longer overlap each other.
+- 8 new sim tests; `-autotestBuilder32` checks the builder fixes in the running game (480-492); `-coopPlayers` runs 2-4 player rooms.
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

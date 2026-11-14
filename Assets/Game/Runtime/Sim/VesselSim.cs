@@ -1007,8 +1007,8 @@ namespace Rocket
         /// <summary>Drag area (m^2, drag coefficient times area) flying nose first and tail first, averaged: for forecasts.</summary>
         public double DragArea()
         {
-            double a = AeroCdA(Vector3.up, 200f, Vector3.zero, out _).magnitude;
-            double b = AeroCdA(Vector3.down, 200f, Vector3.zero, out _).magnitude;
+            double a = AeroCdA(Vector3.up, 200f, Vector3.zero, out _, false).magnitude;
+            double b = AeroCdA(Vector3.down, 200f, Vector3.zero, out _, false).magnitude;
             return (a + b) / 2;
         }
 
@@ -1018,19 +1018,48 @@ namespace Rocket
         /// </summary>
         public void DragRange(out double least, out double most)
         {
-            double tail = AeroCdA(Vector3.down, 200f, Vector3.zero, out _).magnitude;
-            double side = Math.Max(AeroCdA(Vector3.right, 200f, Vector3.zero, out _).magnitude, AeroCdA(Vector3.forward, 200f, Vector3.zero, out _).magnitude);
+            double tail = AeroCdA(Vector3.down, 200f, Vector3.zero, out _, false).magnitude;
+            double side = Math.Max(AeroCdA(Vector3.right, 200f, Vector3.zero, out _, false).magnitude, AeroCdA(Vector3.forward, 200f, Vector3.zero, out _, false).magnitude);
             least = tail;
             most = Math.Max(side, tail);
         }
 
-        Vector3 AeroCdA(Vector3 u, float speed, Vector3 omegaL, out Vector3 torque)
+        /// <summary>
+        /// Milestone 32: the speed of sound here (m/s). About 340 at Arden's sea level, falling to 295 by 11 km (the air
+        /// gets colder) and creeping back up higher; thinner, colder air elsewhere.
+        /// </summary>
+        public double SoundSpeed()
+        {
+            if (body == null || !body.HasAtmosphere) return 300;
+            double alt = Math.Max(0, Altitude);
+            if (body.IsHomeWorld) return alt < 11000 ? 340 - 45 * alt / 11000 : alt < 20000 ? 295 : Math.Min(330, 295 + (alt - 20000) * 0.0011);
+            return 240;
+        }
+
+        /// <summary>
+        /// Milestone 32: how much harder the air pushes near and past the speed of sound (the transonic drag rise that
+        /// makes "max Q" the roughest part of a launch): 1 below Mach 0.8, about 1.45 just past Mach 1, easing back to 1 by
+        /// Mach 3. (Reentry and aerocapture, far faster than that, are as they always were.) Lift isn't changed, only drag.
+        /// </summary>
+        public static float MachDrag(float mach)
+        {
+            if (!(mach >= 0.8f) || mach >= 3f) return 1f;
+            if (mach < 1.05f) { float t = (mach - 0.8f) / 0.25f; return 1f + 0.45f * t * t * (3f - 2f * t); }
+            float k = (mach - 1.05f) / 1.95f;
+            return 1.45f - 0.45f * k * k * (3f - 2f * k);
+        }
+
+        /// <summary>The Mach number now (speed through the air over the speed of sound), for the flight display.</summary>
+        public double Mach => body != null && body.HasAtmosphere ? AirRelVelocity.magnitude / SoundSpeed() : 0;
+
+        Vector3 AeroCdA(Vector3 u, float speed, Vector3 omegaL, out Vector3 torque, bool transonic = true)
         {
             Vector3 total = Vector3.zero;
             torque = Vector3.zero;
             foreach (var p in parts) p.aeroArea = Vector3.zero;
             Vector3 vRel = u * speed;
             float invS2 = speed > 0.1f ? 1f / (speed * speed) : 0f;
+            float machK = transonic ? MachDrag(speed / (float)SoundSpeed()) : 1f;   // (forecasts use the plain drag)
             foreach (var p in parts)
             {
                 if (p.enclosed) continue;
@@ -1045,14 +1074,14 @@ namespace Rocket
                 if (d.radial)
                 {
                     float form = d.radialSize.y * d.radialSize.z * (d.LiftArea > 0 ? 0.15f : 0.6f);
-                    f = -uf * form;
+                    f = -uf * form * machK;
                     if (d.LiftArea > 0) f += LiftForce(d.LiftArea, d.liftSlope, uf, SurfaceNormal(p));
                 }
                 else if (d.kind == PartKind.Fairing && !p.fairingGone)
                 {
                     float c = Vector3.Dot(p.Axis, uf), R = d.fairingRadius, H = d.fairingHeight;
                     float area = (c > 0 ? Mathf.PI * R * R * 0.3f * c * c : 0) + H * 2 * R * 0.8f * (1 - c * c);
-                    f = -uf * area;
+                    f = -uf * area * machK;
                     r = p.localPos + p.localRot * new Vector3(0, H * 0.5f, 0) - com;
                 }
                 else
@@ -1069,7 +1098,7 @@ namespace Rocket
                     }
                     float side = d.length * (d.topDiameter + d.bottomDiameter) * 0.5f * 0.8f + d.finArea * 1.2f;
                     area += side * (1 - c * c);
-                    f = -uf * area;
+                    f = -uf * area * machK;
                     // A blunt heat shield's pressure acts through its centre of curvature, well behind the shield face, so a
                     // capsule flies shield first by itself (as real ones do) instead of tipping over like an arrow flown backwards.
                     if (shieldFace > 0 && area > 0)

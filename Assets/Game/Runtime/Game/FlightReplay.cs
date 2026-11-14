@@ -234,7 +234,7 @@ namespace Rocket
                 Event.current.Use();
             }
             float x = bar.x + 14, y = bar.y + 58;
-            if (GUI.Button(new Rect(x, y, 84, 28), r.playing ? "Pause" : "Play", Ui.Button))
+            if (Ui.Press(new Rect(x, y, 84, 28), r.playing ? "Pause" : "Play", Ui.Button))
             {
                 if (!r.playing && r.ut >= rec.EndUt - 1e-6) { r.ut = rec.StartUt; r.boomed = false; r.ghostView?.SetVisible(true); }
                 r.playing = !r.playing;
@@ -242,16 +242,16 @@ namespace Rocket
             x += 92;
             foreach (float s in new[] { 0.25f, 0.5f, 1f, 2f, 4f, 8f })
             {
-                if (GUI.Button(new Rect(x, y, 50, 28), s < 1 ? $"{s:0.##}x" : $"{s:0}x", Mathf.Approximately(r.speed, s) ? Ui.RowSel : Ui.ButtonSmall)) r.speed = s;
+                if (Ui.Press(new Rect(x, y, 50, 28), s < 1 ? $"{s:0.##}x" : $"{s:0}x", Mathf.Approximately(r.speed, s) ? Ui.ButtonSmallSel : Ui.ButtonSmall)) r.speed = s;
                 x += 54;
             }
             x += 14;
             foreach (ReplayCam c in Enum.GetValues(typeof(ReplayCam)))
             {
-                if (GUI.Button(new Rect(x, y, 84, 28), c.ToString(), r.cam == c ? Ui.RowSel : Ui.ButtonSmall)) { r.cam = c; r.flybySet = false; r.directorTimer = 0; }
+                if (Ui.Press(new Rect(x, y, 84, 28), c.ToString(), r.cam == c ? Ui.ButtonSmallSel : Ui.ButtonSmall)) { r.cam = c; r.flybySet = false; r.directorTimer = 0; }
                 x += 88;
             }
-            if (GUI.Button(new Rect(bar.xMax - 150, y, 136, 28), "Back to flight", Ui.Button)) EndReplay();
+            if (Ui.Press(new Rect(bar.xMax - 150, y, 136, 28), "Back to flight", Ui.Button)) EndReplay();
         }
     }
 }

@@ -136,14 +136,75 @@ namespace Rocket
         bool dirty;
         volatile bool stopping;
 
+        /// <summary>
+        /// One connection. Milestone 32: messages go into a queue that its own thread writes out, so a slow connection
+        /// (a busy Wi-Fi, a laptop going to sleep) can no longer freeze the host's whole game while it waits. When there's
+        /// nothing to send for a moment the thread sends a heartbeat, so both ends notice quickly if the other one's gone.
+        /// </summary>
         class Conn
         {
             public TcpClient tcp;
             public StreamWriter w;
             public int id;
             public bool hello;
-            public void Send(string line) { try { lock (this) { w.WriteLine(line); w.Flush(); } } catch { } }
+            public long lastHeard = DateTime.UtcNow.Ticks;
+            readonly BlockingCollection<string> outbox = new BlockingCollection<string>(new ConcurrentQueue<string>());
+            Thread writer;
+            volatile bool closed;
+
+            public void Start()
+            {
+                writer = new Thread(WriteLoop) { IsBackground = true, Name = "Room writer" };
+                writer.Start();
+            }
+
+            /// <summary>Queues a line. Flight frames are dropped if the line's backed up (the next one's on its way).</summary>
+            public void Send(string line, bool droppable = false)
+            {
+                if (closed) return;
+                if (droppable && outbox.Count > 30) return;
+                if (outbox.Count > 2000) { Close(); return; }   // hopelessly behind: let it go
+                try { outbox.Add(line); } catch { }
+            }
+
+            void WriteLoop()
+            {
+                try
+                {
+                    while (!closed)
+                    {
+                        if (outbox.TryTake(out string line, 1500))
+                        {
+                            bool closeNow = false;
+                            do
+                            {
+                                if (line == CloseMark) { closeNow = true; break; }
+                                w.WriteLine(line);
+                            } while (outbox.TryTake(out line));   // everything waiting, then one flush
+                            w.Flush();
+                            if (closeNow) { Thread.Sleep(200); Close(); return; }
+                        }
+                        else { w.WriteLine(Heartbeat); w.Flush(); }
+                    }
+                }
+                catch { Close(); }
+            }
+
+            public void Close()
+            {
+                closed = true;
+                try { tcp?.Close(); } catch { }
+            }
+
+            /// <summary>Sends what's queued (a "sorry, the room's full"), then hangs up.</summary>
+            public void CloseAfterSending() { try { outbox.Add(CloseMark); } catch { Close(); } }
         }
+
+        const string CloseMark = "__close__";
+
+        const string Heartbeat = "{\"t\":\"hb\"}";
+        /// <summary>Nothing at all from the other end for this long: the connection's gone (Wi-Fi dropped, laptop asleep).</summary>
+        public const double SilenceLimit = 15.0;
 
         public NetPlayer Me => State.Player(MyId);
         public bool Can(MRole r) => Me != null && Me.Has(r);
@@ -200,6 +261,7 @@ namespace Rocket
                     tcp.NoDelay = true;
                     var c = new Conn { tcp = tcp, w = new StreamWriter(tcp.GetStream(), new UTF8Encoding(false)) { AutoFlush = false } };
                     r.hostConn = c;
+                    c.Start();
                     c.Send(JsonUtility.ToJson(new NetMsg { t = "hello", name = who, ver = Proto }));
                     r.ReadLoop(c);
                 }
@@ -214,8 +276,8 @@ namespace Rocket
         {
             stopping = true;
             try { listener?.Stop(); } catch { }
-            lock (conns) foreach (var c in conns) try { c.tcp.Close(); } catch { }
-            try { hostConn?.tcp.Close(); } catch { }
+            lock (conns) foreach (var c in conns) c.Close();
+            hostConn?.Close();
             try { beacon?.Close(); } catch { }
             try { finder?.Close(); } catch { }
             if (Current == this) Current = null;
@@ -240,6 +302,7 @@ namespace Rocket
                     tcp.NoDelay = true;
                     var c = new Conn { tcp = tcp, w = new StreamWriter(tcp.GetStream(), new UTF8Encoding(false)) };
                     lock (conns) conns.Add(c);
+                    c.Start();
                     new Thread(() => ReadLoop(c)) { IsBackground = true, Name = "Room reader" }.Start();
                 }
                 catch { if (stopping) return; Thread.Sleep(50); }
@@ -252,7 +315,12 @@ namespace Rocket
             {
                 var rd = new StreamReader(c.tcp.GetStream(), Encoding.UTF8);
                 string line;
-                while (!stopping && (line = rd.ReadLine()) != null) inbox.Enqueue((c, line));
+                while (!stopping && (line = rd.ReadLine()) != null)
+                {
+                    c.lastHeard = DateTime.UtcNow.Ticks;
+                    if (line == Heartbeat) continue;   // just "still here"
+                    inbox.Enqueue((c, line));
+                }
             }
             catch { }
             inbox.Enqueue((c, "__bye"));
@@ -268,7 +336,7 @@ namespace Rocket
                 if (m.line == "__bye")
                 {
                     if (IsHost) Leave(m.c);
-                    else if (!stopping) { Error = "The room closed (or the connection dropped)."; Connected = false; }
+                    else if (!stopping) { Error = "The host closed the room (or the connection dropped)."; Connected = false; }
                     continue;
                 }
                 NetMsg msg;
@@ -287,8 +355,23 @@ namespace Rocket
                     beaconTimer = 1f;
                     var data = Encoding.UTF8.GetBytes(BeaconText());
                     try { beacon.Send(data, data.Length, new IPEndPoint(IPAddress.Broadcast, DiscoveryPort)); } catch { }
+                    // also each network's own broadcast address (some Wi-Fi, and Macs with several networks, don't pass 255.255.255.255 on)
+                    broadcastTargets ??= DirectedBroadcasts();
+                    foreach (var b in broadcastTargets) try { beacon.Send(data, data.Length, new IPEndPoint(b, DiscoveryPort)); } catch { }
                     try { beacon.Send(data, data.Length, new IPEndPoint(IPAddress.Loopback, DiscoveryPort)); } catch { }
                 }
+                // a player we haven't heard from at all for a while has gone (their heartbeat stopped)
+                long now = DateTime.UtcNow.Ticks;
+                List<Conn> silent = null;
+                lock (conns) foreach (var c in conns) if (c.hello && (now - c.lastHeard) / 1e7 > SilenceLimit) (silent ??= new List<Conn>()).Add(c);
+                if (silent != null) foreach (var c in silent) Leave(c);
+            }
+            else if (!IsHost && Connected && hostConn != null && (DateTime.UtcNow.Ticks - hostConn.lastHeard) / 1e7 > SilenceLimit)
+            {
+                Error = "Lost the connection to the room (nothing heard from the host for a while).";
+                Connected = false;
+                stopping = true;
+                hostConn.Close();
             }
             if (Solo && dirty) { dirty = false; State.stateId++; StateVersion++; }
         }
@@ -299,12 +382,13 @@ namespace Rocket
         {
             if (msg.t == "hello")
             {
-                if (msg.ver != Proto) { c.Send(JsonUtility.ToJson(new NetMsg { t = "refuse", a = "That room is on a different version of the game." })); c.tcp.Close(); return; }
-                if (State.players.Count >= MaxPlayers) { c.Send(JsonUtility.ToJson(new NetMsg { t = "refuse", a = "That room is full (4 players)." })); c.tcp.Close(); return; }
+                if (msg.ver != Proto) { c.Send(JsonUtility.ToJson(new NetMsg { t = "refuse", a = "That room is on a different version of the game: update both games to the same release." })); c.CloseAfterSending(); return; }
+                if (State.players.Count >= MaxPlayers) { c.Send(JsonUtility.ToJson(new NetMsg { t = "refuse", a = "That room is full (4 players)." })); c.CloseAfterSending(); return; }
                 c.id = State.nextPlayer++;
                 c.hello = true;
-                State.players.Add(new NetPlayer { id = c.id, name = Clean(msg.name) });
-                ShareRoles();
+                var joiner = new NetPlayer { id = c.id, name = UniqueName(Clean(msg.name)) };
+                State.players.Add(joiner);
+                GiveJobsTo(joiner);
                 Say($"{Clean(msg.name)} joined the team.");
                 c.Send(JsonUtility.ToJson(new NetMsg { t = "welcome", n = c.id }));
                 MarkDirty();
@@ -317,13 +401,56 @@ namespace Rocket
         void Leave(Conn c)
         {
             lock (conns) conns.Remove(c);
+            c.Close();
             var p = State.Player(c.id);
             if (p == null) return;
             State.players.Remove(p);
-            ShareRoles();
+            HandOnJobs(p.roles);
             Say($"{p.name} left.");
             MarkDirty();
         }
+
+        /// <summary>Two players with the same name get told apart ("Sam" and "Sam 2").</summary>
+        string UniqueName(string n)
+        {
+            if (!State.players.Any(p => p.name == n)) return n;
+            for (int k = 2; k < 10; k++) { string m = $"{(n.Length > 13 ? n.Substring(0, 13) : n)} {k}"; if (!State.players.Any(p => p.name == m)) return m; }
+            return n;
+        }
+
+        /// <summary>
+        /// Milestone 32: someone new joins. Everyone keeps the jobs they have (they used to be dealt out again from scratch,
+        /// undoing whatever people had picked); the newcomer takes jobs from whoever has the most, until the jobs are shared
+        /// out as evenly as they can be.
+        /// </summary>
+        public void GiveJobsTo(NetPlayer joiner)
+        {
+            int want = Math.Max(1, 4 / Math.Max(1, State.players.Count));
+            for (int guard = 0; guard < 4 && CountJobs(joiner) < want; guard++)
+            {
+                var rich = State.players.Where(q => q != joiner && CountJobs(q) > 1).OrderByDescending(CountJobs).ThenByDescending(q => q.id).FirstOrDefault();
+                if (rich == null) break;
+                int give = -1;
+                for (int r = 3; r >= 0; r--) if ((rich.roles & (1 << r)) != 0) { give = r; break; }   // the last job on their list
+                rich.roles &= ~(1 << give);
+                joiner.roles |= 1 << give;
+            }
+            if (joiner.roles == 0 && State.players.Count > 0) joiner.roles = 0;   // a fifth wheel can still watch and chat
+        }
+
+        /// <summary>Someone left: their jobs go to whoever has the fewest (the host first if it's a tie).</summary>
+        public void HandOnJobs(int roles)
+        {
+            for (int r = 0; r < 4; r++)
+            {
+                if ((roles & (1 << r)) == 0) continue;
+                if (State.players.Any(q => q.Has((MRole)r))) continue;
+                var poor = State.players.OrderBy(CountJobs).ThenBy(q => q.id).FirstOrDefault();
+                if (poor != null) poor.roles |= 1 << r;
+            }
+        }
+
+        static int CountJobs(NetPlayer p) { int n = 0; for (int r = 0; r < 4; r++) if ((p.roles & (1 << r)) != 0) n++; return n; }
 
         /// <summary>Shares the four roles out among whoever's here: the host first (with the extras when there are fewer than four).</summary>
         public void ShareRoles()
@@ -422,8 +549,14 @@ namespace Rocket
                 case "take":
                 {
                     int r = Mathf.Clamp(m.n, 0, 3);
+                    if (p.Has((MRole)r)) return;
+                    var had = State.players.FirstOrDefault(q => q != p && q.Has((MRole)r));
                     foreach (var q in State.players) q.roles &= ~(1 << r);
                     p.roles |= 1 << r;
+                    // a swap: whoever had the job gets one of the taker's other jobs if they'd be left with none
+                    if (had != null && had.roles == 0)
+                        for (int k = 0; k < 4; k++)
+                            if (k != r && (p.roles & (1 << k)) != 0) { p.roles &= ~(1 << k); had.roles |= 1 << k; break; }
                     Say($"{p.name} is now the {RoleName(r).ToLower()}.");
                     MarkDirty();
                     return;
@@ -516,7 +649,36 @@ namespace Rocket
         {
             if (!IsHost || Solo) return;
             string json = JsonUtility.ToJson(m);
-            lock (conns) foreach (var c in conns) if (c.hello) c.Send(json);
+            bool droppable = m.t == "fs";   // flight frames: if a player's connection is backed up, skip to the newest
+            lock (conns) foreach (var c in conns) if (c.hello) c.Send(json, droppable);
+        }
+
+        List<IPAddress> broadcastTargets;
+
+        /// <summary>The broadcast address of each local IPv4 network (e.g. 192.168.1.255).</summary>
+        static List<IPAddress> DirectedBroadcasts()
+        {
+            var list = new List<IPAddress>();
+            try
+            {
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+                    foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                    {
+                        if (ua.Address.AddressFamily != AddressFamily.InterNetwork || ua.IPv4Mask == null) continue;
+                        var a = ua.Address.GetAddressBytes();
+                        var mk = ua.IPv4Mask.GetAddressBytes();
+                        if (mk.Length != 4 || (mk[0] == 0 && mk[1] == 0)) continue;
+                        var b = new byte[4];
+                        for (int i = 0; i < 4; i++) b[i] = (byte)(a[i] | ~mk[i]);
+                        var ip = new IPAddress(b);
+                        if (!list.Any(x => x.Equals(ip))) list.Add(ip);
+                    }
+                }
+            }
+            catch { }
+            return list;
         }
 
         public void Touch() => MarkDirty();
@@ -601,7 +763,7 @@ namespace Rocket
                 }
             }
             catch { }
-            Found.RemoveAll(x => Time.unscaledTime - x.seen > 4f);
+            Found.RemoveAll(x => Time.unscaledTime - x.seen > 7f);   // (4 s made rooms flicker on a busy Wi-Fi)
         }
 
         /// <summary>What the host announces each second: the room, its code, players, port, kind, campaign, and (milestone 31) its mission and best score there.</summary>

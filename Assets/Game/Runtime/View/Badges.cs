@@ -208,7 +208,7 @@ namespace Rocket
             Ui.Box(r);
             GUI.Label(new Rect(r.x + 16, r.y + 12, 300, 26), "Badges", Ui.Header);
             GUI.Label(new Rect(r.x + 110, r.y + 15, 500, 22), $"{c.badges.Count} of {Achievements.All.Length} earned in this save", Ui.Small);
-            bool open = !GUI.Button(new Rect(r.xMax - 40, r.y + 10, 28, 24), "x", Ui.ButtonSmall);
+            bool open = !Ui.Press(new Rect(r.xMax - 40, r.y + 10, 28, 24), "x", Ui.ButtonSmall);
             int cols = 7;
             float cw = (r.width - 24) / cols, ch = Mathf.Min(132, (r.height - 56) / 4);
             for (int i = 0; i < Achievements.All.Length; i++)

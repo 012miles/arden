@@ -46,9 +46,11 @@ namespace Rocket
         public static long SignatureOf(VesselSim v) => Signature(v);
         static long Signature(VesselSim v)
         {
+            if (v?.parts == null) return 0;   // a ship being taken apart (the end of a flight in a rocket room)
             long s = v.id * 1000003L + v.parts.Count * 7919L;
             foreach (var p in v.parts)
             {
+                if (p?.def == null) continue;
                 if (p.def.kind == PartKind.Parachute && p.chuteDeployed && !p.chuteFailed) s += 31L * (p.index + 1);
                 if (p.dockedTo >= 0) s += 131L * (p.index + 1);
             }

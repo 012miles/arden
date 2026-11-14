@@ -70,10 +70,11 @@ namespace Rocket
             var r = Room;
             r?.Update(Time.unscaledDeltaTime);
             if (r != null && r.Connected && r.State.activity == 1) { root.EnterCoop(r); return; }   // a rocket room
-            if (r != null && page == Page.Join) r.Listen();
+            bool lobby = page == Page.Hub || page == Page.Make || page == Page.Join;
+            if (r != null && lobby && !r.IsHost) r.Listen();
+            if (r != null && !r.IsHost && r.Connected && lobby) page = Page.Room;
             if (r != null && r.Connected && !r.Solo && page != Page.Join && r.State.activity == 0) r.Listen();   // other teams on the same mission
-            if (r != null && !r.IsHost && r.Connected && page == Page.Join) page = Page.Room;
-            if (r != null && !r.Connected && r.Error != null && page == Page.Room && !r.IsHost) { page = Page.Join; Toast(r.Error); }
+            if (r != null && !r.Connected && r.Error != null && page == Page.Room && !r.IsHost) { page = Page.Join; Notice(r.Error); }
             var plan = r != null && r.Connected ? r.State.plan : new MissionPlan();
             string sig = JsonUtility.ToJson(plan);
             if (sig != sheetSig || sheet == null) { sheetSig = sig; sheet = MissionDesign.Evaluate(plan, root.bodies, Easy); }
@@ -113,9 +114,7 @@ namespace Rocket
         {
             float W = Ui.W, H = Ui.H;
             var r = Room;
-            if (page == Page.Hub) DrawHub(W, H);
-            else if (page == Page.Make) DrawMake(W, H);
-            else if (page == Page.Join) DrawJoin(W, H);
+            if (page == Page.Hub || page == Page.Make || page == Page.Join) DrawLobby(W, H);
             else if (page == Page.Board) DrawBoard(W, H);
             else if (page == Page.Designs) DrawDesigns(W, H);
             else if (r != null && r.Connected)
@@ -124,7 +123,7 @@ namespace Rocket
                 else if (r.State.phase == 1) DrawFlying(W, H);
                 else DrawReport(W, H);
             }
-            else DrawJoin(W, H);
+            else DrawLobby(W, H);
             if (note != null && Time.unscaledTime < noteUntil)
             {
                 var nr = new Rect(W * 0.5f - 300, H * 0.5f - 22, 600, 44);
@@ -133,100 +132,89 @@ namespace Rocket
             }
         }
 
-        /// <summary>Multiplayer, step one: a campaign or a sandbox.</summary>
-        void DrawHub(float W, float H)
-        {
-            var r = new Rect(70, H * 0.14f, 640, 520);
-            Ui.Box(r); Ui.Box(r);
-            GUI.Label(new Rect(r.x + 20, r.y + 14, 580, 40), "MULTIPLAYER", Ui.Title);
-            GUI.Label(new Rect(r.x + 20, r.y + 58, 600, 44), "Up to four players, each on their own device, on the same Wi-Fi.", new GUIStyle(Ui.Label) { wordWrap = true });
-            float y = r.y + 100;
-            GUI.Label(new Rect(r.x + 20, y + 6, 120, 24), "Your name", Ui.Label);
-            playerName = GUI.TextField(new Rect(r.x + 140, y, 260, 32), playerName ?? "", 16, Ui.Field);
-            y += 56;
-            var wrap = new GUIStyle(Ui.Small) { wordWrap = true };
-            if (GUI.Button(new Rect(r.x + 20, y, 280, 54), "Campaign", Ui.Button)) { hubCampaign = true; page = Page.Make; }
-            GUI.Label(new Rect(r.x + 314, y, 306, 60), "A space program the team builds up together: money, research, contracts, kept on the host's computer for next time. Mission design missions unlock one by one.", wrap);
-            y += 74;
-            if (GUI.Button(new Rect(r.x + 20, y, 280, 54), "Sandbox", Ui.Button)) { hubCampaign = false; page = Page.Make; }
-            GUI.Label(new Rect(r.x + 314, y, 306, 60), "Every part, no money: build and fly anything together. Every mission design mission open.", wrap);
-            y += 82;
-            GUI.Label(new Rect(r.x + 20, y, 600, 120), "Then make a room or join one. In a rocket room one player builds the rocket while the others comment and suggest; then one flies it, one stages and runs the systems, one plans the route. In a mission design room each player takes a job (lead, engineer, science, comms) and plans a whole mission together; on your own you do every job. With fewer than four players, people share the jobs. Rooms on the same mission see each other's best score.", wrap);
-            if (GUI.Button(new Rect(r.x + 20, r.yMax - 56, 136, 40), "Back", Ui.Button)) { root.LeaveMission(); return; }
-            if (GUI.Button(new Rect(r.x + 164, r.yMax - 56, 136, 40), "Leaderboard", Ui.Button)) page = Page.Board;
-        }
+        /// <summary>A message on the multiplayer screen (why a room closed, say).</summary>
+        public void Notice(string text) { note = text; noteUntil = Time.unscaledTime + 7f; }
 
-        /// <summary>Multiplayer, step two: make a room (a rocket room or a mission design room) or join one.</summary>
-        void DrawMake(float W, float H)
+        /// <summary>
+        /// Milestone 32 (captaincarl24: multiplayer had "too much buttons"): one screen instead of three. Your name once;
+        /// host a game on the left (campaign or sandbox, a rocket room or a mission design room); the games on your network
+        /// on the right, each with Join, and a box for a code. It listens for games the whole time it's open.
+        /// </summary>
+        void DrawLobby(float W, float H)
         {
-            var r = new Rect(70, H * 0.14f, 640, 470);
+            if (Room == null) NetRoom.Current = new NetRoom { IsHost = false };   // something to listen with
+            float pw = Mathf.Min(1020, W - 80), x0 = Mathf.Max(40, (W - pw) * 0.5f), y0 = Mathf.Max(70, H * 0.1f);
+            var r = new Rect(x0, y0, pw, Mathf.Min(560, H - y0 - 40));
             Ui.Box(r); Ui.Box(r);
-            GUI.Label(new Rect(r.x + 20, r.y + 14, 600, 40), $"MULTIPLAYER  <size=18>· {(hubCampaign ? "Campaign" : "Sandbox")}</size>", Ui.Title);
+            GUI.Label(new Rect(r.x + 24, r.y + 14, 500, 40), "MULTIPLAYER", Ui.Title);
+            GUI.Label(new Rect(r.x + 24, r.y + 50, r.width - 48, 22), "Up to four players, each on their own computer, on the same Wi-Fi.", Ui.Small);
+            GUI.Label(new Rect(r.x + 24, r.y + 86, 100, 24), "Your name", Ui.Label);
+            playerName = GUI.TextField(new Rect(r.x + 124, r.y + 82, 260, 32), playerName ?? "", 16, Ui.Field);
             var wrap = new GUIStyle(Ui.Small) { wordWrap = true };
-            float y = r.y + 66;
-            GUI.Label(new Rect(r.x + 20, y, 400, 24), "Make a room", Ui.Bold);
-            y += 28;
-            GUI.Label(new Rect(r.x + 20, y + 6, 120, 24), "Room name", Ui.Label);
-            roomName = GUI.TextField(new Rect(r.x + 140, y, 260, 32), roomName ?? "", 24, Ui.Field);
-            y += 42;
-            GUI.Label(new Rect(r.x + 20, y + 8, 120, 24), "Kind", Ui.Label);
-            if (GUI.Button(new Rect(r.x + 140, y, 150, 34), "Rocket", hubKind == 1 ? Ui.RowSel : Ui.ButtonSmall)) hubKind = 1;
-            if (GUI.Button(new Rect(r.x + 296, y, 150, 34), "Mission design", hubKind == 0 ? Ui.RowSel : Ui.ButtonSmall)) hubKind = 0;
-            GUI.Label(new Rect(r.x + 454, y + 2, 170, 34), hubKind == 1 ? "build, comment, fly together" : "plan a whole mission, alone or together", wrap);
-            y += 44;
-            if (hubCampaign) { GUI.Label(new Rect(r.x + 140, y - 4, 480, 22), hubKind == 1 ? "Kept on your computer as the save \"" + GameRoot.CoopSlotName(string.IsNullOrWhiteSpace(roomName) ? $"{playerName}'s room" : roomName.Trim()) + "\"." : "Missions open one by one: 1 star or more opens the next.", Ui.Small); y += 22; }
-            if (GUI.Button(new Rect(r.x + 20, y, 280, 44), "Create the room", Ui.Button))
+
+            // ---- host
+            float colW = (r.width - 72) * 0.45f;
+            var hostR = new Rect(r.x + 24, r.y + 132, colW, r.height - 200);
+            Ui.Box(hostR);
+            GUI.Label(new Rect(hostR.x + 14, hostR.y + 10, hostR.width - 28, 26), "Host a game", Ui.Header);
+            float y = hostR.y + 46;
+            float half = (hostR.width - 34) / 2;
+            if (Ui.Press(new Rect(hostR.x + 14, y, half, 34), "Campaign", hubCampaign ? Ui.ButtonSel : Ui.Button)) hubCampaign = true;
+            if (Ui.Press(new Rect(hostR.x + 20 + half, y, half, 34), "Sandbox", !hubCampaign ? Ui.ButtonSel : Ui.Button)) hubCampaign = false;
+            y += 40;
+            GUI.Label(new Rect(hostR.x + 14, y, hostR.width - 28, 40), hubCampaign ? "A space program you build up together: money, research, contracts. Kept on your computer for next time." : "Every part, no money: build and fly anything.", wrap);
+            y += 46;
+            if (Ui.Press(new Rect(hostR.x + 14, y, half, 34), "Rocket", hubKind == 1 ? Ui.ButtonSel : Ui.Button)) hubKind = 1;
+            if (Ui.Press(new Rect(hostR.x + 20 + half, y, half, 34), "Mission design", hubKind == 0 ? Ui.ButtonSel : Ui.Button)) hubKind = 0;
+            y += 40;
+            GUI.Label(new Rect(hostR.x + 14, y, hostR.width - 28, 54), hubKind == 1 ? "Build a rocket and fly it together: a builder, a pilot, a flight engineer and mission control." : "Plan a whole space mission as a team (lead, engineer, science, comms), then watch it fly. Works on your own too.", wrap);
+            y += 58;
+            if (Ui.Press(new Rect(hostR.x + 14, hostR.yMax - 58, hostR.width - 28, 44), "Host", Ui.Button))
             {
+                PlayerPrefs.SetString("mdName", playerName ?? "Player");
+                Room?.Stop();
                 var plan = new MissionPlan();
                 if (hubCampaign) plan.scenario = MissionDesign.CampaignOrder[0].id;
                 var room = NetRoom.Host(playerName, roomName, plan, hubKind, hubCampaign);
                 if (room.Error != null) Toast(room.Error);
                 else if (hubKind == 1) { root.EnterCoop(room); return; }
-                else { if (hubCampaign) room.State.unlocked = MissionDesign.UnlockedFrom(id => MissionScores.Best(id)?.stars ?? 0); page = Page.Room; tab = 0; }
+                else { if (hubCampaign) room.State.unlocked = MissionDesign.UnlockedFrom(id => MissionScores.Best(id)?.stars ?? 0); page = Page.Room; tab = 0; return; }
             }
-            GUI.Label(new Rect(r.x + 314, y + 2, 306, 44), "Others on the same Wi-Fi see it in their list, or type its code.", wrap);
-            y += 66;
-            GUI.Label(new Rect(r.x + 20, y, 400, 24), "Or join one", Ui.Bold);
-            y += 28;
-            if (GUI.Button(new Rect(r.x + 20, y, 280, 44), "Join a room", Ui.Button)) { Room?.Stop(); NetRoom.Current = new NetRoom { IsHost = false }; page = Page.Join; }
-            GUI.Label(new Rect(r.x + 314, y + 2, 306, 44), "Up to 4 players. Pick a room from the list or type the code the host gives you.", wrap);
-            if (GUI.Button(new Rect(r.x + 20, r.yMax - 56, 136, 40), "Back", Ui.Button)) page = Page.Hub;
-        }
 
-        void DrawJoin(float W, float H)
-        {
-            var r = new Rect(70, H * 0.14f, 620, 560);
-            Ui.Box(r); Ui.Box(r);
-            GUI.Label(new Rect(r.x + 20, r.y + 14, 580, 30), "Join a room", Ui.Header);
-            float y = r.y + 54;
-            GUI.Label(new Rect(r.x + 20, y + 6, 120, 24), "Your name", Ui.Label);
-            playerName = GUI.TextField(new Rect(r.x + 140, y, 260, 32), playerName ?? "", 16, Ui.Field);
-            y += 50;
-            var room = Room;
-            GUI.Label(new Rect(r.x + 20, y, 580, 22), "Rooms on this network:", Ui.Bold);
-            y += 26;
-            var found = room?.Found ?? new List<RoomInfo>();
-            if (found.Count == 0) { GUI.Label(new Rect(r.x + 30, y, 560, 22), "Looking... (rooms appear here when someone on the same Wi-Fi creates one)", Ui.Small); y += 28; }
-            foreach (var f in found.OrderBy(f => f.campaign != hubCampaign).Take(5))
+            // ---- join
+            var joinR = new Rect(hostR.xMax + 24, hostR.y, r.xMax - 24 - hostR.xMax - 24, hostR.height);
+            Ui.Box(joinR);
+            GUI.Label(new Rect(joinR.x + 14, joinR.y + 10, joinR.width - 28, 26), "Join a game", Ui.Header);
+            var cur = Room;
+            var found = cur != null && !cur.IsHost ? cur.Found : new List<RoomInfo>();
+            y = joinR.y + 46;
+            if (found.Count == 0)
             {
-                GUI.Label(new Rect(r.x + 30, y + 6, 440, 22), $"<b>{f.name}</b>  ·  {(f.activity == 1 ? "rocket" : "mission design")}, {(f.campaign ? "campaign" : "sandbox")}  ·  {f.players}/4  ·  {f.code}", Ui.Small);
-                GUI.enabled = f.players < 4;
-                if (GUI.Button(new Rect(r.xMax - 140, y, 110, 30), "Join", Ui.ButtonSmall)) DoJoin(f.host + ":" + f.port);
-                GUI.enabled = true;
-                y += 36;
+                GUI.Label(new Rect(joinR.x + 14, y, joinR.width - 28, 44), "Looking for games on your network...\nWhen a friend hosts one, it shows up here.", wrap);
+                y += 52;
             }
-            y += 12;
-            GUI.Label(new Rect(r.x + 20, y + 6, 120, 24), "Room code", Ui.Label);
-            joinCode = GUI.TextField(new Rect(r.x + 140, y, 200, 32), joinCode ?? "", 21, Ui.Field);
-            if (GUI.Button(new Rect(r.x + 350, y, 110, 32), "Join", Ui.ButtonSmall)) DoJoin(joinCode);
-            y += 44;
-            GUI.Label(new Rect(r.x + 20, y, 580, 60), "Ask the person who made the room for its code (it's at the top of their screen). It works on the same network; some school networks block it.", new GUIStyle(Ui.Small) { wordWrap = true });
-            y += 64;
-            if (room != null && (room.Status != null || room.Error != null))
-                GUI.Label(new Rect(r.x + 20, y, 580, 40), room.Error != null ? $"<color=#ff9080>{room.Error}</color>" : room.Status, new GUIStyle(Ui.Small) { wordWrap = true });
-            if (GUI.Button(new Rect(r.x + 20, r.yMax - 54, 120, 38), "Back", Ui.Button)) { Room?.Stop(); NetRoom.Current = null; page = Page.Make; }
-        }
+            var clip = new GUIStyle(Ui.Small) { wordWrap = false, clipping = TextClipping.Clip };
+            foreach (var f in found.OrderBy(f => f.name).Take(5))
+            {
+                var row = new Rect(joinR.x + 10, y, joinR.width - 20, 44);
+                Ui.Line(row, new Color(1, 1, 1, 0.05f));
+                GUI.Label(new Rect(row.x + 8, row.y + 3, row.width - 110, 20), $"<b>{f.name}</b>", clip);
+                GUI.Label(new Rect(row.x + 8, row.y + 22, row.width - 110, 18), $"{(f.activity == 1 ? "Rocket" : "Mission design")} · {(f.campaign ? "campaign" : "sandbox")} · {f.players}/4 players", clip);
+                GUI.enabled = f.players < 4;
+                if (Ui.Press(new Rect(row.xMax - 94, row.y + 6, 86, 32), f.players < 4 ? "Join" : "Full", Ui.Button)) { PlayerPrefs.SetString("mdName", playerName ?? "Player"); DoJoin(f.host + ":" + f.port); }
+                GUI.enabled = true;
+                y += 50;
+            }
+            float cy = joinR.yMax - 96;
+            GUI.Label(new Rect(joinR.x + 14, cy + 6, 120, 24), "Have a code?", Ui.Small);
+            joinCode = GUI.TextField(new Rect(joinR.x + 110, cy, joinR.width - 214, 32), joinCode ?? "", 21, Ui.Field);
+            if (Ui.Press(new Rect(joinR.xMax - 98, cy, 84, 32), "Join", Ui.Button) && !string.IsNullOrWhiteSpace(joinCode)) { PlayerPrefs.SetString("mdName", playerName ?? "Player"); DoJoin(joinCode); }
+            string status = cur != null && !cur.IsHost ? (cur.Error != null ? $"<color=#ff9080>{cur.Error}</color>" : cur.Status) : null;
+            GUI.Label(new Rect(joinR.x + 14, cy + 38, joinR.width - 28, 40), status ?? "The code is on the host's screen. Some school networks block games; a phone hotspot works.", wrap);
 
+            if (Ui.Press(new Rect(r.x + 24, r.yMax - 56, 120, 40), "Back", Ui.Button)) { Room?.Stop(); NetRoom.Current = null; root.LeaveMission(); return; }
+            if (Ui.Press(new Rect(r.x + 152, r.yMax - 56, 140, 40), "Leaderboard", Ui.Button)) page = Page.Board;
+        }
         void DoJoin(string code)
         {
             var old = Room;
@@ -261,7 +249,7 @@ namespace Rocket
                     if (p.Has((MRole)k)) Ui.Line(new Rect(pr.x + 8 + k * 20, pr.y + 22, 16, 8), RoleColor[k]);
                 x += 202;
             }
-            if (GUI.Button(new Rect(bar.xMax - 100, bar.y + 10, 88, 32), "Leave", Ui.ButtonSmall)) { Room?.Stop(); NetRoom.Current = null; page = Page.Hub; result = null; resultSig = null; }
+            if (Ui.Press(new Rect(bar.xMax - 100, bar.y + 10, 88, 32), "Leave", Ui.ButtonSmall)) { Room?.Stop(); NetRoom.Current = null; page = Page.Hub; result = null; resultSig = null; }
         }
 
         void DrawDesign(float W, float H)
@@ -277,7 +265,7 @@ namespace Rocket
                 bool mine = r.Can(TabRole[i]);
                 float tw = 80;
                 var trc = new Rect(tx, left.y + 6, tw, 30);
-                if (GUI.Button(trc, Tabs[i], tab == i ? Ui.RowSel : Ui.ButtonSmall)) tab = i;
+                if (Ui.Press(trc, Tabs[i], tab == i ? Ui.ButtonSmallSel : Ui.ButtonSmall)) tab = i;
                 Ui.Line(new Rect(trc.x + 2, trc.yMax - 3, trc.width - 4, 3), mine ? RoleColor[(int)TabRole[i]] : new Color(1, 1, 1, 0.1f));
                 tx += tw + 4;
             }
@@ -322,7 +310,7 @@ namespace Rocket
             var rc = new Rect(4, y, w - 8, h);
             bool clicked = false;
             GUI.enabled = can;
-            if (GUI.Button(rc, GUIContent.none, selected ? Ui.RowSel : Ui.Row)) clicked = true;
+            if (Ui.Press(rc, GUIContent.none, selected ? Ui.RowSel : Ui.Row)) clicked = true;
             GUI.enabled = true;
             GUI.Label(new Rect(rc.x + 8, rc.y + 4, rc.width * 0.42f, 20), (selected ? "● <b>" : "○ ") + label + (selected ? "</b>" : ""), selected ? PickedStyle : Ui.Small);
             GUI.Label(new Rect(rc.x + rc.width * 0.36f, rc.y + 5, rc.width * 0.64f - 8, 20), detail, selected ? PickedDetail : DetailStyle);
@@ -387,7 +375,7 @@ namespace Rocket
                         foreach (var b in root.bodies.Where(b => !b.isStar && !b.IsGasGiant))
                         {
                             GUI.enabled = can;
-                            if (GUI.Button(new Rect(x, y, 66, 26), b.name, plan.body == b.name ? Ui.RowSel : Ui.ButtonSmall)) r.Sandbox(b.name, null, 0);
+                            if (Ui.Press(new Rect(x, y, 66, 26), b.name, plan.body == b.name ? Ui.ButtonSmallSel : Ui.ButtonSmall)) r.Sandbox(b.name, null, 0);
                             GUI.enabled = true;
                             x += 70; if (x > w - 70) { x = 4; y += 30; }
                         }
@@ -395,7 +383,7 @@ namespace Rocket
                         foreach (var tag in new[] { "map", "weather", "ice", "minerals", "volcano", "space", "relay" })
                         {
                             GUI.enabled = can;
-                            if (GUI.Button(new Rect(x, y, 66, 26), tag, plan.sandboxTag == tag ? Ui.RowSel : Ui.ButtonSmall)) r.Sandbox(null, tag, 0);
+                            if (Ui.Press(new Rect(x, y, 66, 26), tag, plan.sandboxTag == tag ? Ui.ButtonSmallSel : Ui.ButtonSmall)) r.Sandbox(null, tag, 0);
                             GUI.enabled = true;
                             x += 70; if (x > w - 70) { x = 4; y += 30; }
                         }
@@ -403,7 +391,7 @@ namespace Rocket
                     }
                     if (!sc.sandbox && can)
                     {
-                        if (GUI.Button(new Rect(4, y, w - 8, 28), "Start from an example design (then improve it!)", Ui.ButtonSmall)) r.LoadPlan(MissionDesign.Example(plan.scenario));
+                        if (Ui.Press(new Rect(4, y, w - 8, 28), "Start from an example design (then improve it!)", Ui.ButtonSmall)) r.LoadPlan(MissionDesign.Example(plan.scenario));
                         y += 36;
                     }
                     Section(ref y, w, "What counts as success");
@@ -436,7 +424,7 @@ namespace Rocket
                             for (int k = 1; k <= 4; k++)
                             {
                                 GUI.enabled = can;
-                                if (GUI.Button(new Rect(w - 160 + (k - 1) * 38, y - 28, 34, 24), k.ToString(), plan.wings == k ? Ui.RowSel : Ui.ButtonSmall)) r.Wings(k);
+                                if (Ui.Press(new Rect(w - 160 + (k - 1) * 38, y - 28, 34, 24), k.ToString(), plan.wings == k ? Ui.ButtonSmallSel : Ui.ButtonSmall)) r.Wings(k);
                                 GUI.enabled = true;
                             }
                         }
@@ -561,7 +549,7 @@ namespace Rocket
             {
                 chatText = GUI.TextField(new Rect(r.x + 12, r.yMax - 40, chatW - 90, 30), chatText ?? "", 120, Ui.Field);
                 bool enter = Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter) && !string.IsNullOrWhiteSpace(chatText);
-                if (GUI.Button(new Rect(r.x + chatW - 72, r.yMax - 40, 80, 30), "Send", Ui.ButtonSmall) || enter) { room.Chat(chatText); chatText = ""; }
+                if (Ui.Press(new Rect(r.x + chatW - 72, r.yMax - 40, 80, 30), "Send", Ui.ButtonSmall) || enter) { room.Chat(chatText); chatText = ""; }
             }
             else GUI.Label(new Rect(r.x + 12, r.yMax - 34, chatW, 22), "Tip: point at any gauge or choice to see why it matters.", Ui.Small);
             // requests: open ones for my roles, with yes/no; ask someone
@@ -575,22 +563,22 @@ namespace Rocket
                     GUI.Label(new Rect(x, ry + 3, 330, 20), $"<b>{from?.name ?? "?"}</b> → {MissionDesign.RoleNames[q.toRole].ToLower()}: {q.text}", Ui.Small);
                     if (room.Can((MRole)q.toRole))
                     {
-                        if (GUI.Button(new Rect(x + 334, ry, 50, 24), "Yes", Ui.ButtonSmall)) room.Answer(q.id, true);
-                        if (GUI.Button(new Rect(x + 388, ry, 50, 24), "No", Ui.ButtonSmall)) room.Answer(q.id, false);
+                        if (Ui.Press(new Rect(x + 334, ry, 50, 24), "Yes", Ui.ButtonSmall)) room.Answer(q.id, true);
+                        if (Ui.Press(new Rect(x + 388, ry, 50, 24), "No", Ui.ButtonSmall)) room.Answer(q.id, false);
                     }
                     ry += 28;
                 }
                 ry = Mathf.Max(ry, r.y + 64);
                 GUI.Label(new Rect(x, ry + 4, 40, 20), "Ask", Ui.Small);
                 for (int k = 0; k < 4; k++)
-                    if (GUI.Button(new Rect(x + 34 + k * 46, ry, 42, 26), new[] { "Lead", "Eng", "Sci", "Com" }[k], askRole == k ? Ui.RowSel : Ui.ButtonSmall)) askRole = k;
+                    if (Ui.Press(new Rect(x + 34 + k * 46, ry, 42, 26), new[] { "Lead", "Eng", "Sci", "Com" }[k], askRole == k ? Ui.ButtonSmallSel : Ui.ButtonSmall)) askRole = k;
                 askText = GUI.TextField(new Rect(x + 222, ry, 170, 26), askText ?? "", 80, Ui.Field);
-                if (GUI.Button(new Rect(x + 396, ry, 50, 26), "Ask", Ui.ButtonSmall) && !string.IsNullOrWhiteSpace(askText)) { room.Ask((MRole)askRole, askText); askText = ""; }
+                if (Ui.Press(new Rect(x + 396, ry, 50, 26), "Ask", Ui.ButtonSmall) && !string.IsNullOrWhiteSpace(askText)) { room.Ask((MRole)askRole, askText); askText = ""; }
                 // quick asks
                 float qx = x;
                 foreach (var quick in new[] { (1, "more power"), (0, "a bigger rocket"), (3, "a faster antenna"), (2, "a lighter instrument") })
                 {
-                    if (GUI.Button(new Rect(qx, ry + 32, 110, 22), quick.Item2, Ui.ButtonSmall)) room.Ask((MRole)quick.Item1, "Can we have " + quick.Item2 + "?");
+                    if (Ui.Press(new Rect(qx, ry + 32, 110, 22), quick.Item2, Ui.ButtonSmall)) room.Ask((MRole)quick.Item1, "Can we have " + quick.Item2 + "?");
                     qx += 114;
                 }
                 // take a role
@@ -600,7 +588,7 @@ namespace Rocket
                 {
                     bool mine = room.Can((MRole)k);
                     var br = new Rect(rx + (k % 2) * 104, r.y + 28 + (k / 2) * 30, 100, 26);
-                    if (GUI.Button(br, MissionDesign.RoleNames[k].Split(' ')[0] + (k == 1 ? " eng." : ""), mine ? Ui.RowSel : Ui.ButtonSmall) && !mine) room.TakeRole((MRole)k);
+                    if (Ui.Press(br, MissionDesign.RoleNames[k].Split(' ')[0] + (k == 1 ? " eng." : ""), mine ? Ui.ButtonSmallSel : Ui.ButtonSmall) && !mine) room.TakeRole((MRole)k);
                     Ui.Line(new Rect(br.x, br.yMax - 3, br.width, 3), RoleColor[k]);
                 }
             }
@@ -612,7 +600,7 @@ namespace Rocket
                 int ready = room.State.players.Count(p => p.ready || p.id == room.MyId);
                 bool all = room.Solo || ready == room.State.players.Count;
                 GUI.enabled = sheet.CanLaunch && all;
-                if (GUI.Button(go, "Fly the mission", Ui.Button))
+                if (Ui.Press(go, "Fly the mission", Ui.Button))
                 {
                     if (me != null && !me.ready) room.Ready(true);
                     room.Fly(root.bodies, Easy);
@@ -622,11 +610,11 @@ namespace Rocket
             }
             else if (me != null)
             {
-                if (GUI.Button(go, me.ready ? "Ready ✓ (click to undo)" : "I'm ready", me.ready ? Ui.RowSel : Ui.Button)) room.Ready(!me.ready);
+                if (Ui.Press(go, me.ready ? "Ready ✓ (click to undo)" : "I'm ready", me.ready ? Ui.ButtonSel : Ui.Button)) room.Ready(!me.ready);
                 GUI.Label(new Rect(go.x, go.yMax + 4, go.width, 40), "The host flies it when everyone's ready.", new GUIStyle(Ui.Small) { alignment = TextAnchor.UpperCenter, wordWrap = true });
             }
-            if (GUI.Button(new Rect(r.xMax - 210, r.yMax - 34, 96, 26), "Designs", Ui.ButtonSmall)) page = Page.Designs;
-            if (GUI.Button(new Rect(r.xMax - 110, r.yMax - 34, 96, 26), "Scores", Ui.ButtonSmall)) page = Page.Board;
+            if (Ui.Press(new Rect(r.xMax - 210, r.yMax - 34, 96, 26), "Designs", Ui.ButtonSmall)) page = Page.Designs;
+            if (Ui.Press(new Rect(r.xMax - 110, r.yMax - 34, 96, 26), "Scores", Ui.ButtonSmall)) page = Page.Board;
         }
 
         // ---------------------------------------------------------------- flying it
@@ -672,7 +660,7 @@ namespace Rocket
                 ey += 38;
                 if (ey > er.yMax - 30) break;
             }
-            if (Room.IsHost && GUI.Button(new Rect(W * 0.5f - 70, bar.yMax + 8, 140, 32), "Skip to the end", Ui.ButtonSmall)) flyStart = Time.unscaledTime - FlyLength;
+            if (Room.IsHost && Ui.Press(new Rect(W * 0.5f - 70, bar.yMax + 8, 140, 32), "Skip to the end", Ui.ButtonSmall)) flyStart = Time.unscaledTime - FlyLength;
         }
 
         // ---------------------------------------------------------------- the report
@@ -738,13 +726,13 @@ namespace Rocket
             float by = r.yMax - 52;
             if (room.IsHost)
             {
-                if (GUI.Button(new Rect(r.x + 20, by, 230, 40), "Change the design", Ui.Button)) room.SetPhase(0);
-                if (GUI.Button(new Rect(r.x + 258, by, 200, 40), "Fly it again", Ui.Button)) room.Fly(root.bodies, Easy);
+                if (Ui.Press(new Rect(r.x + 20, by, 230, 40), "Change the design", Ui.Button)) room.SetPhase(0);
+                if (Ui.Press(new Rect(r.x + 258, by, 200, 40), "Fly it again", Ui.Button)) room.Fly(root.bodies, Easy);
             }
             else GUI.Label(new Rect(r.x + 20, by + 10, 440, 22), "The host can change the design or fly again.", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 360, by, 110, 40), "Scores", Ui.Button)) page = Page.Board;
-            if (GUI.Button(new Rect(r.xMax - 244, by, 110, 40), "Designs", Ui.Button)) page = Page.Designs;
-            if (GUI.Button(new Rect(r.xMax - 128, by, 110, 40), "Leave", Ui.Button)) { room.Stop(); NetRoom.Current = null; page = Page.Hub; result = null; resultSig = null; }
+            if (Ui.Press(new Rect(r.xMax - 360, by, 110, 40), "Scores", Ui.Button)) page = Page.Board;
+            if (Ui.Press(new Rect(r.xMax - 244, by, 110, 40), "Designs", Ui.Button)) page = Page.Designs;
+            if (Ui.Press(new Rect(r.xMax - 128, by, 110, 40), "Leave", Ui.Button)) { room.Stop(); NetRoom.Current = null; page = Page.Hub; result = null; resultSig = null; }
         }
 
         static void Chart(Rect r, string title, List<float> vals, float maxFixed, Color c, float mult)
@@ -810,7 +798,7 @@ namespace Rocket
                 }
                 y += 8;
             }
-            if (GUI.Button(new Rect(r.x + 20, r.yMax - 52, 120, 38), "Back", Ui.Button)) page = Room != null && Room.Connected ? Page.Room : Page.Hub;
+            if (Ui.Press(new Rect(r.x + 20, r.yMax - 52, 120, 38), "Back", Ui.Button)) page = Room != null && Room.Connected ? Page.Room : Page.Hub;
         }
 
         readonly List<string> compare = new List<string>();     // milestone 31: two designs side by side ("" = the one on the table now)
@@ -848,19 +836,19 @@ namespace Rocket
             {
                 GUI.Label(new Rect(r.x + 20, y + 6, 120, 22), "Save this one as", Ui.Small);
                 designName = GUI.TextField(new Rect(r.x + 140, y, lw - 240, 30), designName ?? "", 32, Ui.Field);
-                if (GUI.Button(new Rect(r.x + lw - 90, y, 100, 30), "Save", Ui.ButtonSmall)) { MissionDesigns.Save(string.IsNullOrWhiteSpace(designName) ? MissionDesign.ScenarioOf(room.State.plan).name : designName, room.State.plan); Toast("Saved."); }
+                if (Ui.Press(new Rect(r.x + lw - 90, y, 100, 30), "Save", Ui.ButtonSmall)) { MissionDesigns.Save(string.IsNullOrWhiteSpace(designName) ? MissionDesign.ScenarioOf(room.State.plan).name : designName, room.State.plan); Toast("Saved."); }
                 y += 40;
                 GUI.Label(new Rect(r.x + 20, y + 6, 120, 22), "Paste a code", Ui.Small);
                 pasteCode = GUI.TextField(new Rect(r.x + 140, y, lw - 240, 30), pasteCode ?? "", 4000, Ui.Field);
                 GUI.enabled = lead;
-                if (GUI.Button(new Rect(r.x + lw - 90, y, 100, 30), "Load it", Ui.ButtonSmall))
+                if (Ui.Press(new Rect(r.x + lw - 90, y, 100, 30), "Load it", Ui.ButtonSmall))
                 {
                     var p = MissionDesigns.FromShareCode(pasteCode);
                     if (p != null) { room.LoadPlan(p); Toast("Loaded."); page = Page.Room; } else Toast("That code doesn't work.");
                 }
                 GUI.enabled = true;
                 y += 40;
-                if (GUI.Button(new Rect(r.x + 140, y, 230, 30), "Copy a share code", Ui.ButtonSmall)) { GUIUtility.systemCopyBuffer = MissionDesigns.ShareCode(room.State.plan); Toast("Share code copied: paste it to a friend."); }
+                if (Ui.Press(new Rect(r.x + 140, y, 230, 30), "Copy a share code", Ui.ButtonSmall)) { GUIUtility.systemCopyBuffer = MissionDesigns.ShareCode(room.State.plan); Toast("Share code copied: paste it to a friend."); }
                 y += 46;
             }
             GUI.Label(new Rect(r.x + 20, y, lw, 22), "Tick two to compare them", Ui.Bold);
@@ -876,7 +864,7 @@ namespace Rocket
             }
             if (!lead && inRoom) GUI.Label(new Rect(r.x + 20, r.yMax - 92, lw, 20), "Only the mission lead can load a design, while designing.", Ui.Small);
             DrawCompare(new Rect(r.x + pw * 0.5f, r.y + 56, pw * 0.5f - 20, r.height - 120));
-            if (GUI.Button(new Rect(r.x + 20, r.yMax - 52, 120, 38), "Back", Ui.Button)) page = inRoom ? Page.Room : Page.Hub;
+            if (Ui.Press(new Rect(r.x + 20, r.yMax - 52, 120, 38), "Back", Ui.Button)) page = inRoom ? Page.Room : Page.Hub;
         }
 
         void DesignRow(ref float y, float x, float w, string key, string name, MissionPlan p, bool saved, bool lead)
@@ -884,16 +872,16 @@ namespace Rocket
             if (p == null) return;
             var sh = MissionDesign.Evaluate(p, root.bodies, Easy);
             bool on = compare.Contains(key);
-            if (GUI.Button(new Rect(x, y + 4, 30, 30), on ? "✓" : "", on ? Ui.RowSel : Ui.ButtonSmall)) ToggleCompare(key);
+            if (Ui.Press(new Rect(x, y + 4, 30, 30), on ? "✓" : "", on ? Ui.ButtonSmallSel : Ui.ButtonSmall)) ToggleCompare(key);
             float tw = w - 38 - (saved ? 196 : 0);
             GUI.Label(new Rect(x + 38, y + 1, tw, 22), $"<b>{name}</b>  ·  {MissionDesign.ScenarioOf(p).name}", ClipSmall);
             GUI.Label(new Rect(x + 38, y + 19, tw, 22), $"<color=#9fb2c4>{sh.massKg:0} kg, {sh.totalCostM:0} M, {p.instruments.Count} instruments{(sh.CanLaunch ? "" : ", can't launch yet")}</color>", ClipSmall);
             if (saved)
             {
                 GUI.enabled = lead;
-                if (GUI.Button(new Rect(x + w - 192, y + 5, 92, 28), "Load", Ui.ButtonSmall)) { Room.LoadPlan(p); page = Page.Room; }
+                if (Ui.Press(new Rect(x + w - 192, y + 5, 92, 28), "Load", Ui.ButtonSmall)) { Room.LoadPlan(p); page = Page.Room; }
                 GUI.enabled = true;
-                if (GUI.Button(new Rect(x + w - 94, y + 5, 92, 28), "Delete", Ui.ButtonSmall)) { MissionDesigns.Delete(key); compare.Remove(key); }
+                if (Ui.Press(new Rect(x + w - 94, y + 5, 92, 28), "Delete", Ui.ButtonSmall)) { MissionDesigns.Delete(key); compare.Remove(key); }
             }
             y += 42;
         }

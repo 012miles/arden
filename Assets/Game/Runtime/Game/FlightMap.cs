@@ -349,6 +349,7 @@ namespace Rocket
             var g = ToGui(world);
             if (!g.HasValue) return false;
             var p = g.Value;
+            if (p.x < -10 || p.y < -10 || p.x > Ui.W + 10 || p.y > Ui.H + 10) return false;   // off the screen: nothing to draw (or click)
             if (Ui.OverPanel(new Rect(p.x - 4, p.y - 4, 8, 8))) return false; // hidden behind a HUD panel
             Ui.Line(new Rect(p.x - 4, p.y - 4, 8, 8), c);
             // Labels that would land on one already drawn step down underneath it; past a few, only the dot shows.
@@ -367,7 +368,7 @@ namespace Rocket
             var old = GUI.color;
             GUI.color = c;
             bool clicked = false;
-            if (clickable) clicked = GUI.Button(new Rect(r.x, r.y - 1, w, 22), label, Ui.Bold);
+            if (clickable) clicked = Ui.Press(new Rect(r.x, r.y - 1, w, 22), label, Ui.Bold);
             else GUI.Label(r, label, Ui.Bold);
             GUI.color = old;
             return clicked;
@@ -485,9 +486,9 @@ namespace Rocket
             var ir = new Rect(W / 2 - 230, Ui.H - 330 - extra, 460, 64 + extra);
             Ui.Box(ir);
             GUI.Label(new Rect(ir.x + 10, ir.y + 6, ir.width - 214, 20), $"Focus {mapFocus.name} (TAB) · click your orbit to plan a burn", Ui.Small);
-            if (GUI.Button(new Rect(ir.xMax - 204, ir.y + 4, 58, 20), "Ore (O)", showOreMap ? Ui.RowSel : Ui.ButtonSmall)) SetMapLayer(!showOreMap, false);
-            if (GUI.Button(new Rect(ir.xMax - 142, ir.y + 4, 64, 20), "Regions", showRegionMap ? Ui.RowSel : Ui.ButtonSmall)) SetMapLayer(false, !showRegionMap);
-            if (GUI.Button(new Rect(ir.xMax - 74, ir.y + 4, 66, 20), "Comms", showCommMap ? Ui.RowSel : Ui.ButtonSmall)) SetMapLayer(false, false, !showCommMap);
+            if (Ui.Press(new Rect(ir.xMax - 204, ir.y + 4, 58, 20), "Ore (O)", showOreMap ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetMapLayer(!showOreMap, false);
+            if (Ui.Press(new Rect(ir.xMax - 142, ir.y + 4, 64, 20), "Regions", showRegionMap ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetMapLayer(false, !showRegionMap);
+            if (Ui.Press(new Rect(ir.xMax - 74, ir.y + 4, 66, 20), "Comms", showCommMap ? Ui.ButtonSmallSel : Ui.ButtonSmall)) SetMapLayer(false, false, !showCommMap);
             if (showCommMap)
                 GUI.Label(new Rect(ir.x + 10, ir.y + 50, ir.width - 20, 20),
                     "Links: <color=#66ff80>strong</color>, <color=#ffd84d>weak</color>, <color=#ff6650>faint</color>. Deep space stations track craft past 80 Mm.", Ui.Small);
@@ -535,8 +536,8 @@ namespace Rocket
                 // The transfer planner: target another planet while orbiting yours
                 bool aeroBtn = CruiseTarget && target.HasAtmosphere;
                 GUI.Label(new Rect(ir.x + 10, ir.yMax - 24, ir.width - (aeroBtn ? 222 : 132), 20), transfer, Ui.Small);
-                if (TransferButton != null && GUI.Button(new Rect(ir.xMax - 118, ir.yMax - 25, 110, 20), TransferButton, Ui.ButtonSmall)) TransferButtonPressed();
-                if (aeroBtn && GUI.Button(new Rect(ir.xMax - 208, ir.yMax - 25, 86, 20), "Aerocapture", Ui.ButtonSmall)) PlanAerocapture();
+                if (TransferButton != null && Ui.Press(new Rect(ir.xMax - 118, ir.yMax - 25, 110, 20), TransferButton, Ui.ButtonSmall)) TransferButtonPressed();
+                if (aeroBtn && Ui.Press(new Rect(ir.xMax - 208, ir.yMax - 25, 86, 20), "Aerocapture", Ui.ButtonSmall)) PlanAerocapture();
             }
         }
 

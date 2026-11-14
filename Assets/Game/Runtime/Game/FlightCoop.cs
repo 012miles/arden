@@ -64,14 +64,19 @@ namespace Rocket
                     catch { }
                 }
                 else if (m.t == "cmd") RunCoopCommand(c, who, m);
+                // a command can end the flight (mission control's "end"): stop here, the ship's being taken apart
+                if (!root.inFlight || active?.parts == null) return;
             }
+            if (active?.parts == null) return;
             // the flight, to everyone
             coopSendT -= dt; coopSnapT -= dt;
             long sig = FlightRecording.SignatureOf(active);
             if (sig != coopSig || coopSnapT <= 0)
             {
                 coopSig = sig; coopSnapT = 0.5f; coopSnap++;
-                c.room.BroadcastRaw(new NetMsg { t = "snap", n = coopSnap, json = JsonUtility.ToJson(active.ToSave()) });
+                string snap = null;
+                try { snap = JsonUtility.ToJson(active.ToSave()); } catch (Exception e) { Debug.LogWarning("Couldn't send the flight: " + e.Message); }
+                if (snap != null) c.room.BroadcastRaw(new NetMsg { t = "snap", n = coopSnap, json = snap });
             }
             if (coopSendT <= 0) { coopSendT = 0.05f; c.room.BroadcastRaw(new NetMsg { t = "fs", json = JsonUtility.ToJson(FrameNow()) }); }
             // the goal
@@ -317,8 +322,8 @@ namespace Rocket
             GUI.Label(new Rect(gr.x + 10, gr.y + 4, tw - 20, 20), $"Goal: <b>{Coop.Goal(st.goal).name}</b> {(st.goalDone ? "<color=#7dff8a>✓ done!</color>" : "")}", Ui.Small);
             if (c.Has(Coop.Control) || c.IsHost)
             {
-                if (GUI.Button(new Rect(gr.x + 10, gr.y + 24, 150, 22), "End flight for all", Ui.ButtonSmall)) CoopEndFlight();
-                if (c.Has(Coop.Control) && GUI.Button(new Rect(gr.x + 168, gr.y + 24, 150, 22), node == null ? "Add maneuver" : "Delete maneuver", Ui.ButtonSmall))
+                if (Ui.Press(new Rect(gr.x + 10, gr.y + 24, 150, 22), "End flight for all", Ui.ButtonSmall)) CoopEndFlight();
+                if (c.Has(Coop.Control) && Ui.Press(new Rect(gr.x + 168, gr.y + 24, 150, 22), node == null ? "Add maneuver" : "Delete maneuver", Ui.ButtonSmall))
                 {
                     if (node == null) AddNodeAtNextApsis(); else DeleteNode();
                 }
@@ -334,14 +339,14 @@ namespace Rocket
             Ui.Box(r); Ui.Box(r);
             GUI.Label(new Rect(r.x, r.y + 12, r.width, 30), active.destroyed ? "The rocket was lost" : "Paused (the flight goes on)", Ui.BigCenter);
             float y = r.y + 56;
-            if (!active.destroyed && GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), "Resume", Ui.Button)) paused = false;
+            if (!active.destroyed && Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Resume", Ui.Button)) paused = false;
             if (active.destroyed) y -= 0; else y += 36;
             bool canEnd = c.IsHost || c.Has(Coop.Control);
             GUI.enabled = canEnd;
-            if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), canEnd ? "Back to building (everyone)" : "The host or mission control ends the flight", Ui.Button)) { paused = false; CoopEndFlight(); return; }
+            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), canEnd ? "Back to building (everyone)" : "The host or mission control ends the flight", Ui.Button)) { paused = false; CoopEndFlight(); return; }
             GUI.enabled = true;
             y += 36;
-            if (GUI.Button(new Rect(r.x + 40, y, r.width - 80, 30), "Leave the room", Ui.Button)) { paused = false; root.LeaveCoop(); return; }
+            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Leave the room", Ui.Button)) { paused = false; root.LeaveCoop(); return; }
         }
     }
 }

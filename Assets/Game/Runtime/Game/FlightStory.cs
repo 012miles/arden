@@ -78,7 +78,7 @@ namespace Rocket
             GUI.Label(new Rect(r.x + 70, r.y + 8, w - 150, 22), $"<color=#9fc6e8>Mission control</color>  ·  {storyWho}", Ui.Small);
             GUI.Label(new Rect(r.x + 70, r.y + 28, w - 84, 60), Words.Say(storyText), wrapStyle ??= new GUIStyle(Ui.Label) { wordWrap = true, clipping = TextClipping.Clip });
             if (storyGoal != null) GUI.Label(new Rect(r.x + 70, r.y + h - 30, w - 160, 22), $"<color=#ffd56a>Next:</color> <b>{storyGoal}</b>", Ui.Small);
-            if (GUI.Button(new Rect(r.xMax - 70, r.y + h - 34, 56, 26), "OK", Ui.ButtonSmall)) storyUntil = 0f;
+            if (Ui.Press(new Rect(r.xMax - 70, r.y + h - 34, 56, 26), "OK", Ui.ButtonSmall)) storyUntil = 0f;
         }
     }
 }

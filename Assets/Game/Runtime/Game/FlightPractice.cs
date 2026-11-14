@@ -129,22 +129,22 @@ namespace Rocket
             var worlds = PracticeWorlds;
             practiceBody = Mathf.Clamp(practiceBody, 0, worlds.Length - 1);
             var wb = worlds[practiceBody];
-            if (GUI.Button(new Rect(r.x + 16, y, 200, 30), "Refill everything", Ui.Button)) PracticeRefill();
+            if (Ui.Press(new Rect(r.x + 16, y, 200, 30), "Refill everything", Ui.Button)) PracticeRefill();
             y += 44;
             GUI.Label(new Rect(r.x + 16, y + 4, 60, 22), "World", Ui.Label);
-            if (GUI.Button(new Rect(r.x + 80, y, 30, 28), "<", Ui.ButtonSmall)) practiceBody = (practiceBody + worlds.Length - 1) % worlds.Length;
+            if (Ui.Press(new Rect(r.x + 80, y, 30, 28), "<", Ui.ButtonSmall)) practiceBody = (practiceBody + worlds.Length - 1) % worlds.Length;
             GUI.Label(new Rect(r.x + 112, y + 3, 120, 22), wb.name, Ui.Center);
-            if (GUI.Button(new Rect(r.x + 234, y, 30, 28), ">", Ui.ButtonSmall)) practiceBody = (practiceBody + 1) % worlds.Length;
+            if (Ui.Press(new Rect(r.x + 234, y, 30, 28), ">", Ui.ButtonSmall)) practiceBody = (practiceBody + 1) % worlds.Length;
             y += 40;
             GUI.Label(new Rect(r.x + 16, y + 4, 120, 22), "Orbit at", Ui.Label);
-            if (GUI.Button(new Rect(r.x + 110, y, 30, 28), "-", Ui.ButtonSmall)) practiceAlt = Mathf.Max(10f, practiceAlt - (practiceAlt > 200 ? 100 : 10));
+            if (Ui.Press(new Rect(r.x + 110, y, 30, 28), "-", Ui.ButtonSmall)) practiceAlt = Mathf.Max(10f, practiceAlt - (practiceAlt > 200 ? 100 : 10));
             GUI.Label(new Rect(r.x + 142, y + 3, 90, 22), $"{practiceAlt:0} km", Ui.Center);
-            if (GUI.Button(new Rect(r.x + 234, y, 30, 28), "+", Ui.ButtonSmall)) practiceAlt = Mathf.Min(5000f, practiceAlt + (practiceAlt >= 200 ? 100 : 10));
-            if (GUI.Button(new Rect(r.x + 280, y, 240, 28), $"Put me in orbit round {wb.name}", Ui.ButtonSmall)) { PracticeOrbit(wb, practiceAlt * 1000); showPractice = false; return; }
+            if (Ui.Press(new Rect(r.x + 234, y, 30, 28), "+", Ui.ButtonSmall)) practiceAlt = Mathf.Min(5000f, practiceAlt + (practiceAlt >= 200 ? 100 : 10));
+            if (Ui.Press(new Rect(r.x + 280, y, 240, 28), $"Put me in orbit round {wb.name}", Ui.ButtonSmall)) { PracticeOrbit(wb, practiceAlt * 1000); showPractice = false; return; }
             y += 40;
             bool canLand = !wb.IsGasGiant;
             GUI.enabled = canLand;
-            if (GUI.Button(new Rect(r.x + 16, y, 504, 28), canLand ? $"Drop me 3 km above {wb.name} by day, to practise landing" : $"{wb.name} has no ground to land on", Ui.ButtonSmall))
+            if (Ui.Press(new Rect(r.x + 16, y, 504, 28), canLand ? $"Drop me 3 km above {wb.name} by day, to practise landing" : $"{wb.name} has no ground to land on", Ui.ButtonSmall))
             {
                 Vector3d sun = wb.InertialToFixed(Sun.DirectionFrom(wb.AbsolutePosition(ut), ut), ut);
                 Vector3d spot = (sun + CelestialBody.EastAt(sun) * 0.35).normalized;
@@ -158,11 +158,11 @@ namespace Rocket
             practiceSpot = Mathf.Clamp(practiceSpot, 0, spots.Count - 1);
             var ls = spots[practiceSpot];
             GUI.Label(new Rect(r.x + 16, y + 4, 90, 22), "Place", Ui.Label);
-            if (GUI.Button(new Rect(r.x + 80, y, 30, 28), "<", Ui.ButtonSmall)) practiceSpot = (practiceSpot + spots.Count - 1) % spots.Count;
+            if (Ui.Press(new Rect(r.x + 80, y, 30, 28), "<", Ui.ButtonSmall)) practiceSpot = (practiceSpot + spots.Count - 1) % spots.Count;
             bool known = U.career.visited.Contains(ls.id);
             GUI.Label(new Rect(r.x + 112, y + 3, 200, 22), known ? ls.name : $"? on {ls.body}", Ui.Center);
-            if (GUI.Button(new Rect(r.x + 314, y, 30, 28), ">", Ui.ButtonSmall)) practiceSpot = (practiceSpot + 1) % spots.Count;
-            if (GUI.Button(new Rect(r.x + 356, y, 164, 28), "Drop me next to it", Ui.ButtonSmall))
+            if (Ui.Press(new Rect(r.x + 314, y, 30, 28), ">", Ui.ButtonSmall)) practiceSpot = (practiceSpot + 1) % spots.Count;
+            if (Ui.Press(new Rect(r.x + 356, y, 164, 28), "Drop me next to it", Ui.ButtonSmall))
             {
                 var lb = root.bodies.First(b => b.name == ls.body);
                 Vector3d near = (ls.dir + CelestialBody.EastAt(ls.dir) * (Math.Min(400, ls.reach * 0.6) / lb.radius)).normalized;
@@ -173,9 +173,9 @@ namespace Rocket
             GUI.Label(new Rect(r.x + 16, y + 4, 120, 22), "Time of day", Ui.Label);
             string[] tods = { "Sunrise", "Noon", "Sunset", "Night" };
             for (int i = 0; i < 4; i++)
-                if (GUI.Button(new Rect(r.x + 130 + i * 98, y, 92, 28), tods[i], Ui.ButtonSmall)) { PracticeTimeOfDay(i); showPractice = false; return; }
+                if (Ui.Press(new Rect(r.x + 130 + i * 98, y, 92, 28), tods[i], Ui.ButtonSmall)) { PracticeTimeOfDay(i); showPractice = false; return; }
             y += 44;
-            if (GUI.Button(new Rect(r.xMax - 116, r.yMax - 44, 100, 30), "Close", Ui.Button)) showPractice = false;
+            if (Ui.Press(new Rect(r.xMax - 116, r.yMax - 44, 100, 30), "Close", Ui.Button)) showPractice = false;
         }
     }
 }

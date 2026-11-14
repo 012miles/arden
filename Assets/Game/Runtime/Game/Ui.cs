@@ -8,27 +8,58 @@ namespace Rocket
     public static class Ui
     {
         public static float Scale = 1f, W = 1600f, H = 900f;
-        public const float MinWidth = 1480f;
-        public static GUIStyle Panel, Label, Bold, Small, SmallLine, Header, Title, Hero, Button, ButtonSmall, Row, RowSel, RowSelCenter, Center, BigCenter, Hint, Field;
+        public const float MinWidth = 1480f, MinHeight = 900f;
+        public static GUIStyle Panel, Label, Bold, Small, SmallLine, Header, Title, Hero, Button, ButtonSmall, ButtonSel, ButtonSmallSel, Row, RowSel, RowSelCenter, Center, BigCenter, Hint, Field;
         public static readonly Color Accent = new Color(0.35f, 0.8f, 1f);
         static Texture2D texPanel, texRowSel, texWhite;
         static List<Rect> rects = new List<Rect>(), rectsBuilding = new List<Rect>();
+        // Everything drawn last frame, in order: panels (true) and buttons (false), for the layout check
+        static List<(Rect r, bool panel)> drawn = new List<(Rect, bool)>(), drawnBuilding = new List<(Rect, bool)>();
         static bool init;
+
+        /// <summary>
+        /// How big the interface is (milestone 32: it fits any computer by itself). Every screen is laid out in a virtual
+        /// space at least MinWidth x MinHeight, scaled to fill the window as far as it can without running out of room, so
+        /// nothing overlaps on any screen shape: a 13" or 15" laptop, a 16:9 monitor, an ultrawide, a small window.
+        /// The size setting can only make it smaller (more room); a bigger interface would have to overlap.
+        /// </summary>
+        public static float ComputeScale(int screenW, int screenH, float setting)
+        {
+            float fit = Mathf.Min(screenH / MinHeight, screenW / MinWidth);   // the biggest it can be without overlapping
+            return Mathf.Clamp(fit * Mathf.Clamp(setting, 0.6f, 1f), 0.3f, 4f);
+        }
 
         public static void Begin()
         {
             if (!init) Init();
-            // Fit the 900-tall layout, but never narrower than MinWidth: on 4:3 or 5:4 windows the top bars would collide.
-            Scale = Mathf.Clamp(Mathf.Min(Screen.height / 900f, Screen.width / MinWidth) * Settings.UiScale, 0.5f, 3f);
+            Scale = ComputeScale(Screen.width, Screen.height, Settings.UiScale);
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1f));
             W = Screen.width / Scale;
             H = Screen.height / Scale;
-            if (Event.current.type == EventType.Repaint)
+            var e = Event.current;
+            if (e.type == EventType.Repaint)
             {
                 var tmp = rects; rects = rectsBuilding; rectsBuilding = tmp;
                 rectsBuilding.Clear();
+                var tmp2 = drawn; drawn = drawnBuilding; drawnBuilding = tmp2;
+                drawnBuilding.Clear();
             }
+            // Clicking anywhere leaves a text box (clicking another text box goes straight into that one, as it's drawn later)
+            if (e.type == EventType.MouseDown) GUIUtility.keyboardControl = 0;
         }
+
+        static bool TopLevel => GUIUtility.GUIToScreenPoint(Vector2.zero).sqrMagnitude < 0.01f;
+
+        static void Note(Rect r, GUIStyle s)
+        {
+            if (Event.current.type == EventType.Repaint && s != GUIStyle.none && TopLevel) drawnBuilding.Add((r, false));
+        }
+
+        /// <summary>GUI.Button, noted for the layout check (buttons that land on other buttons).</summary>
+        public static bool Press(Rect r, string text, GUIStyle s) { Note(r, s); return GUI.Button(r, text, s); }
+        public static bool Press(Rect r, GUIContent c, GUIStyle s) { Note(r, s); return GUI.Button(r, c, s); }
+        public static bool Press(Rect r, string text) { Note(r, Button); return GUI.Button(r, text, Button ?? GUI.skin.button); }
+        public static bool Press(Rect r, GUIContent c) { Note(r, Button); return GUI.Button(r, c, Button ?? GUI.skin.button); }
 
         /// <summary>True if the mouse (screen pixels, bottom-left origin) is over any panel drawn last frame.</summary>
         public static bool MouseOverUI(Vector2 px)
@@ -65,6 +96,24 @@ namespace Rocket
                 }
                 live.Add(a);
             }
+            // Buttons on top of other buttons (a toolbar too full for the window), unless a panel drawn after the first
+            // one covers the spot (a menu that drops down over them).
+            for (int i = 0; i < drawn.Count; i++)
+            {
+                if (drawn[i].panel) continue;
+                var a = drawn[i].r;
+                if (a.x < -1 || a.y < -1 || a.xMax > W + 1 || a.yMax > H + 1) bad.Add($"button off screen {R(a)} in {W:0}x{H:0}");
+                for (int j = i + 1; j < drawn.Count; j++)
+                {
+                    if (drawn[j].panel) continue;
+                    var b = drawn[j].r;
+                    var o = Rect.MinMaxRect(Mathf.Max(a.xMin, b.xMin), Mathf.Max(a.yMin, b.yMin), Mathf.Min(a.xMax, b.xMax), Mathf.Min(a.yMax, b.yMax));
+                    if (o.width <= 2 || o.height <= 2) continue;
+                    bool covered = false;
+                    for (int k = i + 1; k < j && !covered; k++) if (drawn[k].panel && Contains(drawn[k].r, o)) covered = true;
+                    if (!covered) bad.Add($"buttons overlap {R(a)} & {R(b)} by {o.width:0}x{o.height:0}");
+                }
+            }
             return bad;
         }
 
@@ -73,7 +122,7 @@ namespace Rocket
         public static void Box(Rect r)
         {
             // Boxes inside a scroll view are in its own coordinates; the scroll view's panel already covers them.
-            if (Event.current.type == EventType.Repaint && GUIUtility.GUIToScreenPoint(Vector2.zero).sqrMagnitude < 0.01f) rectsBuilding.Add(r);
+            if (Event.current.type == EventType.Repaint && TopLevel) { rectsBuilding.Add(r); drawnBuilding.Add((r, true)); }
             GUI.Box(r, GUIContent.none, Panel);
         }
 
@@ -152,6 +201,12 @@ namespace Rocket
             Button = Btn(15, BodyMedium, texBtn, texBtnHover, texBtnDown, text);
             ButtonSmall = Btn(13, BodyMedium, texBtn, texBtnHover, texBtnDown, text);
             ButtonSmall.padding = new RectOffset(4, 4, 2, 2);
+            // A button that's switched on (the tool in use, the chosen option): the same shape and centred text as any
+            // button, in the highlight colour. (Before milestone 32 these used the list-row style, which put the text in
+            // the top-left corner.)
+            ButtonSel = Btn(15, BodyMedium, texRowSel, texRowSel, texBtnDown, Color.white);
+            ButtonSmallSel = Btn(13, BodyMedium, texRowSel, texRowSel, texBtnDown, Color.white);
+            ButtonSmallSel.padding = new RectOffset(4, 4, 2, 2);
             Row = new GUIStyle(Label) { padding = new RectOffset(6, 6, 3, 3) };
             RowSel = new GUIStyle(Row) { border = new RectOffset(7, 7, 7, 7) };
             RowSel.normal.background = texRowSel;
@@ -170,13 +225,15 @@ namespace Rocket
         public static float WordsPicker(float x, float y, float bw)
         {
             for (int i = 0; i < 3; i++)
-                if (GUI.Button(new Rect(x + i * (bw + 4), y, bw, 28), Words.Names[i], (int)Words.Level == i ? RowSelCenter : ButtonSmall)) Words.Level = (WordLevel)i;
+                if (Press(new Rect(x + i * (bw + 4), y, bw, 28), Words.Names[i], (int)Words.Level == i ? ButtonSmallSel : ButtonSmall)) Words.Level = (WordLevel)i;
             return 28;
         }
 
         static GUIStyle Btn(int size, Font f, Texture2D normal, Texture2D hover, Texture2D down, Color text)
         {
-            var b = new GUIStyle(GUI.skin.button) { fontSize = size, font = f, border = new RectOffset(7, 7, 7, 7) };
+            // Text in the middle of the button, with even padding all round (the fonts sit a pixel low, so one less at the top)
+            var b = new GUIStyle(GUI.skin.button) { fontSize = size, font = f, border = new RectOffset(7, 7, 7, 7), alignment = TextAnchor.MiddleCenter,
+                padding = new RectOffset(6, 6, 2, 4), wordWrap = false, clipping = TextClipping.Clip };
             b.normal.background = b.focused.background = normal;
             b.hover.background = hover;
             b.active.background = b.onActive.background = down;
