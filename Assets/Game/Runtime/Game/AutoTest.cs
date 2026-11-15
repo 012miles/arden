@@ -124,7 +124,7 @@ namespace Rocket
                 yield break;
             }
 
-            foreach (var (flag, tour) in new (string, Func<IEnumerator>)[] { ("-autotestWalkHost", WalkHostTour), ("-autotestWalkJoin", WalkJoinTour), ("-autotest44", M44Tour) })   // milestone 43
+            foreach (var (flag, tour) in new (string, Func<IEnumerator>)[] { ("-autotestWalkHost", WalkHostTour), ("-autotestWalkJoin", WalkJoinTour), ("-autotest44", M44Tour), ("-autotest45", M45Tour) })   // milestone 43
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), flag) >= 0)
                 {
                     yield return tour();

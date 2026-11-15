@@ -527,9 +527,13 @@ namespace Rocket
                     if (c.gameObject.activeSelf != on) c.gameObject.SetActive(on);
                     if (on)
                     {
-                        float size = Mathf.Sqrt(p.def.chuteCdA / 1.3f / Mathf.PI) * Mathf.Sqrt(p.chuteOpen);
-                        c.localScale = new Vector3(size, size * 0.8f, size);
-                        c.localPosition = new Vector3(0, 1.5f + size * 1.3f, 0);
+                        // milestone 45: the canopy hangs on its lines, which meet just above the parachute's pack; it opens out
+                        // as it fills and turns slowly as it comes down
+                        float full = Mathf.Sqrt(p.def.chuteCdA / 1.3f / Mathf.PI), open = Mathf.Sqrt(p.chuteOpen);
+                        float spread = full * Mathf.Lerp(0.25f, 1f, open), tall = full * 0.8f * Mathf.Lerp(1.6f, 1f, open);
+                        c.localScale = new Vector3(spread, tall, spread);
+                        c.localPosition = new Vector3(0, 0.35f + tall * (MeshFactory.CanopyLines + 0.35f), 0);
+                        c.localRotation = Quaternion.Euler(0, (UnityEngine.Time.time * 7f + p.index * 40f) % 360f, 0);
                     }
                 }
                 if (struts.ContainsKey(p.index)) SetLeg(p.index, p.def, p.legDeploy);

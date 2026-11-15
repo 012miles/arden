@@ -1553,12 +1553,71 @@ namespace Rocket
             return starSphere;
         }
 
-        /// <summary>Unit parachute canopy: dome over y = 0..1.</summary>
+        /// <summary>
+        /// Unit parachute (milestone 45, captaincarl24: "get a better parachute why is it just a semi circle floating on top of
+        /// the capsule"): a canopy of 16 gores in orange and white, each billowing out between its seams, a vent at the crown
+        /// and a scalloped skirt (radius 1 at y = 0), with a suspension line from every seam down to the riser at y = -CanopyLines.
+        /// </summary>
+        public const float CanopyLines = 2.2f;
         public static Mesh Canopy()
         {
             if (canopy != null) return canopy;
             var b = new MeshBuilder();
-            b.AddSphere(Vector3.zero, 1f, new Color(0.95f, 0.5f, 0.2f), 20, 8, Mathf.PI * 0.42f, doubleSided: true);
+            const int gores = 16, rings = 7;
+            const float crownY = 0.62f, vent = 0.13f;
+            Color orange = new Color(0.97f, 0.45f, 0.12f), white = new Color(0.96f, 0.95f, 0.92f);
+            float th0 = Mathf.Asin(vent);
+            Vector3 P(float az, float t, float billow)
+            {
+                float th = Mathf.Lerp(th0, Mathf.PI / 2, t);
+                float r = Mathf.Sin(th) * (1f + billow), y = crownY * Mathf.Cos(th);
+                return new Vector3(Mathf.Cos(az) * r, y, Mathf.Sin(az) * r);
+            }
+            void Tri2(Vector3 a, Vector3 c, Vector3 d, Color col)
+            {
+                Vector3 n = Vector3.Cross(c - a, d - a).normalized;
+                if (Vector3.Dot(n, (a + c + d) / 3f - new Vector3(0, -0.4f, 0)) < 0) n = -n;   // outward
+                b.AddTri(a, c, d, n, col);
+                b.AddTri(a, c, d, -n, col * 0.82f);   // the inside, a little darker
+            }
+            for (int g = 0; g < gores; g++)
+            {
+                Color col = g % 2 == 0 ? orange : white;
+                float a0 = g * Mathf.PI * 2 / gores, a1 = (g + 1) * Mathf.PI * 2 / gores, am = (a0 + a1) / 2;
+                for (int k = 0; k < rings; k++)
+                {
+                    float t0 = k / (float)rings, t1 = (k + 1) / (float)rings;
+                    float bulge0 = 0.045f * Mathf.Sin(t0 * Mathf.PI * 0.9f + 0.2f), bulge1 = 0.045f * Mathf.Sin(t1 * Mathf.PI * 0.9f + 0.2f);
+                    // seams pulled in, the middle of each gore billowing out; the skirt scalloped up at the seams
+                    Vector3 s00 = P(a0, t0, 0), s01 = P(a0, t1, 0), s10 = P(a1, t0, 0), s11 = P(a1, t1, 0);
+                    Vector3 m0 = P(am, t0, bulge0), m1 = P(am, t1, bulge1);
+                    if (k == rings - 1) { s01.y += 0.05f; s11.y += 0.05f; }
+                    Tri2(s00, m0, m1, col); Tri2(s00, m1, s01, col);
+                    Tri2(m0, s10, s11, col); Tri2(m0, s11, m1, col);
+                }
+                // a seam tape along the gore's edge
+                for (int k = 0; k < rings; k++)
+                {
+                    Vector3 p0 = P(a0, k / (float)rings, 0.004f), p1 = P(a0, (k + 1) / (float)rings, 0.004f);
+                    if (k == rings - 1) p1.y += 0.05f;
+                    Vector3 side = new Vector3(-Mathf.Sin(a0), 0, Mathf.Cos(a0)) * 0.012f;
+                    Tri2(p0 - side, p0 + side, p1 + side, new Color(0.75f, 0.3f, 0.08f));
+                    Tri2(p0 - side, p1 + side, p1 - side, new Color(0.75f, 0.3f, 0.08f));
+                }
+                // the suspension line from this seam's foot to the riser
+                Vector3 foot = P(a0, 1f, 0) + new Vector3(0, 0.05f, 0), riser = new Vector3(0, -CanopyLines, 0);
+                Vector3 dir = (riser - foot).normalized, w = Vector3.Cross(dir, new Vector3(Mathf.Cos(a0), 0, Mathf.Sin(a0))).normalized * 0.007f;
+                Color line = new Color(0.9f, 0.88f, 0.82f);
+                Tri2(foot - w, foot + w, riser + w * 0.3f, line);
+                Tri2(foot - w, riser + w * 0.3f, riser - w * 0.3f, line);
+            }
+            // the riser: a short strap from where the lines meet down toward the capsule
+            Vector3 rt = new Vector3(0, -CanopyLines, 0), rb = new Vector3(0, -CanopyLines - 0.35f, 0);
+            foreach (var w in new[] { new Vector3(0.015f, 0, 0), new Vector3(0, 0, 0.015f) })
+            {
+                Tri2(rt - w, rt + w, rb + w, new Color(0.25f, 0.25f, 0.27f));
+                Tri2(rt - w, rb + w, rb - w, new Color(0.25f, 0.25f, 0.27f));
+            }
             canopy = b.ToMesh("Canopy");
             return canopy;
         }

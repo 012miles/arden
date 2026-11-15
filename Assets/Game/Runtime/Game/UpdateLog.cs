@@ -23,6 +23,10 @@ namespace Rocket
         /// <summary>Every update, newest first (milestone 41, captaincarl24: just the first version and the latest updates).</summary>
         public static readonly Update[] All =
         {
+            U(45, "Nov 15, 2026", "A real parachute",
+                "Parachutes look like parachutes: 16 orange and white panels billowing between their seams, a vent at the top and a scalloped edge",
+                "Suspension lines run from every seam down to a strap above the capsule, so the canopy hangs from the ship instead of floating over it",
+                "It opens out as it fills and turns slowly on the way down"),
             U(44, "Nov 15, 2026", "NASA's Mission Review and real plane cockpits",
                 "Mission Review in the builder (the Review button): your rocket checked the way NASA checks a mission, from the NASA Space Apps challenge's resources",
                 "The four mission segments (launch, space, ground, user), the Mission Design Lab's disciplines, JPL's design maturity levels 1-4, and the real NASA missions your design is like",

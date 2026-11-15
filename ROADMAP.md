@@ -948,7 +948,11 @@ captaincarl24: "incorporate the nasa datasets into the game ... use the datasets
 - **Mission Review** (Sim/MissionReview.cs; the builder's Review button): the rocket on the stand checked like a NASA mission. The four mission segments (launch, space, ground, user) from "Design and Develop Science Missions"; the Mission Design Lab's disciplines (propulsion, power, thermal, attitude control, communications, end of mission); JPL's Concept Maturity Levels 1-4; real NASA missions like the design (after the telescope learning game). Every red line says what to add.
 - **Plane cockpits** (Game/FlightCockpit.cs): a plane's cabins are built along it (nose ahead, belly as the floor) and the felt pull is turned into that frame (cabinRot), replacing the old "always level" rule. Upside down you stand on the roof (CabinMove.Roof, the view rolls over, mouse look flips); a loop's g holds you on the floor; standing on its tail lays you on your back. The cockpit: raked windscreen with frame and glass (and reentry glow), side windows, arched roof, seats facing the nose (rows for bigger crews), rudder pedals, thrust levers. Passenger cabins: 2+2 seat rows, small windows with shades, overhead bins.
 - 2 new tests (-only44); tour -autotest44 (840-843).
-- Next (milestone 45): 10 plane presets (shuttle-like, airliners, supersonic) with bigger plane parts, a better parachute, a return-home autopilot from Tal.
+
+### Milestone 45: a real parachute (2026-11-15)
+captaincarl24: "get a better parachute why is it just a semi circle floating on top of the capsule".
+- MeshFactory.Canopy: 16 orange/white gores billowing between seams, a crown vent, a scalloped skirt and seam tapes, suspension lines from every seam to a riser (CanopyLines below the skirt); Views hangs it so the riser meets the parachute pack, widens it as it fills and turns it slowly. 1 new test (-only45), tour -autotest45 (850-851).
+- Next (milestone 46): 10 plane presets (shuttle-like, airliners, supersonic) with bigger plane parts, a better parachute, a return-home autopilot from Tal.
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 
