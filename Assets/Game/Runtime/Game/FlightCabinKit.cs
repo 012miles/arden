@@ -48,6 +48,129 @@ namespace Rocket
         bool alarmFlashing;
         static Material miniBallMat;
 
+        // milestone 37: cabin surfaces drawn by RocketLit (ids 11-16), and the photographed bright metal (id 2) shaded as paint
+        static readonly Vector4 MatFabric = new Vector4(11, 0, 0.1f, 0), MatRubber = new Vector4(12, 0, 0.2f, 0), MatPanel = new Vector4(13, 0, 0.42f, 0),
+            MatQuilt = new Vector4(14, 0, 0.1f, 0), MatPerf = new Vector4(15, 0, 0.35f, 0), MatVelcro = new Vector4(16, 0, 0.03f, 0), MatBrushed = new Vector4(2, 0, 0.55f, 0);
+        readonly List<(Light l, float i, Color c)> cabinLamps = new List<(Light, float, Color)>();
+        readonly List<(Mesh mesh, Vector3 mid, Vector3 n, Vector3 t, float w, float hh, Prop blind)> sunPatches = new List<(Mesh, Vector3, Vector3, Vector3, float, float, Prop)>();
+        readonly List<Prop> windowBlinds = new List<Prop>();
+
+        /// <summary>Lit by the cabin's lamps, not the sun through the walls (the crew, the plushie).</summary>
+        static void IndoorLit(GameObject go)
+        {
+            var pb = new MaterialPropertyBlock();
+            foreach (var r in go.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (r.sharedMaterial != Mats.Lit) continue;
+                r.GetPropertyBlock(pb);
+                pb.SetFloat("_SunScale", 0.08f);
+                pb.SetFloat("_Ambient", 0.24f);
+                r.SetPropertyBlock(pb);
+            }
+        }
+
+        /// <summary>
+        /// Real lamps (milestone 37): point lights that only light the cabin, so light pools under them and fades into the
+        /// corners. The ceiling lamp(s) follow the light switch, the flood lamp the FLOOD knob, and the screens glow blue.
+        /// </summary>
+        void BuildCabinLamps(bool hab, float h, float front)
+        {
+            cabinLamps.Clear();
+            void AddLamp(string name, Vector3 at, Color c, float intensity, float range)
+            {
+                var go = new GameObject(name) { layer = InteriorLayer };
+                go.transform.SetParent(room.transform, false);
+                go.transform.localPosition = at;
+                var l = go.AddComponent<Light>();
+                l.type = LightType.Point; l.color = c; l.intensity = intensity; l.range = range;
+                l.cullingMask = 1 << InteriorLayer; l.renderMode = LightRenderMode.ForcePixel; l.shadows = LightShadows.None;
+                cabinLamps.Add((l, intensity, c));
+            }
+            Color warm = new Color(1f, 0.92f, 0.8f);
+            if (hab) foreach (float z in new[] { -roomL / 2 + 1.5f, -roomL / 2 + 4f, -roomL / 2 + 6.5f }) AddLamp("Ceiling lamp", new Vector3(0, h - 0.15f, z), warm, 2.6f, 4.5f);
+            else AddLamp("Ceiling lamp", new Vector3(0, h - 0.2f, -0.1f), warm, 3.0f, 5f);
+            AddLamp("Flood lamp", new Vector3(0, h - 0.35f, front - 0.95f), new Color(1f, 0.96f, 0.9f), 1.3f, 2.8f);
+            AddLamp("Screen glow", new Vector3(0, 0.78f, front - 0.5f), new Color(0.45f, 0.75f, 1f), 0.4f, 1.3f);
+        }
+
+        void UpdateCabinLamps()
+        {
+            float flood = BreakerOff("flood") ? 0 : KitValue("knob_flood", 0.3f);
+            bool flickering = cabinLights != null && cabinLightMode != 1 && !cabinLights.activeSelf;
+            foreach (var (l, i0, c0) in cabinLamps)
+            {
+                if (l == null) continue;
+                float k = 1;
+                Color c = c0;
+                if (l.name == "Flood lamp") k = flood / 0.3f * (cabinLightMode == 1 ? 0.35f : 1f);
+                else if (l.name == "Screen glow") k = BreakerOff("panel") ? 0.25f : 1f;
+                else
+                {
+                    k = cabinLightMode == 0 ? 1f : cabinLightMode == 1 ? 0f : 0.5f;
+                    if (cabinLightMode == 2) c = new Color(1f, 0.2f, 0.14f);
+                    if (flickering) k *= 0.12f;
+                }
+                if (LampTest) k = Mathf.Max(k, 1f);
+                l.intensity = i0 * k;
+                l.color = c;
+            }
+        }
+
+        /// <summary>Sunlight through each window: a bright patch on the floor that moves as the ship turns (milestone 37).</summary>
+        void BuildSunPatches(float h)
+        {
+            sunPatches.Clear();
+            var wins = Windows(h).ToList();
+            for (int i = 0; i < wins.Count; i++)
+            {
+                var (c, n, w, sill, head) = wins[i];
+                var go = new GameObject("Sun patch") { layer = InteriorLayer };
+                go.transform.SetParent(room.transform, false);
+                var mesh = new Mesh { name = "Sun patch" };
+                mesh.MarkDynamic();
+                mesh.vertices = new Vector3[4];
+                mesh.colors = new Color[4];
+                mesh.normals = new[] { Vector3.up, Vector3.up, Vector3.up, Vector3.up };
+                mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = cabinGlow;
+                mr.shadowCastingMode = ShadowCastingMode.Off;
+                sunPatches.Add((mesh, c + Vector3.up * (sill + head) / 2, n, new Vector3(n.z, 0, -n.x), w, head - sill, i < windowBlinds.Count ? windowBlinds[i] : null));
+            }
+        }
+
+        void UpdateSunPatches()
+        {
+            var sun = root.sun;
+            float sunI = sun != null && sun.enabled && sun.gameObject.activeInHierarchy ? sun.intensity * Mathf.Max(sun.color.r, Mathf.Max(sun.color.g, sun.color.b)) : 0;
+            Vector3 s = sun != null ? Quaternion.Inverse(renderRot) * sun.transform.forward : Vector3.down;   // the way the light travels, in the cabin
+            var verts = new Vector3[4];
+            var cols = new Color[4];
+            foreach (var sp in sunPatches)
+            {
+                float facing = Vector3.Dot(s, sp.n);
+                bool lit = sunI > 0.05f && s.y < -0.08f && facing > 0.05f && (sp.blind == null || sp.blind.state < 0.5f);
+                float a = lit ? Mathf.Clamp01(sunI / 2.5f) * 0.3f * Mathf.Clamp01(facing * 2.5f) : 0;
+                if (a > 0.003f)
+                {
+                    for (int k = 0; k < 4; k++)
+                    {
+                        Vector3 corner = sp.mid + sp.t * (sp.w / 2) * (k == 0 || k == 3 ? -1 : 1) + Vector3.up * (sp.hh / 2) * (k < 2 ? -1 : 1);
+                        Vector3 hit = corner + s * ((corner.y - 0.007f) / -s.y);
+                        if (roomRound) { var f = new Vector2(hit.x, hit.z); float lim = roomR * 0.95f; if (f.magnitude > lim) { f = f.normalized * lim; hit.x = f.x; hit.z = f.y; } }
+                        else { hit.x = Mathf.Clamp(hit.x, -roomW / 2 + 0.02f, roomW / 2 - 0.02f); hit.z = Mathf.Clamp(hit.z, -roomL / 2 + 0.02f, roomL / 2 - 0.02f); }
+                        verts[k] = hit;
+                        cols[k] = new Color(1f, 0.9f, 0.72f, a);
+                    }
+                }
+                else for (int k = 0; k < 4; k++) { verts[k] = sp.mid; cols[k] = Color.clear; }
+                sp.mesh.vertices = verts;
+                sp.mesh.colors = cols;
+                sp.mesh.RecalculateBounds();
+            }
+        }
+
         // ---------------------------------------------------------------- the kit
 
         float KitValue(string id, float dflt) => propById.TryGetValue(id, out var p) ? p.state : dflt;
@@ -306,6 +429,8 @@ namespace Rocket
                 cabinHum.clip = humClip; cabinHum.loop = true; cabinHum.spatialBlend = 0; cabinHum.volume = 0; cabinHum.pitch = 0.7f;
                 cabinHum.Play();
             }
+            BuildCabinLamps(hab, h, front);   // milestone 37
+            BuildSunPatches(h);
             BuildOverheadPanel(hab, h);
             BuildGaugeStrip(front);
             BuildWindowsGlass(hab, h);
@@ -327,7 +452,7 @@ namespace Rocket
             var p = PanelRoot("Overhead panel", at, Quaternion.Euler(-90, 0, 0));   // face down; its "up" is toward the back
             Piece("Overhead plate", Vector3.zero, Quaternion.identity, b =>
             {
-                b.Mat = MeshBuilder.MatMatte;
+                b.Mat = MatPanel;
                 b.AddBox(new Vector3(0, 0, 0.015f), new Vector3(1.14f, 0.64f, 0.03f), C(0.2f, 0.21f, 0.23f), Quaternion.identity);
                 b.AddBox(new Vector3(0, 0, -0.001f), new Vector3(1.1f, 0.6f, 0.002f), C(0.27f, 0.29f, 0.31f), Quaternion.identity);
                 // section frames and dividers
@@ -438,7 +563,7 @@ namespace Rocket
             var p = PanelRoot("Gauge strip", new Vector3(0, 0.88f, front - 0.16f), Quaternion.Euler(15, 0, 0));
             Piece("Strip plate", Vector3.zero, Quaternion.identity, b =>
             {
-                b.Mat = MeshBuilder.MatMatte;
+                b.Mat = MatPanel;
                 b.AddBox(new Vector3(0, 0, 0.02f), new Vector3(1.46f, 0.22f, 0.04f), C(0.16f, 0.17f, 0.19f), Quaternion.identity);
                 b.AddBox(new Vector3(0, 0.115f, -0.03f), new Vector3(1.46f, 0.012f, 0.1f), C(0.1f, 0.1f, 0.11f), Quaternion.identity);   // a glare shield lip
                 foreach (var c in new[] { new Vector3(-0.7f, 0.09f), new Vector3(0.7f, 0.09f), new Vector3(-0.7f, -0.09f), new Vector3(0.7f, -0.09f) }) Screw(b, c + new Vector3(0, 0, -0.002f));
@@ -540,8 +665,8 @@ namespace Rocket
                 // a thick inner frame with bolts all round
                 Piece("Window bolts", mid, q, b =>
                 {
-                    b.Mat = MeshBuilder.MatPaint;
-                    Color fr = C(0.45f, 0.47f, 0.5f);
+                    b.Mat = MatBrushed;
+                    Color fr = C(0.7f, 0.72f, 0.75f);
                     foreach (int s in new[] { -1, 1 }) b.AddBox(new Vector3(s * (w / 2 + 0.02f), 0, -0.035f), new Vector3(0.04f, hh + 0.08f, 0.05f), fr, Quaternion.identity);
                     for (int k = 0; k < 6; k++)
                     {
@@ -571,7 +696,7 @@ namespace Rocket
                 {
                     Piece("Ceiling vent", new Vector3(x, h - 0.01f, 0.3f), Quaternion.identity, b =>
                     {
-                        b.Mat = MeshBuilder.MatMatte;
+                        b.Mat = MatPerf;
                         b.AddBox(Vector3.zero, new Vector3(0.36f, 0.02f, 0.2f), C(0.25f, 0.26f, 0.28f), Quaternion.identity);
                         for (int k = 0; k < 6; k++) b.AddBox(new Vector3(-0.15f + k * 0.06f, -0.012f, 0), new Vector3(0.012f, 0.008f, 0.18f), C(0.12f, 0.12f, 0.13f), Quaternion.identity);
                     });
@@ -597,7 +722,7 @@ namespace Rocket
                 var s = seats[i];
                 Piece("Seat sides", s, Quaternion.identity, b =>
                 {
-                    b.Mat = MeshBuilder.MatPaint;
+                    b.Mat = MatFabric;
                     Color pad = C(0.22f, 0.32f, 0.46f), frame = C(0.55f, 0.56f, 0.58f);
                     foreach (int side in new[] { -1, 1 })
                     {
@@ -649,7 +774,7 @@ namespace Rocket
             float stripW = hab ? 0.36f : 0.8f;
             // a Velcro strip with a tablet, a camera and a torch stuck to it
             bool vertical = hab;
-            Piece("Velcro", strip.At(0, hab ? 1.15f : 1.3f, 0.005f), strip.Face, b => { b.Mat = MeshBuilder.MatMatte; b.AddBox(Vector3.zero, vertical ? new Vector3(0.05f, 0.9f, 0.006f) : new Vector3(stripW, 0.05f, 0.006f), C(0.18f, 0.18f, 0.2f), Quaternion.identity); });
+            Piece("Velcro", strip.At(0, hab ? 1.15f : 1.3f, 0.005f), strip.Face, b => { b.Mat = MatVelcro; b.AddBox(Vector3.zero, vertical ? new Vector3(0.05f, 0.9f, 0.006f) : new Vector3(stripW, 0.05f, 0.006f), C(0.18f, 0.18f, 0.2f), Quaternion.identity); });
             Vector3 Item(float k) => vertical ? strip.At(0, 0.8f + k * 0.35f, 0.02f) : strip.At(-0.3f + k * 0.3f, 1.3f, 0.02f);
             var tablet = Piece("Tablet", Item(0), strip.Face, b => { b.Mat = MeshBuilder.MatPaint; b.AddBox(Vector3.zero, new Vector3(0.2f, 0.14f, 0.012f), C(0.12f, 0.12f, 0.13f), Quaternion.identity); });
             var tg = Piece("Tablet screen", Item(0) + strip.n * 0.0075f, strip.Face, b => b.AddBox(Vector3.zero, new Vector3(0.18f, 0.12f, 0.001f), C(0.1f, 0.2f, 0.35f), Quaternion.identity), true);
@@ -685,7 +810,7 @@ namespace Rocket
                 float bw = 0.4f, bh = 0.32f, bd = 0.3f;
                 var bag = Piece("Stowage bag", at, face, b =>
                 {
-                    b.Mat = MeshBuilder.MatMatte;
+                    b.Mat = MatFabric;
                     Color cloth = C(0.88f, 0.86f, 0.8f);
                     b.AddBox(new Vector3(0, bh / 2, 0), new Vector3(bw, bh - 0.04f, bd), cloth, Quaternion.identity);
                     b.AddBox(new Vector3(0, bh / 2, 0), new Vector3(bw - 0.04f, bh, bd - 0.04f), cloth * 0.97f, Quaternion.identity);   // rounded look
@@ -701,7 +826,7 @@ namespace Rocket
                 // stacked on the floor of the round cabin, against the wall
                 var top = Piece("Stowage bag", bags.At(0.0f, 0.32f, 0.15f), bags.Face, b =>
                 {
-                    b.Mat = MeshBuilder.MatMatte;
+                    b.Mat = MatFabric;
                     b.AddBox(new Vector3(0, 0.12f, 0), new Vector3(0.5f, 0.22f, 0.26f), C(0.85f, 0.83f, 0.76f), Quaternion.identity);
                     b.AddBox(new Vector3(0, 0.12f, 0), new Vector3(0.025f, 0.226f, 0.266f), C(0.3f, 0.32f, 0.36f), Quaternion.identity);
                 });
@@ -714,7 +839,7 @@ namespace Rocket
             {
                 Piece("Bungee", bungee.At(0, by + dy, 0.03f), bungee.Face, b =>
                 {
-                    b.Mat = MeshBuilder.MatPaint;
+                    b.Mat = MatFabric;
                     b.AddBox(Vector3.zero, new Vector3(bw2, 0.008f, 0.008f), C(0.15f, 0.3f, 0.75f), Quaternion.identity);
                     foreach (int s in new[] { -1, 1 }) b.AddBox(new Vector3(s * bw2 / 2, 0, 0.012f), new Vector3(0.02f, 0.02f, 0.024f), C(0.7f, 0.7f, 0.72f), Quaternion.identity);
                 });
@@ -778,15 +903,10 @@ namespace Rocket
                     var s = Facet(i);
                     Piece("Wall pad", s.At(0, 0.48f, 0.012f), s.Face, b =>
                     {
-                        b.Mat = MeshBuilder.MatMatte;
+                        b.Mat = MatQuilt;   // (the shader puffs and stitches it)
                         Color cloth = C(0.86f, 0.85f, 0.8f);
-                        b.AddBox(Vector3.zero, new Vector3(0.84f, 0.5f, 0.02f), cloth, Quaternion.identity);
-                        for (int x = 0; x < 6; x++) for (int y = 0; y < 4; y++)
-                        {
-                            Vector3 c = new Vector3(-0.35f + x * 0.14f, -0.18f + y * 0.12f, -0.012f);
-                            b.AddBox(c, new Vector3(0.12f, 0.1f, 0.01f), cloth * 1.02f, Quaternion.identity);
-                            b.AddSphere(c + new Vector3(0.07f, 0.06f, 0.008f), 0.006f, cloth * 0.8f, 6, 4);   // the tufts
-                        }
+                        b.AddBox(Vector3.zero, new Vector3(0.84f, 0.5f, 0.03f), cloth, Quaternion.identity);
+                        b.Mat = MatFabric;
                         b.AddBox(new Vector3(0, 0.25f, -0.006f), new Vector3(0.86f, 0.02f, 0.024f), C(0.3f, 0.32f, 0.36f), Quaternion.identity);
                     });
                 }
@@ -933,6 +1053,8 @@ namespace Rocket
             float panelK = BreakerOff("panel") ? 0.12f : Mathf.Lerp(0.35f, 1.25f, KitValue("knob_panel", 0.7f));
             foreach (var (tm, c) in kitLabels) if (tm != null) tm.color = new Color(c.r * panelK, c.g * panelK, c.b * panelK, c.a);
             ApplyCabinAmbient();
+            UpdateCabinLamps();   // milestone 37
+            UpdateSunPatches();
             foreach (var (go, on) in kitLights) { bool o = false; try { o = on() && !BreakerOff("panel") || LampTest; } catch { } if (go.activeSelf != o) go.SetActive(o); }
             if (keypadScreen != null) keypadScreen.text = BreakerOff("nav") ? "" : keypadShow == "" ? "READY" : keypadShow;
             // the fans: streamers flutter, the hum
@@ -1008,9 +1130,9 @@ namespace Rocket
         void ApplyCabinAmbient()
         {
             if (cabinMat == null) return;
-            float baseA = cabinLightMode == 0 ? 0.45f : cabinLightMode == 1 ? 0.18f : 0.3f;
+            float baseA = cabinLightMode == 0 ? 0.2f : cabinLightMode == 1 ? 0.06f : 0.1f;   // (milestone 37: the lamps do most of it now)
             float flood = BreakerOff("flood") ? 0 : KitValue("knob_flood", 0.3f);
-            float a = Mathf.Max(0.05f, baseA + (flood - 0.3f) * 0.35f);
+            float a = Mathf.Max(0.03f, baseA + (flood - 0.3f) * 0.08f);
             if (Mathf.Abs(a - lastAmbient) < 0.002f) return;
             lastAmbient = a;
             cabinMat.SetFloat("_Ambient", a);
@@ -1020,6 +1142,7 @@ namespace Rocket
         {
             gauges.Clear(); floaters.Clear(); rattlers.Clear(); streamers.Clear(); kitLabels.Clear(); plasma.Clear(); kitLights.Clear(); propById.Clear();
             miniBall = null; cabinAudio = null; cabinHum = null; keypadScreen = null; vibration = 0;
+            cabinLamps.Clear(); sunPatches.Clear(); windowBlinds.Clear();
         }
     }
 }

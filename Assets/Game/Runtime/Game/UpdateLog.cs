@@ -23,6 +23,12 @@ namespace Rocket
         /// <summary>Every update, newest first.</summary>
         public static readonly Update[] All =
         {
+            U(37, "Nov 14, 2026", "Realistic cabins",
+                "Real lamps light the cabin: light pools under them, corners go darker, and the sun no longer shines through the walls",
+                "Sunlight falls through the windows onto the floor and moves as the ship turns; close a blind and it's gone",
+                "Textured surfaces: woven seat cloth, studded rubber floors, painted panels with seams and scratches, quilted pads, perforated grilles, brushed metal rails",
+                "Night red really turns the lamps red; FLOOD brightens a lamp over the desk; the screens throw a blue glow",
+                "The crew in the cabin are lit by the lamps too"),
             U(36, "Nov 14, 2026", "A cabin you could live in",
                 "An overhead panel: 16 circuit breakers that really cut things, FLOOD / PANEL / VOLUME / TEMP knobs, guarded switches and LAMP TEST",
                 "A keypad computer: type a program number and ENT (1 height, 2 speed, 3 fuel, 4 high point, 5 clock... and a few secrets)",

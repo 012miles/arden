@@ -255,6 +255,7 @@ namespace Rocket
             if (cabinFolk.TryGetValue(key, out var go) && go != null) return go;
             go = MyArdling.Build(look, InteriorLayer);
             go.transform.SetParent(room.transform, false);
+            IndoorLit(go);   // milestone 37
             cabinFolk[key] = go;
             return go;
         }
@@ -269,7 +270,7 @@ namespace Rocket
             if (cabinMat == null)
             {
                 cabinMat = new Material(Mats.Lit) { name = "Cabin" };
-                cabinMat.SetFloat("_Ambient", 0.45f);      // lit from inside, whatever the sun's doing (milestone 35: lower, with the ambient occlusion off in here)
+                cabinMat.SetFloat("_Ambient", 0.2f);      // lit from inside, whatever the sun's doing (milestone 35: lower, with the ambient occlusion off in here)
                 cabinGlow = Mats.Additive;
             }
             var b = new MeshBuilder();
@@ -278,6 +279,11 @@ namespace Rocket
             if (hab) BuildHab(b, glow, p.def.crew); else BuildCapsule(b, glow, p.def.crew);
             room = new GameObject("Cabin " + p.def.name) { layer = InteriorLayer };
             room.transform.position = new Vector3(0, -30000f, 0);   // far from anything (and on its own layer)
+            // milestone 37: lit by its own lamps (not the sun through the walls), corners darkening like a real room
+            cabinMat.SetFloat("_SunScale", 0f);
+            cabinMat.SetFloat("_CabinAO", 1f);
+            cabinMat.SetVector("_RoomOrigin", room.transform.position);
+            cabinMat.SetVector("_RoomSize", hab ? new Vector4(roomW / 2, 2.1f, 1, roomL / 2) : new Vector4(roomR * Mathf.Cos(Mathf.PI / 12f), 2.1f, 0, 0));
             var mesh = new GameObject("Walls") { layer = InteriorLayer };
             mesh.transform.SetParent(room.transform, false);
             mesh.AddComponent<MeshFilter>().sharedMesh = b.ToMesh("Cabin");
@@ -296,7 +302,7 @@ namespace Rocket
             BuildCabinProps(hab, p.def.crew, 2.1f);   // milestone 35: the controls, the screens, the things to play with
         }
 
-        static readonly Color Wall = new Color(0.78f, 0.79f, 0.77f), Floor = new Color(0.5f, 0.52f, 0.55f), Trim = new Color(0.2f, 0.22f, 0.25f),
+        static readonly Color Wall = new Color(0.78f, 0.79f, 0.77f), Floor = new Color(0.38f, 0.39f, 0.42f), Trim = new Color(0.2f, 0.22f, 0.25f),
             Seat = new Color(0.25f, 0.35f, 0.5f), ScreenGlow = new Color(0.25f, 0.7f, 1f);
 
         /// <summary>A round capsule cabin: windows ahead and to each side, seats facing the controls, the hatch behind.</summary>
@@ -306,13 +312,15 @@ namespace Rocket
             roomR = crew >= 2 ? 2.5f : 2.1f;
             float h = 2.1f;
             const int sides = 12;
-            b.Mat = MeshBuilder.MatMatte;
+            b.Mat = MatPanel;   // milestone 37: painted panels (the shader adds seams, orange peel, scratches)
             // floor and ceiling (round)
             for (int i = 0; i < sides; i++)
             {
                 float a0 = i * Mathf.PI * 2 / sides, a1 = (i + 1) * Mathf.PI * 2 / sides;
                 Vector3 p0 = new Vector3(Mathf.Sin(a0), 0, Mathf.Cos(a0)) * roomR, p1 = new Vector3(Mathf.Sin(a1), 0, Mathf.Cos(a1)) * roomR;
+                b.Mat = MatRubber;
                 b.AddTri(Vector3.zero, p0, p1, Vector3.up, Floor);
+                b.Mat = MatPanel;
                 b.AddTri(Vector3.up * h, p1 + Vector3.up * h, p0 + Vector3.up * h, Vector3.down, Wall * 0.92f);
                 bool window = i == 0 || i == 11 || i == 3 || i == 8;          // ahead (two panes), right, left
                 bool hatch = i == 5 || i == 6;                                 // behind
@@ -331,7 +339,7 @@ namespace Rocket
                 float x = (s - (seatCount - 1) / 2f) * 0.9f;
                 var at = new Vector3(x, 0, roomR - 1.35f);
                 seats.Add(at);
-                b.Mat = MeshBuilder.MatPaint;
+                b.Mat = MatFabric;
                 b.AddBox(at + new Vector3(0, 0.3f, 0), new Vector3(0.5f, 0.1f, 0.5f), Seat, Quaternion.identity);
                 b.AddBox(at + new Vector3(0, 0.55f, -0.25f), new Vector3(0.5f, 0.5f, 0.08f), Seat, Quaternion.Euler(-12, 0, 0));
                 b.Mat = MeshBuilder.MatMatte;
@@ -353,8 +361,9 @@ namespace Rocket
             roomRound = false;
             roomW = 3.2f; roomL = 7f;
             float h = 2.1f, hw = roomW / 2, hl = roomL / 2;
-            b.Mat = MeshBuilder.MatMatte;
+            b.Mat = MatRubber;
             b.AddQuad(new Vector3(-hw, 0, -hl), new Vector3(-hw, 0, hl), new Vector3(hw, 0, hl), new Vector3(hw, 0, -hl), Vector3.up, Floor);
+            b.Mat = MatPanel;
             b.AddQuad(new Vector3(-hw, h, -hl), new Vector3(hw, h, -hl), new Vector3(hw, h, hl), new Vector3(-hw, h, hl), Vector3.down, Wall * 0.92f);
             // side walls in four bays, each with a window
             float bay = roomL / 4;
@@ -373,17 +382,18 @@ namespace Rocket
             {
                 var at = new Vector3((s % 2 == 0 ? -1 : 1) * 0.7f, 0, hl - 1.6f - (s / 2) * 1.1f);
                 seats.Add(at);
-                b.Mat = MeshBuilder.MatPaint;
+                b.Mat = MatFabric;
                 b.AddBox(at + new Vector3(0, 0.3f, 0), new Vector3(0.5f, 0.1f, 0.5f), Seat, Quaternion.identity);
                 b.AddBox(at + new Vector3(0, 0.55f, -0.25f), new Vector3(0.5f, 0.5f, 0.08f), Seat, Quaternion.identity);
             }
             // bunks, a table, plants
-            b.Mat = MeshBuilder.MatPaint;
+            b.Mat = MatFabric;
             for (int k = 0; k < 2; k++)
             {
                 b.AddBox(new Vector3(-hw + 0.4f, 0.3f + k * 0.8f, -hl + 1.3f), new Vector3(0.75f, 0.12f, 1.5f), new Color(0.35f, 0.45f, 0.6f), Quaternion.identity);
                 b.AddBox(new Vector3(hw - 0.4f, 0.3f + k * 0.8f, -hl + 1.3f), new Vector3(0.75f, 0.12f, 1.5f), new Color(0.6f, 0.4f, 0.3f), Quaternion.identity);
             }
+            b.Mat = MatPanel;
             b.AddBox(new Vector3(0, 0.55f, -0.4f), new Vector3(1f, 0.05f, 1f), new Color(0.85f, 0.85f, 0.82f), Quaternion.identity);
             b.Mat = MeshBuilder.MatMatte;
             for (int k = 0; k < 4; k++) b.AddSphere(new Vector3(hw - 0.35f, 0.4f, 0.6f + k * 0.45f), 0.2f, new Color(0.25f, 0.6f, 0.25f), 10, 6);

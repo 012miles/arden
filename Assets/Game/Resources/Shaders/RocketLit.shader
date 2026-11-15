@@ -1,7 +1,8 @@
 // Parts, buildings and the pad (milestone 20): physically based lighting on vertex-coloured procedural meshes.
 // Per-vertex material in UV0: x = material id, y = metallic, z = smoothness, w = unused.
 //   0 paint, 1 gold foil, 2 bright metal, 3 dark metal, 4 concrete, 5 asphalt (1-5 use the downloaded texture layers),
-//   6 glass, 7 lamp (glows).
+//   6 glass, 7 lamp (glows); milestone 37, cabin surfaces drawn here: 11 woven cloth, 12 studded rubber floor,
+//   13 painted panel (orange peel, seams, scratches), 14 quilting, 15 perforated metal, 16 hook-and-loop.
 // Sun with soft shadows, extra lights (engine glow, spotlights), sky/ground fill and reflections of the world below.
 Shader "Rocket/Lit"
 {
@@ -13,6 +14,10 @@ Shader "Rocket/Lit"
         _Char ("Charring", Range(0, 1)) = 0
         _DetailA ("Detail albedo+roughness", 2DArray) = "" {}
         _DetailN ("Detail normals", 2DArray) = "" {}
+        _SunScale ("Sun and sky (0 indoors)", Range(0, 1)) = 1
+        _CabinAO ("Room corners darken (cabins)", Range(0, 1)) = 0
+        _RoomOrigin ("Room origin (world)", Vector) = (0, 0, 0, 0)
+        _RoomSize ("Room: radius or half width, height, box?, half length", Vector) = (2, 2.1, 0, 0)
     }
     SubShader
     {
@@ -25,6 +30,10 @@ Shader "Rocket/Lit"
             float4 _Tint;
             float _Emission;
             float _Char;
+            float _SunScale;
+            float _CabinAO;
+            float4 _RoomOrigin;
+            float4 _RoomSize;
         CBUFFER_END
         ENDHLSL
 
@@ -106,6 +115,106 @@ Shader "Rocket/Lit"
                 nWS = TransformObjectToWorldNormal(normalize(float3(tn.x, tn.z, tn.y)));
             }
 
+            // ---- Milestone 37: cabin surfaces drawn in the shader (nothing to download), with real relief ----
+            // The plane a surface mostly faces: uv in metres along it, and its two directions (object space).
+            void CabinPlane(float3 p, float3 nO, out float2 uv, out float3 t, out float3 b)
+            {
+                float3 a = abs(nO);
+                if (a.y >= a.x && a.y >= a.z) { uv = p.xz; t = float3(1, 0, 0); b = float3(0, 0, 1); }
+                else if (a.x >= a.z) { uv = p.zy; t = float3(0, 0, 1); b = float3(0, 1, 0); }
+                else { uv = p.xy; t = float3(1, 0, 0); b = float3(0, 1, 0); }
+            }
+
+            // Height (0..1) of each pattern
+            float CabinHeight(int id, float2 uv)
+            {
+                if (id == 11)   // woven cloth: threads over and under, 3 mm
+                {
+                    float2 q = uv / 0.003;
+                    float wx = sin(q.x * RK_PI) * 0.5 + 0.5, wy = sin(q.y * RK_PI) * 0.5 + 0.5;
+                    float pick = step(0.5, frac((floor(q.x) + floor(q.y)) * 0.5));
+                    return lerp(wx, wy, pick);
+                }
+                if (id == 12)   // rubber floor: round studs every 4 cm
+                {
+                    float2 c = frac(uv / 0.04) - 0.5;
+                    return 1 - smoothstep(0.17, 0.25, length(c));
+                }
+                if (id == 13)   // painted panel: orange peel, with panel seams every 60 x 50 cm
+                {
+                    float peel = RkNoise3(float3(uv / 0.005, 1.7));
+                    float2 d = abs(frac(uv / float2(0.6, 0.5) + 0.5) - 0.5) * float2(0.6, 0.5);
+                    float seam = smoothstep(0.001, 0.0035, min(d.x, d.y));
+                    return peel * 0.12 + seam * 0.88;
+                }
+                if (id == 14)   // quilting: puffed diamonds, 9 cm
+                {
+                    float2 r = float2(uv.x + uv.y, uv.x - uv.y) * 0.7071 / 0.09;
+                    float2 c = abs(frac(r) - 0.5);
+                    return sqrt(saturate(1 - pow(max(c.x, c.y) * 2, 4)));
+                }
+                if (id == 15)   // perforated metal: 4 mm holes, staggered
+                {
+                    float2 q = uv / 0.009;
+                    q.x += step(0.5, frac(q.y * 0.5)) * 0.5;
+                    return smoothstep(0.19, 0.25, length(frac(q) - 0.5));
+                }
+                if (id == 16) return RkNoise3(float3(uv / 0.0015, 3.1));   // hook-and-loop fuzz
+                return 0.5;
+            }
+
+            void CabinSurface(int id, float3 p, float3 nO, inout float3 albedo, inout float smooth, inout float3 nWS)
+            {
+                float2 uv; float3 t, b;
+                CabinPlane(p, nO, uv, t, b);
+                float cell = id == 11 ? 0.003 : id == 12 ? 0.04 : id == 13 ? 0.01 : id == 14 ? 0.09 : id == 15 ? 0.009 : 0.003;
+                float e = cell * 0.08;
+                float h = CabinHeight(id, uv);
+                float hx = CabinHeight(id, uv + float2(e, 0)), hy = CabinHeight(id, uv + float2(0, e));
+                // fade the finest patterns out with distance (no shimmering), keep the colour
+                float fw = length(fwidth(uv));
+                float fade = saturate(2.0 - fw / cell * 2.5);
+                float bump = (id == 11 ? 0.0005 : id == 12 ? 0.003 : id == 13 ? 0.0005 : id == 14 ? 0.01 : id == 15 ? 0.0012 : 0.0003) * fade;
+                float2 g = float2(hx - h, hy - h) / e * bump;
+                float3 nObj = normalize(nO - t * g.x - b * g.y);
+                nWS = normalize(lerp(nWS, TransformObjectToWorldNormal(nObj), fade));
+                float hv = lerp(0.5, h, fade);
+                float mott = RkNoise3(p * 3.1) * 0.6 + RkNoise3(p * 13.0) * 0.4;   // stains, wear, dye
+                if (id == 11) { albedo *= lerp(0.8, 1.0, hv) * (0.94 + 0.1 * mott); smooth = 0.06; }
+                else if (id == 12)
+                {
+                    float scuff = smoothstep(0.62, 0.8, RkNoise3(p * 1.7));
+                    albedo *= lerp(0.72, 1.05, hv) * (0.9 + 0.15 * mott);
+                    albedo = lerp(albedo, albedo * 1.35 + 0.02, scuff * 0.35);
+                    smooth = lerp(0.12, 0.32, hv);
+                }
+                else if (id == 13)
+                {
+                    float2 d = abs(frac(uv / float2(0.6, 0.5) + 0.5) - 0.5) * float2(0.6, 0.5);
+                    float seam = smoothstep(0.001, 0.0035, min(d.x, d.y));
+                    float sc = RkNoise3(float3(uv.x * 260.0, uv.y * 9.0, 5.0)) * RkNoise3(float3(uv.x * 9.0, uv.y * 230.0, 2.0));
+                    float scratch = smoothstep(0.6, 0.66, sc) * fade;   // rare, faint ones
+                    albedo *= lerp(0.45, 1.0, seam) * (0.95 + 0.08 * mott);
+                    albedo += scratch * 0.025;
+                    smooth = saturate(smooth + (mott - 0.5) * 0.15 - scratch * 0.2);
+                }
+                else if (id == 14) { albedo *= lerp(0.74, 1.0, hv) * (0.95 + 0.07 * mott); smooth = 0.08; }
+                else if (id == 15) { albedo *= lerp(0.06, 1.0, hv); smooth = 0.38; }
+                else if (id == 16) { albedo *= 0.82 + 0.28 * hv; smooth = 0.02; }
+            }
+
+            // Corners of a cabin darken a little, as they do in real rooms (no screen-space noise)
+            float CabinOcclusion(float3 posWS, float3 nWS)
+            {
+                float3 q = posWS - _RoomOrigin.xyz;
+                float floorAO = lerp(0.5, 1, smoothstep(0.0, 0.5, q.y));
+                float ceilAO = lerp(0.72, 1, smoothstep(_RoomSize.y, _RoomSize.y - 0.4, q.y));
+                float toWall = _RoomSize.z > 0.5 ? min(_RoomSize.x - abs(q.x), _RoomSize.w - abs(q.z)) : _RoomSize.x - length(q.xz);
+                float wallAO = lerp(0.6, 1, smoothstep(0.0, 0.45, toWall));
+                float ao = lerp(floorAO * ceilAO, wallAO * lerp(1, floorAO, 0.3), saturate(abs(nWS.y)));
+                return lerp(1, ao, _CabinAO);
+            }
+
             half4 frag(Varyings i) : SV_Target
             {
                 float3 n = normalize(i.normalWS);
@@ -134,6 +243,7 @@ Shader "Rocket/Lit"
                     albedo *= 0.96 + 0.08 * m;
                 }
                 else if (id == 7) emissive = albedo * 6;
+                else if (id >= 11 && id <= 16) CabinSurface(id, i.positionOS, normalize(i.normalOS), albedo, smooth, n);   // milestone 37
 
                 // Milestone 24: buildings and grounds drawn in the shader, so plain boxes read as real buildings
                 float glassAmt = 0;
@@ -223,8 +333,8 @@ Shader "Rocket/Lit"
 
                 float4 shadowCoord = TransformWorldToShadowCoord(i.positionWS);
                 Light sun = GetMainLight(shadowCoord);
-                float3 col = RkDirect(diff, f0, rough, n, v, sun.direction, sun.color * sun.shadowAttenuation);
-                col += diff * RkShineLight(n);
+                float3 col = RkDirect(diff, f0, rough, n, v, sun.direction, sun.color * sun.shadowAttenuation) * _SunScale;   // (indoors: the cabin's own lamps)
+                col += diff * RkShineLight(n) * _SunScale;
 
             #if defined(_ADDITIONAL_LIGHTS) || defined(_CLUSTER_LIGHT_LOOP)
                 InputData inputData = (InputData)0;
@@ -249,7 +359,16 @@ Shader "Rocket/Lit"
                 float nv = saturate(dot(n, v));
                 float3 R = reflect(-v, n);
                 float3 env = RkEnvironment(i.positionWS, R, rough);
-                col += (diff * RkAmbient(n) * fill + env * RkEnvBRDF(f0, rough, nv) * min(fill, 1.5)) * ao;
+                float3 amb = RkAmbient(n);
+                if (_SunScale < 0.999)
+                {
+                    // indoors: a soft, even fill from the cabin itself (in space there's no sky to light it)
+                    amb = lerp(float3(0.3, 0.3, 0.31) * (0.8 + 0.2 * saturate(n.y * 0.5 + 0.5)), amb, _SunScale);
+                    env = lerp(float3(0.2, 0.2, 0.21), env, _SunScale);
+                }
+                if (_CabinAO > 0) ao *= CabinOcclusion(i.positionWS, n);
+                col += (diff * amb * fill + env * RkEnvBRDF(f0, rough, nv) * min(fill, 1.5)) * ao;
+                if (_CabinAO > 0) col *= lerp(1, ao, 0.5);   // the lamps' light gathers less in the corners too
                 col += albedo * _Emission * 1.5 + emissive;
                 col = RkApplyFog(col, length(GetCameraPositionWS() - i.positionWS));
                 return half4(col, 1);

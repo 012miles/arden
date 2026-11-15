@@ -130,7 +130,7 @@ namespace Rocket
         /// <summary>Everything you can use, the live screens and the extra detail, for the cabin just built.</summary>
         void BuildCabinProps(bool hab, int crew, float h)
         {
-            props.Clear(); screens.Clear(); lamps.Clear(); folkWalk.Clear();
+            props.Clear(); screens.Clear(); lamps.Clear(); folkWalk.Clear(); windowBlinds.Clear();
             lookedAt = null; plantGrow = 0; chessMoves = 0; cabinLightMode = 0; abortArmedUntil = 0;
             float front = hab ? roomL / 2 : roomR - 0.12f;
             float side = hab ? roomW / 2 - 0.35f : 0.98f;
@@ -181,7 +181,7 @@ namespace Rocket
         void ResetCabinLight()
         {
             if (cabinMat == null) return;
-            cabinMat.SetFloat("_Ambient", 0.45f);
+            cabinMat.SetFloat("_Ambient", 0.2f);
             cabinMat.SetColor("_Tint", Color.white);
         }
 
@@ -191,7 +191,7 @@ namespace Rocket
             float z = front - 0.42f;
             Piece("Desk", Vector3.zero, Quaternion.identity, b =>
             {
-                b.Mat = MeshBuilder.MatMatte;
+                b.Mat = MatPanel;
                 b.AddBox(new Vector3(0, 0.22f, z), new Vector3(width, 0.44f, 0.52f), C(0.32f, 0.34f, 0.37f), Quaternion.identity);
                 b.AddBox(new Vector3(0, 0.445f, z), new Vector3(width + 0.04f, 0.02f, 0.56f), C(0.18f, 0.19f, 0.21f), Quaternion.identity);
                 b.AddBox(new Vector3(0, 0.2f, z - 0.265f), new Vector3(width - 0.1f, 0.3f, 0.01f), C(0.26f, 0.28f, 0.3f), Quaternion.identity);
@@ -200,7 +200,7 @@ namespace Rocket
             // the slanted board with three screens
             var boardRot = Quaternion.Euler(35, 0, 0);
             Vector3 boardC = new Vector3(0, 0.62f, front - 0.27f), n = boardRot * Vector3.back;
-            Piece("Board", boardC, boardRot, b => { b.Mat = MeshBuilder.MatMatte; b.AddBox(Vector3.zero, new Vector3(width - 0.12f, 0.36f, 0.04f), C(0.16f, 0.17f, 0.19f), Quaternion.identity); });
+            Piece("Board", boardC, boardRot, b => { b.Mat = MatPanel; b.AddBox(Vector3.zero, new Vector3(width - 0.12f, 0.36f, 0.04f), C(0.16f, 0.17f, 0.19f), Quaternion.identity); });
             float sw = (width - 0.3f) / 3f;
             string[] titles = { "FLIGHT", "ORBIT", "FUEL" };
             for (int k = 0; k < 3; k++)
@@ -331,7 +331,7 @@ namespace Rocket
             foreach (int s in new[] { -1, 1 })
                 Piece("Console", new Vector3(s * side, 0, z), Quaternion.identity, b =>
                 {
-                    b.Mat = MeshBuilder.MatMatte;
+                    b.Mat = MatPanel;
                     b.AddBox(new Vector3(0, 0.3f, 0), new Vector3(0.24f, 0.6f, 0.42f), C(0.3f, 0.32f, 0.35f), Quaternion.identity);
                     b.AddBox(new Vector3(0, 0.605f, 0), new Vector3(0.26f, 0.015f, 0.44f), C(0.16f, 0.17f, 0.19f), Quaternion.identity);
                     for (int k = 0; k < 3; k++) b.AddBox(new Vector3(-s * 0.121f, 0.15f + k * 0.12f, 0), new Vector3(0.004f, 0.08f, 0.3f), C(0.2f, 0.21f, 0.23f), Quaternion.identity);
@@ -355,9 +355,10 @@ namespace Rocket
             var rot = Quaternion.Euler(35, 0, 0);
             Piece("Radio", rz + new Vector3(0, 0.08f, 0.05f), rot, b =>
             {
-                b.Mat = MeshBuilder.MatMatte;
+                b.Mat = MatPanel;
                 b.AddBox(Vector3.zero, new Vector3(0.22f, 0.16f, 0.05f), C(0.2f, 0.22f, 0.2f), Quaternion.identity);
-                for (int k = 0; k < 5; k++) b.AddBox(new Vector3(0.07f, -0.04f + k * 0.012f, -0.026f), new Vector3(0.05f, 0.004f, 0.004f), C(0.08f, 0.08f, 0.08f), Quaternion.identity);   // speaker grille
+                b.Mat = MatPerf;
+                b.AddBox(new Vector3(0.07f, -0.015f, -0.026f), new Vector3(0.06f, 0.09f, 0.003f), C(0.6f, 0.62f, 0.64f), Quaternion.identity);   // speaker grille
             });
             Piece("Radio screen", rz + new Vector3(0, 0.08f, 0.05f) + rot * new Vector3(-0.03f, 0.01f, -0.027f), rot, b => b.AddBox(Vector3.zero, new Vector3(0.13f, 0.1f, 0.002f), C(0.1f, 0.25f, 0.1f) * 0.6f, Quaternion.identity), true);
             var rtm = Label(rz + new Vector3(0, 0.08f, 0.05f) + rot * new Vector3(-0.09f, 0.055f, -0.03f), rot, "", 0.009f, C(0.6f, 1f, 0.6f), TextAnchor.UpperLeft);
@@ -409,7 +410,7 @@ namespace Rocket
                 var s = seats[i];
                 Piece("Harness", s, Quaternion.identity, b =>
                 {
-                    b.Mat = MeshBuilder.MatMatte;
+                    b.Mat = MatFabric;
                     b.AddBox(new Vector3(-0.12f, 0.55f, -0.2f), new Vector3(0.05f, 0.45f, 0.01f), C(0.15f, 0.15f, 0.17f), Quaternion.Euler(-12, 0, 0));
                     b.AddBox(new Vector3(0.12f, 0.55f, -0.2f), new Vector3(0.05f, 0.45f, 0.01f), C(0.15f, 0.15f, 0.17f), Quaternion.Euler(-12, 0, 0));
                     b.AddBox(new Vector3(0, 0.4f, -0.17f), new Vector3(0.06f, 0.06f, 0.02f), C(0.7f, 0.72f, 0.75f), Quaternion.identity);
@@ -472,6 +473,7 @@ namespace Rocket
                 blind.transform.localScale = new Vector3(1, 0.02f, 1);
                 var bp = AddProp("blind" + props.Count, "Blind", c + Vector3.up * ((sill + head) / 2), null, null, 0.4f, true);
                 bp.reach = 2.4f;
+                windowBlinds.Add(bp);
                 bp.prompt = () => bp.state > 0.5f ? "E: open the blind" : "E: close the blind";
                 bp.use = () => { bp.state = bp.state > 0.5f ? 0 : 1; SendCabin(bp); };
                 bp.moving = blind.transform;
@@ -483,7 +485,7 @@ namespace Rocket
             Piece("Locker", lk, lq, b =>
             {
                 // an open-fronted box: back, sides, top and bottom (the door covers the front)
-                b.Mat = MeshBuilder.MatPaint;
+                b.Mat = MatPanel;
                 Color shell = C(0.85f, 0.48f, 0.15f);
                 b.AddBox(new Vector3(0, 0.75f, 0.24f), new Vector3(0.6f, 1.5f, 0.02f), C(0.3f, 0.22f, 0.15f), Quaternion.identity);
                 b.AddBox(new Vector3(-0.29f, 0.75f, 0.1f), new Vector3(0.02f, 1.5f, 0.3f), shell, Quaternion.identity);
@@ -498,7 +500,7 @@ namespace Rocket
             });
             var door = Piece("Locker door", lk + lq * new Vector3(-0.29f, 0, -0.06f), lq, b =>
             {
-                b.Mat = MeshBuilder.MatPaint;
+                b.Mat = MatPanel;
                 b.AddBox(new Vector3(0.29f, 0.75f, 0), new Vector3(0.58f, 1.48f, 0.02f), C(0.9f, 0.52f, 0.18f), Quaternion.identity);
                 b.AddBox(new Vector3(0.52f, 0.8f, -0.02f), new Vector3(0.03f, 0.14f, 0.02f), C(0.3f, 0.3f, 0.32f), Quaternion.identity);
                 for (int k = 0; k < 4; k++) b.AddBox(new Vector3(0.29f, 1.3f - k * 0.025f, -0.012f), new Vector3(0.3f, 0.008f, 0.004f), C(0.6f, 0.35f, 0.1f), Quaternion.identity);
@@ -547,6 +549,7 @@ namespace Rocket
             var toy = MyArdling.Build(Ardlings.LookFor("Plushie Ardling"), InteriorLayer);
             toy.transform.SetParent(pivot.transform, false);
             toy.transform.localScale = Vector3.one * 0.16f;
+            IndoorLit(toy);
             toy.transform.localPosition = new Vector3(0, -0.4f - Ardlings.Height * 0.16f, 0);
             var tp = AddProp("plushie", "Plushie", ph + Vector3.down * 0.48f, () => "E: give the plushie a push", null, 0.12f, true);
             tp.moving = pivot.transform;
@@ -629,7 +632,9 @@ namespace Rocket
                     bool window = i == 0 || i == 11 || i == 3 || i == 8, hatchSide = i == 5 || i == 6;
                     if (!window && !hatchSide && i != 7)   // (7: the snack locker)
                     {
+                        b.Mat = MatBrushed;
                         b.AddBox(m * 0.97f + Vector3.up * 1.2f, new Vector3(0.025f, 0.025f, (p1 - p0).magnitude * 0.7f), C(0.85f, 0.86f, 0.88f), along);
+                        b.Mat = MeshBuilder.MatPaint;
                         for (int s = -1; s <= 1; s += 2) b.AddBox(m * 0.985f + Vector3.up * 1.2f + (p1 - p0).normalized * s * (p1 - p0).magnitude * 0.33f, new Vector3(0.02f, 0.02f, 0.06f), C(0.6f, 0.6f, 0.62f), Quaternion.LookRotation(n));
                     }
                     if (i == 1)
@@ -638,12 +643,14 @@ namespace Rocket
                     {
                         // a vent with slats
                         var q = Quaternion.LookRotation(-n);
-                        b.AddBox(m * 0.985f + Vector3.up * 1.75f, new Vector3(0.35f, 0.2f, 0.02f), C(0.25f, 0.26f, 0.28f), q);
+                        b.Mat = MatPerf;
+                        b.AddBox(m * 0.985f + Vector3.up * 1.75f, new Vector3(0.35f, 0.2f, 0.02f), C(0.55f, 0.56f, 0.58f), q);
+                        b.Mat = MatBrushed;
                         for (int s = 0; s < 5; s++) b.AddBox(m * 0.975f + Vector3.up * (1.67f + s * 0.04f), new Vector3(0.32f, 0.008f, 0.015f), C(0.12f, 0.12f, 0.13f), q);
                     }
                 }
                 // floor plates: a ring and spokes
-                b.Mat = MeshBuilder.MatMatte;
+                b.Mat = MatBrushed;
                 for (int k = 0; k < 12; k++)
                 {
                     float a = (k + 0.5f) * Mathf.PI / 6;
@@ -680,9 +687,11 @@ namespace Rocket
                 {
                     b.AddBox(new Vector3(s * (hw - 0.08f), h - 0.1f, 0), new Vector3(0.04f, 0.04f, roomL), C(0.9f, 0.75f, 0.2f), Quaternion.identity);
                     b.AddBox(new Vector3(s * (hw - 0.14f), h - 0.1f, 0), new Vector3(0.035f, 0.035f, roomL), C(0.25f, 0.5f, 0.85f), Quaternion.identity);
+                    b.Mat = MatBrushed;
                     b.AddBox(new Vector3(s * (hw - 0.04f), 1.62f, 0), new Vector3(0.025f, 0.025f, roomL - 0.6f), C(0.85f, 0.86f, 0.88f), Quaternion.identity);
+                    b.Mat = MeshBuilder.MatPaint;
                 }
-                b.Mat = MeshBuilder.MatMatte;
+                b.Mat = MatBrushed;
                 for (float z = -hl + 0.25f; z < hl; z += 0.5f) b.AddBox(new Vector3(0, 0.004f, z), new Vector3(roomW * 0.9f, 0.006f, 0.02f), C(0.38f, 0.4f, 0.43f), Quaternion.identity);
             }
             // oxygen tanks by the hatch, a first-aid box, a fire blanket
@@ -744,7 +753,7 @@ namespace Rocket
                     for (int k = 0; k < 2; k++)
                     {
                         float y = 0.36f + k * 0.8f;
-                        b.Mat = MeshBuilder.MatMatte;
+                        b.Mat = MatFabric;
                         b.AddBox(new Vector3(x, y + 0.03f, z), new Vector3(0.7f, 0.07f, 1.44f), C(0.92f, 0.92f, 0.9f), Quaternion.identity);                 // mattress
                         b.AddBox(new Vector3(x, y + 0.1f, z - 0.55f), new Vector3(0.42f, 0.08f, 0.24f), C(0.97f, 0.97f, 0.97f), Quaternion.Euler(0, 4 * s, 0)); // pillow
                         b.AddBox(new Vector3(x, y + 0.08f, z + 0.2f), new Vector3(0.72f, 0.04f, 0.95f), blankets[n++ % 4], Quaternion.identity);             // blanket
@@ -876,7 +885,7 @@ namespace Rocket
                     cabinLightMode = Mathf.RoundToInt(p.state) % 3;
                     lastAmbient = -1;
                     ApplyCabinAmbient();
-                    if (cabinMat != null) cabinMat.SetColor("_Tint", cabinLightMode == 2 ? C(1f, 0.45f, 0.4f) : Color.white);
+                    if (cabinMat != null) cabinMat.SetColor("_Tint", cabinLightMode == 2 ? C(1f, 0.6f, 0.55f) : Color.white);
                     if (cabinLights != null) cabinLights.SetActive(cabinLightMode != 1);
                     break;
                 case "plant": plantGrow = Mathf.Clamp01(p.state); break;

@@ -768,6 +768,23 @@ captaincarl24: "more detailed bro, search online to see how other popular games 
 - The world's own ambient occlusion stays off inside; the cabin's fill light was lowered to match. `-autotestCabin` now also
   tests the overhead panel, the gauges and the clutter, floats things in orbit and glows in reentry (750-757).
 
+### Milestone 37: realistic cabins (2026-11-14)
+captaincarl24: "make the interior more detailed and more realistic, add some textures".
+- **Real light**: the cabin material no longer takes the sun (`_SunScale` 0 in RocketLit, which shone through the walls) and has
+  its own even indoor fill instead of the sky's; real point lights that only light the cabin layer do the rest: the ceiling
+  lamp(s) (white, off when dim, red for night), a flood lamp over the desk (the FLOOD knob) and a blue screen glow. Light
+  pools under the lamps and fades into the corners; the lamps flicker in reentry and light up for LAMP TEST.
+- **Sunlight through the windows**: each window's opening is projected along the real sun direction (turned into the cabin's
+  frame) onto the floor as a warm patch that moves as the ship turns, only when the sun is outside that window and its blind
+  is open.
+- **Corners like a real room** (`_CabinAO`): vertical surfaces darken toward the floor and ceiling, floors and ceilings toward the
+  walls, worked out from the room's shape in the shader, smooth (none of the screen-space grain).
+- **Textured surfaces drawn in the shader** (RocketLit ids 11-16, nothing to download): woven cloth (seats, harnesses, bags,
+  bedding, bungees), studded rubber floor with scuffs, painted panels (orange peel, seams every 60 x 50 cm, fine scratches),
+  quilted pads, perforated metal (vents, the radio's speaker), hook-and-loop. Each has real relief (bumped normals), fading
+  out with distance so nothing shimmers. Rails, floor plates and window frames use the photographed brushed metal.
+- The crew and the plushie are lit by the lamps too.
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 
