@@ -2,6 +2,8 @@
 
 An original rocket-building and spaceflight game made in Unity. Build rockets, fly them to orbit and beyond, explore a small solar system of its own, and plan whole space missions alone or with friends.
 
+Developed by captaincarl24
+
 ## What you can do
 
 - **Build rockets and spaceplanes**: stack parts, set up stages, and see your delta-v, thrust-to-weight and burn time before launch.
@@ -139,8 +141,6 @@ Decals folder ("Add your own pictures...") to use them.
 Builds, screenshots and Unity's `Library` cache are kept out of the repo on purpose (see `.gitignore`).
 
 ## Credits
-
-Developed by captaincarl24.
 
 - **Star map**: NASA/Goddard Space Flight Center Scientific Visualization Studio, from Gaia DR2 (ESA/Gaia/DPAC).
 - **Textures**: ambientCG (CC0).
