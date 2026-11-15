@@ -162,7 +162,7 @@ namespace Rocket
             if (e.type == EventType.MouseDown && e.button == 0 && Ui.MouseOverUI(In.MousePosition)) GameAudio.I?.Click();
             if (Ui.Hidden && !inMenu && !inMission && !(inFlight && flight != null && flight.photoMode)) { Ui.DrawHiddenHint(); return; }
             // while the Definitions window is open, the screen behind it is drawn but takes no clicks or keys
-            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open || Lessons.PickerOpen) && e.type != EventType.Repaint && e.type != EventType.Layout;
+            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open || Lessons.PickerOpen || EndCredits.Active) && e.type != EventType.Repaint && e.type != EventType.Layout;
             if (blocked) GUI.enabled = false;
             DrawScreen();
             if (blocked) GUI.enabled = true;
@@ -171,6 +171,7 @@ namespace Rocket
             MyArdling.DrawWindow();   // milestone 34: the My Ardling menu, over any screen
             if (inFlight && !Ui.Hidden) Lessons.Draw(flight);   // milestone 35: a lesson's box
             if (!inMenu && !inFlight) Lessons.DrawPicker(); else Lessons.PickerOpen = false;
+            EndCredits.Draw();   // milestone 35: the credits roll
             Glossary.DrawTip();
         }
 

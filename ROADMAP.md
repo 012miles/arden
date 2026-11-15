@@ -699,6 +699,12 @@ Ardling animations, a slightly smaller helmet and a better sticky note face."
 - **The space centre first**: loading or starting a game opens the space centre from the air; click a building (or Rocket builder).
 - **Easy helps you fly**: parts half as tough again; a stage that runs dry with engines next fires the next one; parachutes open once
   they won't tear; legs come down near the ground; SAS starts on.
+- **The Easy autopilot** (captaincarl24: "for easy mode, make it so it can autopilot to the moon and autoland"): a bar above the navball
+  on Easy: *Fly to Tal* / *Fly to Vesk* launches to orbit if needed (the launch autopilot), plans the transfer (a half-orbit transfer
+  timed for the moon, then fine-tuned over nearby times and sizes with the trajectory predictor to arrive 20-60 km up), auto-burns it,
+  warps to the moon's gravity, burns into a low orbit at the closest point, then lands: a burn to fall, a part-way warp, and a landing
+  burn that starts while there's room to stop (all the speed counts) and holds a falling speed down to about 1.6 m/s, legs down.
+  *Land* does the last part from any moon orbit; round a world with air, *Come home* drops into the air for the parachutes. X stops it.
 - **Parts vary**: each part's limits (crash speed, heat, air pressure) are its rating times 0.93-1.13, picked when it's built and kept in
   saves; the crash message says the rating and where this one gave way. (Fixed at exactly the rating in the tests and tours.)
 - **Crashes break apart**: every part flies off on its own from the blast, tumbles, falls, bounces, skids and comes to rest on the ground
@@ -710,8 +716,26 @@ Ardling animations, a slightly smaller helmet and a better sticky note face."
   sway; a smaller helmet (0.27 m, a taller collar); sharper sticky notes (256 px) with shine in the eyes, rosy cheeks on the happy faces
   and a curled corner. 3 flags per trip outside.
 - **Colours**: green LAUNCH (builder and the pad), Start, Done and Ready; red Abort and End flight.
+- **Credits roll at the end** (captaincarl24: "the credits on the title screen are kinda bothering me ... once you complete the game it shows
+  the credits, Minecraft type"): the Credits button is gone from the title menu (a small link in the corner plays them); finishing the
+  story rolls them once, after mission control's last word, scrolling up over the dark (hold SPACE to speed up, ESC to skip).
+- **Cabins you can use** (captaincarl24: "for multiplayer, make the inside really detailed and interactive, super interactive"): look at
+  something (the dot turns yellow and says what it is) and press E or click. *The controls work*: STAGE (a big red button), ABORT (under
+  a clear cover: E lifts it, E again aborts), SAS / RCS / LIGHTS / GEAR switches that flip, a throttle lever (scroll on it, or E for
+  full and cut), the map screen; in a room each still needs that player's job. *Live screens*: FLIGHT (world, height, speed, climb, g),
+  ORBIT (high and low points, tilt, the next burn), FUEL (fuel, stage, throttle, signal, food), a mission clock (T+), the radio's last
+  messages, and warning lamps (FUEL, HEAT, SAS, RCS, GEAR, LIGHTS). *Things to play with*: the radio (quick calls: to the team's chat
+  in a room, or mission control answers), cabin lights (bright, dim, night red), a blind on every window, the snack locker (its door
+  swings open; grab a snack), a plant that grows when watered, an Ardling plushie on a string (it swings under thrust and floats in
+  space), a fire extinguisher; in habitats a bunk to nap in, an exercise bike with turning pedals and a game of chess. The hatch wheel
+  spins as you open it. *Detail*: rivets and seams on every wall, gas and water pipes, handrails, cables, vents, floor plates, a ring of
+  lights, oxygen tanks, a first-aid box, harnesses and headrests, a clipboard checklist, labels everywhere. *Multiplayer*: the others
+  walk round with their arms and legs swinging and their names over their heads; the blinds, locker, lights, plant, plushie, bike and
+  chess are shared (a `cs` message the host passes on as `csr`; each cabin remembers how it was left, for whoever comes in next).
+  (The habitat's window bays now fit the room too.)
 - 4 new sim tests (flags, toughness, lessons, swimming); `-autotest35` tours the space centre, tutorials, lessons, a crash, the sea,
-  swimming and the new look (700-711).
+  swimming and the new look (700-713); `-autotestTrip` flies a Tal Lander from the pad to Tal and down on the Easy autopilot (720-729);
+  `-autotestCabin` uses everything in a capsule (and launches from its STAGE button), then a habitat, and goes out of the hatch (730-747).
 
 ## Next
 - Ideas welcome. (Controller support: not wanted.)

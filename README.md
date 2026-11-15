@@ -10,14 +10,15 @@ Developed by captaincarl24
 - **Fly real orbits**: thrust, drag and heating, exact orbits on rails, time warp, a map view, a launch autopilot and a flight computer.
 - **Go further**: rendezvous and docking, space stations, landers, rovers, bases, supplies for long voyages, aerobraking and heat shields, and an intercept planner.
 - **Crew**: Ardlings with jobs and experience. Walk in first or third person (C), run, jump, plant flags, climb back in; ENTER climbs out
-  after any landing the crew lived through. TAB goes inside the cabin: walk round and look out of the windows at the real world.
+  after any landing the crew lived through. TAB goes inside the cabin: walk round, look out of the windows at the real world, and use
+  everything (E): STAGE, ABORT, switches, the throttle, live screens, the radio, blinds, lights, the snack locker and more.
 - **Make it yours**: paint your rocket in 16 colours and stick on decals (built-in ones or your own pictures), save your own presets, and
   dress your Ardling (suit colour, visor note, hat) for multiplayer.
 - **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole
   interface with F1.
 - **Career**: science, money, contracts and an upgradeable space centre, plus achievements, a story, replays, photo mode (F2) and weather.
 - **Three difficulty levels**: Easy, Standard and Engineer, with explanations that match. Easy also helps you fly: tougher parts, stages
-  that fire when they run dry, parachutes and legs that open by themselves.
+  that fire when they run dry, parachutes and legs that open by themselves, and an autopilot that flies you to Tal or Vesk and lands.
 - **Expedition** (multiplayer, 1-4 players, solo works too): everyone builds one rocket together in the real builder with the real parts,
   then rides in it as their own Ardling through the real, full-size solar system. Pick a mission (Tal, the lost outpost, Vesk, Ochre,
   Brume's moons or a free expedition) and a difficulty; the builder shows the six resources (mass, power, budget, data, comms, time) and
@@ -67,7 +68,7 @@ land within 300 m of an outpost or wreck (⌂ on the map) to **Scavenge** it; **
 | C | First or third person (on foot) |
 | G | Plant a flag |
 | B | Climb back in |
-| TAB | Go inside the cabin (E at the seats flies, E at the hatch goes out) |
+| TAB | Go inside the cabin (look at something and press E to use it: the seats fly, the hatch goes out) |
 | Alt | Free the mouse pointer in first person |
 
 ### Builder

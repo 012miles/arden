@@ -420,6 +420,7 @@ namespace Rocket
         public int storyStep;                  // milestone 28: the story mission in progress
         public bool storyStarted, storyBriefed;
         public List<string> scavenged = new List<string>();   // milestone 34: outposts and wrecks searched
+        public bool creditsSeen;               // milestone 35: the credits rolled after the story
         public int presetSlots;                // milestone 34: slots open for your own presets (older saves: 0, read as 1)
     }
 
@@ -448,6 +449,8 @@ namespace Rocket
         public double funds = StartFunds, science, reputation;
         /// <summary>How many slots for the player's own presets this campaign has opened (milestone 34; the first is free).</summary>
         public int presetSlots = 1;
+        /// <summary>The credits have rolled at the end of the story in this game (milestone 35).</summary>
+        public bool creditsSeen;
         public readonly HashSet<string> unlocked = new HashSet<string> { "start" };
         public readonly Dictionary<string, SubjectSave> subjects = new Dictionary<string, SubjectSave>();
         public readonly List<Contract> contracts = new List<Contract>();
@@ -480,6 +483,7 @@ namespace Rocket
             funds = StartFunds;
             science = reputation = 0;
             presetSlots = 1;
+            creditsSeen = false;
             scavenged.Clear();
             unlocked.Clear();
             unlocked.Add("start");
@@ -1040,7 +1044,7 @@ namespace Rocket
             badges = badges.ToList(),
             landmarksSpotted = spotted.ToList(), landmarksVisited = visited.ToList(),
             storyStep = storyStep, storyStarted = storyStarted, storyBriefed = storyBriefed,
-            presetSlots = presetSlots, scavenged = scavenged.ToList(),
+            presetSlots = presetSlots, scavenged = scavenged.ToList(), creditsSeen = creditsSeen,
         };
 
         public void Load(CareerSave s)
@@ -1048,6 +1052,7 @@ namespace Rocket
             if (s == null || s.version == 0) { mode = GameMode.Sandbox; chosen = false; return; } // saved before careers existed
             mode = s.mode; chosen = s.chosen; funds = s.funds; science = s.science; reputation = s.reputation;
             presetSlots = Math.Max(1, s.presetSlots);
+            creditsSeen = s.creditsSeen;
             scavenged.Clear();
             if (s.scavenged != null) scavenged.AddRange(s.scavenged);
             unlocked.Clear(); foreach (var u in s.unlocked) unlocked.Add(u); unlocked.Add("start");

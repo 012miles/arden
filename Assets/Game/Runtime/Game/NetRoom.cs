@@ -134,6 +134,7 @@ namespace Rocket
         public Action<NetMsg> OnClientMessage;
         /// <summary>Milestone 34: someone's place in a cabin (the host passes each on to everyone).</summary>
         public Action<int, string, bool> OnPose;
+        public Action<int, string> OnCabin;   // milestone 35: someone used something in a cabin
         public string RoleName(int r) => State.Rocket ? Coop.RoleNames[Mathf.Clamp(r, 0, 3)] : MissionDesign.RoleNames[Mathf.Clamp(r, 0, 3)];
 
         TcpListener listener;
@@ -625,6 +626,7 @@ namespace Rocket
                 // ---- expeditions (milestone 33): poses, actions and the pilot's controls go to the expedition on the host
                 case "cmd": if (State.Rocket) OnHostCommand?.Invoke(who, m); return;
                 case "ip": if (State.Rocket) { OnPose?.Invoke(who, m.a, m.on); BroadcastRaw(new NetMsg { t = "ipr", n = who, a = m.a, on = m.on }); } return;
+                case "cs": if (State.Rocket && !string.IsNullOrEmpty(m.a) && m.a.Length < 80) { OnCabin?.Invoke(who, m.a); BroadcastRaw(new NetMsg { t = "csr", n = who, a = m.a }); } return;
                 case "answer":
                 {
                     var q = State.requests.FirstOrDefault(x => x.id == m.n);

@@ -35,6 +35,8 @@ namespace Rocket
                 audio?.Clunk(0.12f);
                 return;
             }
+            // milestone 35: the last mission done and its message read: the credits roll, once
+            if (Story.Finished(c) && !c.creditsSeen && !Coop.Active && !Universe.IsAutotest) { c.creditsSeen = true; U.Save(); EndCredits.Start(true); return; }
             var m = Story.Current(c);
             if (m != null && !c.storyBriefed && countdown < 0f && rollout == null)
             {

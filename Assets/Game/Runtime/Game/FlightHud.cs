@@ -83,6 +83,7 @@ namespace Rocket
                 && Ui.Press(new Rect(W / 2 - 120, H - 320, 240, 42), $"LAUNCH  ({In.Name(K.Space)})", Ui.ButtonGo))
             { if (!TryCountdown()) Stage(); }
             DrawInteriorHud(W, H);   // milestone 34: the cabin's prompts
+            DrawTripPanel(W, H);     // milestone 35: the Easy autopilot
             var v = active;
             var body = v.body;
             Orbit orbit = trajectory.Count > 0 ? trajectory[0].orbit : null;

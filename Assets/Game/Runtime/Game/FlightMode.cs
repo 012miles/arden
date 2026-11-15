@@ -197,6 +197,7 @@ namespace Rocket
         {
             FreeCursor();
             Lessons.Stop();
+            trip = TripPhase.Off;
             firstPerson = false;
             fpHiddenView = null;
             LeaveInterior();
@@ -488,6 +489,7 @@ namespace Rocket
             if (active == null) return;
             UpdateCursor();   // milestone 34: the pointer's locked while looking round in first person
             EasyHelpers(active, Time.unscaledDeltaTime);   // milestone 35: Easy lends a hand
+            TripTick(Time.unscaledDeltaTime);              // milestone 35: the Easy autopilot to a moon and down
             if (replay != null)
             {
                 float rdt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);

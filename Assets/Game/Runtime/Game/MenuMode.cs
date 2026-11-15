@@ -309,7 +309,11 @@ namespace Rocket
             Ui.Shadowed(new Rect(x, H - 34, 600, 20), $"Saves: {slots.Count}   ·   designs are shared between games", foot);
             int baked = PlanetBaker.Baked;
             string worlds = baked < 8 ? $"drawing the worlds ({baked}/8)   ·   " : "";
-            Ui.Shadowed(new Rect(W - 520, H - 34, 490, 20), $"{worlds}Update {UpdateLog.Latest.n}   ·   version {Application.version}", foot.ApplyRight());
+            Ui.Shadowed(new Rect(W - 620, H - 34, 490, 20), $"{worlds}Update {UpdateLog.Latest.n}   ·   version {Application.version}", foot.ApplyRight());
+            // milestone 35: the credits, tucked away in the corner (they also roll when you finish the story)
+            var link = new GUIStyle(foot) { alignment = TextAnchor.MiddleCenter };
+            link.hover.textColor = Ui.Accent;
+            if (page == Page.Main && Ui.Press(new Rect(W - 120, H - 36, 90, 24), "Credits", link)) EndCredits.Start();
         }
 
         /// <summary>
@@ -340,9 +344,7 @@ namespace Rocket
             y += h + gap;
             if (Ui.MenuItem(new Rect(x, y, w, h), "Update log", UpdateLog.Unread ? $"<color=#ffd060>New:</color> update {UpdateLog.Latest.n}, {UpdateLog.Latest.name.ToLowerInvariant()}" : $"Everything new, up to update {UpdateLog.Latest.n}")) ShowPage("updates");
             y += h + gap;
-            float half = (w - gap) / 2;
-            if (Ui.MenuItem(new Rect(x, y, half, 40), "Credits", null)) ShowPage("credits");
-            if (Ui.MenuItem(new Rect(x + half + gap, y, half, 40), "Quit", null)) Application.Quit();
+            if (Ui.MenuItem(new Rect(x, y, w, 40), "Quit", null)) Application.Quit();   // (milestone 35: Credits is a small link in the corner now)
             // what's new, bottom right
             float cw = 430, ch = Mathf.Min(330, H - 200);
             if (UpdateLog.DrawCard(new Rect(W - cw - 40, H - ch - 56, cw, ch), 6)) ShowPage("updates");

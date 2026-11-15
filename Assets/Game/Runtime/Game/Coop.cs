@@ -83,10 +83,22 @@ namespace Rocket
             room.OnHostCommand = (who, m) => commands.Enqueue((who, m));
             room.OnClientMessage = OnStream;
             room.OnPose = (who, a, on) => poses[who] = (a, on, Time.unscaledTime);
+            room.OnCabin = CabinEvent;   // milestone 35
         }
 
         /// <summary>Milestone 34: where each player is in a cabin ("part|x|z|yaw"), whether they're inside, and when it was heard.</summary>
         public readonly Dictionary<int, (string a, bool on, float t)> poses = new Dictionary<int, (string, bool, float)>();
+        // milestone 35: the cabins' shared things (blinds, lockers, lights, the plant...): what just happened, and how each was left
+        public readonly Queue<(int who, string a)> cabinEvents = new Queue<(int, string)>();
+        public readonly Dictionary<string, float> cabinState = new Dictionary<string, float>();
+        public void CabinEvent(int who, string a)
+        {
+            if (string.IsNullOrEmpty(a)) return;
+            cabinEvents.Enqueue((who, a));
+            while (cabinEvents.Count > 40) cabinEvents.Dequeue();
+            var f = a.Split('|');
+            if (f.Length == 3 && float.TryParse(f[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v)) cabinState[f[0] + "|" + f[1]] = v;
+        }
 
         public bool Has(int role) => room.Me != null && room.Me.Has((MRole)role);
         public static int RoleFor(CAct a) => a == CAct.Build || a == CAct.Science ? Builder : a == CAct.Steer ? Pilot : a == CAct.Navigate ? Control : Engineer;
@@ -146,6 +158,7 @@ namespace Rocket
                 case "say": if (!string.IsNullOrEmpty(m.a)) { sayings.Enqueue(m.a); while (sayings.Count > 6) sayings.Dequeue(); } break;
                 case "boom": boom = true; break;
                 case "ipr": if (m.n != room.MyId) poses[m.n] = (m.a, m.on, Time.unscaledTime); break;
+                case "csr": if (m.n != room.MyId) CabinEvent(m.n, m.a); break;
                 case "career": careerJson = m.json; careerNew = true; break;
             }
         }

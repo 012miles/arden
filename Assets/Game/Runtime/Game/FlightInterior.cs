@@ -58,7 +58,7 @@ namespace Rocket
             firstPerson = false;
             ipos = new Vector3(0, 0, roomRound ? -0.6f : -roomL * 0.25f);
             iyaw = 0; ipitch = 0;
-            Show($"Inside the {p.def.name}. W/S/A/D walk, the mouse looks round ({In.Name(K.LeftAlt)} frees the pointer). E at the seats: fly; E at the hatch: go out. {In.Name(K.Tab)}: leave.", 6f);
+            Show($"Inside the {p.def.name}. Look at anything and press E to use it: the switches, STAGE, the throttle, the radio, the blinds, the locker... Sit in a seat to fly; the hatch goes out. {In.Name(K.Tab)}: leave.", 6f);
         }
 
         /// <summary>For tours: which way you look in the cabin.</summary>
@@ -74,6 +74,9 @@ namespace Rocket
             if (room != null) UnityEngine.Object.Destroy(room);
             room = null;
             cabinFolk.Clear();
+            props.Clear(); screens.Clear(); lamps.Clear();
+            ResetCabinLight();
+            SetWorldAo(true);
         }
 
         // ---------------------------------------------------------------- every frame
@@ -84,8 +87,11 @@ namespace Rocket
             v.inputPitch = v.inputYaw = v.inputRoll = v.driveInput = 0;
             v.inputTranslate = Vector3.zero;
             if (insidePart == null || !v.parts.Contains(insidePart) || insidePart.crew.Count == 0 && !Coop.Active) { LeaveInterior(); return; }
-            if (In.Down(K.Tab)) { LeaveInterior(); return; }
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
+            UpdateCabinProps(dt);   // milestone 35: the moving parts and the live screens
+            if (!inside) return;
+            if (mapView) return;    // (the map screen: M comes back)
+            if (In.Down(K.Tab)) { LeaveInterior(); return; }
             if (!In.Held(K.LeftAlt) && Application.isFocused)
             {
                 var d = In.MouseDelta;
@@ -109,11 +115,8 @@ namespace Rocket
                 ipos.x = Mathf.Clamp(ipos.x, -roomW / 2 + 0.4f, roomW / 2 - 0.4f);
                 ipos.z = Mathf.Clamp(ipos.z, -roomL / 2 + 0.4f, roomL / 2 - 0.4f);
             }
-            if (In.Down(K.E))
-            {
-                if (NearSeat()) { LeaveInterior(); Show("At the controls.", 2f); return; }
-                if (NearHatch()) { var p = insidePart; LeaveInterior(); GoEva(p); return; }
-            }
+            // milestone 35: look at something and press E (or click, or scroll the throttle)
+            if (UseCabin() && !inside) return;
             ipSend -= dt;
             if (ipSend <= 0) { ipSend = 0.12f; SendPose(true); }
         }
@@ -136,8 +139,10 @@ namespace Rocket
             if (!inside || room == null || insidePart == null || mapView || photoMode)
             {
                 if (icam != null && icam.enabled) icam.enabled = false;
+                SetWorldAo(true);
                 return;
             }
+            SetWorldAo(false);   // milestone 35
             if (icam == null) BuildInteriorCamera(world);
             icam.enabled = true;
             var look = Quaternion.Euler(-ipitch, iyaw, 0);
@@ -169,13 +174,26 @@ namespace Rocket
         /// <summary>The prompts while inside.</summary>
         void DrawInteriorHud(float W, float H)
         {
-            if (!inside) return;
-            string hint = NearSeat() ? "E: take the controls" : NearHatch() ? "E: open the hatch and go out" : null;
+            if (!inside || mapView) return;
+            // milestone 35: what the dot's on, and what E does to it
+            string hint = null;
+            if (lookedAt != null) { try { hint = lookedAt.prompt?.Invoke(); } catch { } }
             var st = new GUIStyle(Ui.BigCenter) { fontSize = 20 };
-            if (hint != null) Ui.Shadowed(new Rect(W / 2 - 300, H * 0.62f, 600, 30), hint, st);
-            Ui.Shadowed(new Rect(W / 2 - 400, H - 40, 800, 22), $"Inside the {insidePart?.def.name}   ·   W/S/A/D walk   ·   mouse: look   ·   {In.Name(K.Tab)}: leave the cabin", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
-            // a small dot in the middle, for looking at things
-            Ui.Line(new Rect(W / 2 - 2, H / 2 - 2, 4, 4), new Color(1, 1, 1, 0.7f));
+            if (lookedAt != null) Ui.Shadowed(new Rect(W / 2 - 300, H / 2 + 18, 600, 26), lookedAt.name.ToUpperInvariant(), new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold });
+            if (hint != null) Ui.Shadowed(new Rect(W / 2 - 400, H / 2 + 42, 800, 30), hint, st);
+            Ui.Shadowed(new Rect(W / 2 - 500, H - 40, 1000, 22), $"Inside the {insidePart?.def.name}   ·   look at things: E or click uses them   ·   scroll on the throttle   ·   W/S/A/D walk   ·   {In.Name(K.Tab)}: leave the cabin", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
+            // the dot in the middle, for looking at things (bigger and yellow when it's on something)
+            if (lookedAt != null) Ui.Line(new Rect(W / 2 - 4, H / 2 - 4, 8, 8), new Color(1f, 0.85f, 0.3f, 0.95f));
+            else Ui.Line(new Rect(W / 2 - 2, H / 2 - 2, 4, 4), new Color(1, 1, 1, 0.7f));
+            // what's been said (the flight's usual messages don't show in here)
+            if (!string.IsNullOrEmpty(message) && Time.unscaledTime < messageUntil)
+            {
+                var c = GUI.color;
+                GUI.color = new Color(1, 1, 1, Mathf.Clamp01(messageUntil - Time.unscaledTime));
+                float mh = Mathf.Max(60, Ui.BigCenter.CalcHeight(new GUIContent(Words.Say(message)), 800));
+                Ui.Shadowed(new Rect(W / 2 - 400, 70, 800, mh), Words.Say(message), Ui.BigCenter);
+                GUI.color = c;
+            }
         }
 
         // ---------------------------------------------------------------- the others in the cabin
@@ -213,6 +231,7 @@ namespace Rocket
                     var go = Folk(key, MyArdling.LookOf(pl.look ?? pl.name));
                     go.transform.localPosition = Vector3.Lerp(go.transform.localPosition, new Vector3(x, 0, z), 0.3f);
                     go.transform.localRotation = Quaternion.Slerp(go.transform.localRotation, Quaternion.Euler(0, yaw, 0), 0.3f);
+                    AnimateFolk(key, go, pl.name);   // milestone 35
                 }
             }
             // the crew in their seats (anyone not walking round, and not you)
@@ -249,7 +268,7 @@ namespace Rocket
             if (cabinMat == null)
             {
                 cabinMat = new Material(Mats.Lit) { name = "Cabin" };
-                cabinMat.SetFloat("_Ambient", 0.85f);      // lit from inside, whatever the sun's doing
+                cabinMat.SetFloat("_Ambient", 0.45f);      // lit from inside, whatever the sun's doing (milestone 35: lower, with the ambient occlusion off in here)
                 cabinGlow = Mats.Additive;
             }
             var b = new MeshBuilder();
@@ -273,6 +292,7 @@ namespace Rocket
                 gr.sharedMaterial = cabinGlow;
                 gr.shadowCastingMode = ShadowCastingMode.Off;
             }
+            BuildCabinProps(hab, p.def.crew, 2.1f);   // milestone 35: the controls, the screens, the things to play with
         }
 
         static readonly Color Wall = new Color(0.78f, 0.79f, 0.77f), Floor = new Color(0.5f, 0.52f, 0.55f), Trim = new Color(0.2f, 0.22f, 0.25f),
@@ -302,11 +322,7 @@ namespace Rocket
                 WallQuad(b, p0 * 0.995f, p1 * 0.995f, n, 0, 0.18f, Trim);
             }
             // the controls under the front windows, with screens
-            panelAt = new Vector3(0, 0, roomR - 0.75f);
-            b.Mat = MeshBuilder.MatMatte;   // (metal reflects nothing in here and goes black)
-            b.AddBox(new Vector3(0, 0.22f, roomR - 0.45f), new Vector3(1.8f, 0.44f, 0.5f), Trim * 1.6f, Quaternion.identity);
-            b.AddBox(new Vector3(0, 0.46f, roomR - 0.55f), new Vector3(1.8f, 0.05f, 0.6f), Trim * 2f, Quaternion.Euler(-18, 0, 0));
-            for (int k = -1; k <= 1; k++) glow.AddBox(new Vector3(k * 0.58f, 0.49f, roomR - 0.58f), new Vector3(0.45f, 0.02f, 0.3f), ScreenGlow * (k == 0 ? 1.2f : 0.8f), Quaternion.Euler(-18, 0, 0));
+            panelAt = new Vector3(0, 0, roomR - 0.75f);   // (the desk itself, with its screens and switches, is FlightCabin's)
             // seats facing ahead
             int seatCount = Mathf.Max(1, crew);
             for (int s = 0; s < seatCount; s++)
@@ -325,15 +341,9 @@ namespace Rocket
             b.Mat = MeshBuilder.MatPaint;
             int s0 = b.v.Count;
             b.AddFrustum(0.06f, 0f, 0.55f, 0.55f, new Color(0.6f, 0.62f, 0.65f), 20, true, false);
-            XfLocal(b, s0, new Vector3(0, 0.8f, -roomR + 0.14f), Quaternion.Euler(90, 0, 0));
-            s0 = b.v.Count;
-            b.AddFrustum(0.05f, 0f, 0.22f, 0.22f, new Color(0.9f, 0.6f, 0.15f), 14, true, false);
-            XfLocal(b, s0, new Vector3(0, 0.8f, -roomR + 0.22f), Quaternion.Euler(90, 0, 0));
+            XfLocal(b, s0, new Vector3(0, 0.8f, -roomR + 0.14f), Quaternion.Euler(90, 0, 0));   // (its wheel turns: FlightCabin)
             // a light in the ceiling
             glow.AddBox(new Vector3(0, h - 0.02f, 0), new Vector3(1.2f, 0.02f, 1.2f), new Color(1f, 0.95f, 0.85f) * 0.5f, Quaternion.identity);
-            // handholds and a locker
-            b.Mat = MeshBuilder.MatPaint;
-            b.AddBox(new Vector3(-roomR * 0.62f, 0.75f, -roomR * 0.62f), new Vector3(0.6f, 1.5f, 0.45f), new Color(0.85f, 0.48f, 0.15f), Quaternion.Euler(0, 45, 0));
         }
 
         /// <summary>A long habitat: windows down both sides, bunks, a table, plants, the hatch at the far end.</summary>
@@ -346,9 +356,10 @@ namespace Rocket
             b.AddQuad(new Vector3(-hw, 0, -hl), new Vector3(-hw, 0, hl), new Vector3(hw, 0, hl), new Vector3(hw, 0, -hl), Vector3.up, Floor);
             b.AddQuad(new Vector3(-hw, h, -hl), new Vector3(hw, h, -hl), new Vector3(hw, h, hl), new Vector3(-hw, h, hl), Vector3.down, Wall * 0.92f);
             // side walls in four bays, each with a window
+            float bay = roomL / 4;
             for (int k = 0; k < 4; k++)
             {
-                float z0 = -hl + k * 2f, z1 = z0 + 2f;
+                float z0 = -hl + k * bay, z1 = z0 + bay;
                 Pane(b, new Vector3(-hw, 0, z0), new Vector3(-hw, 0, z1), Vector3.right, 0, 0.55f, 1.5f, h);
                 Pane(b, new Vector3(hw, 0, z1), new Vector3(hw, 0, z0), Vector3.left, 0, 0.55f, 1.5f, h);
             }
@@ -356,9 +367,6 @@ namespace Rocket
             Pane(b, new Vector3(hw, 0, hl), new Vector3(-hw, 0, hl), Vector3.back, 0, 0.6f, 1.55f, h);
             WallQuad(b, new Vector3(-hw, 0, -hl), new Vector3(hw, 0, -hl), Vector3.forward, 0, h, Trim * 1.4f);
             panelAt = new Vector3(0, 0, hl - 0.7f);
-            b.Mat = MeshBuilder.MatMatte;
-            b.AddBox(new Vector3(0, 0.25f, hl - 0.35f), new Vector3(2f, 0.5f, 0.5f), Trim * 1.6f, Quaternion.identity);
-            for (int k = -1; k <= 1; k++) glow.AddBox(new Vector3(k * 0.62f, 0.53f, hl - 0.4f), new Vector3(0.5f, 0.02f, 0.32f), ScreenGlow, Quaternion.Euler(-15, 0, 0));
             int seatCount = Mathf.Max(1, crew);
             for (int s = 0; s < seatCount; s++)
             {
@@ -381,8 +389,8 @@ namespace Rocket
             hatchAt = new Vector3(0, 0, -hl + 0.5f);
             b.Mat = MeshBuilder.MatPaint;
             int s0 = b.v.Count;
-            b.AddFrustum(0.05f, 0f, 0.24f, 0.24f, new Color(0.9f, 0.6f, 0.15f), 14, true, false);
-            XfLocal(b, s0, new Vector3(0, 0.8f, -hl + 0.06f), Quaternion.Euler(90, 0, 0));
+            b.AddFrustum(0.05f, 0f, 0.6f, 0.6f, new Color(0.6f, 0.62f, 0.65f), 20, true, false);   // the door (its wheel: FlightCabin)
+            XfLocal(b, s0, new Vector3(0, 0.8f, -hl + 0.0f), Quaternion.Euler(90, 0, 0));
             for (int k = 0; k < 3; k++) glow.AddBox(new Vector3(0, h - 0.02f, -hl + 1.5f + k * 2.5f), new Vector3(0.9f, 0.02f, 0.9f), new Color(1f, 0.95f, 0.85f) * 0.45f, Quaternion.identity);
         }
 
