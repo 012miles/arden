@@ -143,6 +143,7 @@ namespace Rocket
         void StartFlight()
         {
             wanderTimer = 0;
+            HookArdlingViews();   // milestone 42
             if (audio == null) audio = new FlightAudio(root.farCam.gameObject);
             U.SpawnRescues(root.bodies);
             commTimer = 0;
@@ -1416,8 +1417,8 @@ namespace Rocket
         void SpawnBoom(CelestialBody b, Vector3d rel, float size)
         {
             if (active != null) audio?.Boom(b == active.body ? Vector3d.Distance(rel, active.pos) : double.MaxValue);
-            // milestone 35: a cluster of bursts going off one after another, not one round flash
-            int n = size > 12 ? 7 : 4;
+            // (milestone 42: no more glowing spheres: the light, the ring, the fire and smoke make the blast, Explosions.Blast)
+            int n = 0;
             for (int k = 0; k < n; k++)
             {
                 var go = new GameObject("Explosion");
@@ -1430,7 +1431,8 @@ namespace Rocket
             if (active != null && b == active.body)
             {
                 double alt = rel.magnitude - b.radius;
-                Smoke.Burst((b.AbsolutePosition(renderUt) + rel - originAbs).ToFloat(), size * 0.45f, b.HasAtmosphere && b.PressureAtm(alt) > 0.02);   // (milestone 35: smaller, so the wreckage shows)
+                Explosions.Blast((b.AbsolutePosition(renderUt) + rel - originAbs).ToFloat(), rel.normalized.ToFloat(), size * 0.45f,
+                    b.HasAtmosphere && b.PressureAtm(alt) > 0.02, alt - LaunchSite.SurfaceHeight(b, b.InertialToFixed(rel, ut).normalized) < size * 2.5);   // (milestone 42: a richer blast)
             }
         }
 

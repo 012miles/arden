@@ -60,7 +60,7 @@ namespace Rocket.EditorTools
         static string GuardsTest()
         {
             var big = Drones.Guards("tal.camp", 7);
-            Check(big.Count == 3 && big[0] == DroneKind.Warden && big.Skip(1).All(k => k == DroneKind.Scout), "a big outpost: a warden and two scouts");
+            Check(big[0] == DroneKind.Warden && big.Count(k => k == DroneKind.Scout) == 2 && big.Count(k => k == DroneKind.Shiftling) == 1 && big.Count == 4, "a big outpost: a warden and two scouts (and since milestone 42 a Shiftling among them)");
             for (int s = 0; s < 30; s++)
             {
                 var g = Drones.Guards("site.tal." + (s % 8), s);

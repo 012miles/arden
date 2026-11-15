@@ -154,13 +154,20 @@ namespace Rocket
             new ItemDef { id = "repairkit", name = "Repair kit", kind = ItemKind.Tool, price = 180, rarity = 1, color = C(0.9f, 0.55f, 0.1f), shape = "kit", about = "Fixes a broken part within reach. Anyone can use it, not just engineers." },
             new ItemDef { id = "scanner", name = "Scanner", kind = ItemKind.Tool, price = 160, rarity = 1, color = C(0.3f, 0.8f, 0.7f), shape = "box", about = "Shows what's lying about, and outposts, for a minute." },
             new ItemDef { id = "torch", name = "Torch", kind = ItemKind.Tool, price = 60, rarity = 0, color = C(0.95f, 0.8f, 0.2f), shape = "tube", about = "A light for dark places. Use it again to switch it off." },
-            new ItemDef { id = "zapper", name = "Zapper", kind = ItemKind.Tool, price = 650, rarity = 2, color = C(0.3f, 0.75f, 1f), shape = "tube", about = "Keep it in your backpack: left click zaps the drone you're facing, up to 18 m away." },
+            new ItemDef { id = "zapper", name = "Zapper", kind = ItemKind.Tool, price = 650, rarity = 2, color = C(0.3f, 0.75f, 1f), shape = "tube", about = "Press its number to hold it: left click zaps what you face, up to 18 m away." },
+            // milestone 42: weapons (Sim/Weapons.cs has how hard, how far and how often)
+            new ItemDef { id = "wrench", name = "Wrench", kind = ItemKind.Tool, price = 220, rarity = 0, color = C(0.7f, 0.7f, 0.75f), shape = "bar", about = "A good heavy wrench. Up close it hits twice as hard as a kick." },
+            new ItemDef { id = "baton", name = "Shock baton", kind = ItemKind.Tool, price = 480, rarity = 1, color = C(0.35f, 0.7f, 1f), shape = "tube", about = "Up close: a hard hit with a crackle." },
+            new ItemDef { id = "blaster", name = "Blaster", kind = ItemKind.Tool, price = 950, rarity = 2, color = C(1f, 0.5f, 0.2f), shape = "tube", about = "Quick bolts, up to 30 m. Hold it and click as fast as you like." },
+            new ItemDef { id = "boltrifle", name = "Bolt rifle", kind = ItemKind.Tool, price = 1700, rarity = 3, color = C(0.6f, 0.95f, 0.35f), shape = "tube", about = "Slow to recharge, but one bolt hits very hard, up to 60 m away." },
             new ItemDef { id = "flagpack", name = "Spare flag", kind = ItemKind.Tool, price = 70, rarity = 1, color = C(0.9f, 0.9f, 0.95f), shape = "tube", about = "One more flag to plant." },
             // things worth money
             new ItemDef { id = "meteorite", name = "Meteorite chunk", kind = ItemKind.Valuable, price = 180, rarity = 1, color = C(0.3f, 0.28f, 0.27f), shape = "rock", about = "Fell from space a long time ago. Collectors love them." },
             new ItemDef { id = "probepart", name = "Old probe part", kind = ItemKind.Valuable, price = 120, rarity = 0, color = C(0.75f, 0.7f, 0.4f), shape = "box", about = "From one of the first probes. A museum will pay for it." },
             new ItemDef { id = "geode", name = "Crystal geode", kind = ItemKind.Valuable, price = 420, rarity = 2, color = C(0.6f, 0.4f, 0.85f), shape = "gem", about = "Sparkling crystals inside a dull rock." },
             new ItemDef { id = "patch", name = "Lost mission patch", kind = ItemKind.Valuable, price = 90, rarity = 0, color = C(0.2f, 0.35f, 0.75f), shape = "bar", about = "From a mission nobody remembers." },
+            new ItemDef { id = "shiftsample", name = "Shiftling sample", kind = ItemKind.Valuable, price = 220, rarity = 3, color = new Color(0.55f, 0.2f, 0.75f), shape = "gem", about = "Still faintly glowing. The labs back home pay well for it." },   // milestone 42
+            new ItemDef { id = "hollowheart", name = "Hollow heart", kind = ItemKind.Valuable, price = 2500, rarity = 3, color = new Color(0.85f, 0.25f, 1f), shape = "gem", about = "The core of a Hollow, beaten in its own wreck. Very rare, very valuable." },   // milestone 42
             new ItemDef { id = "dronecore", name = "Drone core", kind = ItemKind.Valuable, price = 150, rarity = 3, color = C(0.95f, 0.35f, 0.3f), shape = "gem", about = "What made a rogue drone tick. Worth a fair bit." },
             new ItemDef { id = "coin", name = "Ancient Ardling coin", kind = ItemKind.Valuable, price = 900, rarity = 3, color = C(0.95f, 0.8f, 0.3f), shape = "gem", about = "Nobody knows how it got here." },
             // upgrades
@@ -177,11 +184,14 @@ namespace Rocket
         static readonly float[] RarityWeight = { 60, 28, 10, 2 };
 
         /// <summary>What a search turns up: 2-5 things, picked by rarity (the same each time for the same seed).</summary>
+        /// <summary>Milestone 42: what only comes from beating drones, Shiftlings and Hollows (not loot, the machine or the shop).</summary>
+        public static bool DropOnly(string id) => id == "dronecore" || id == "shiftsample" || id == "hollowheart";
+
         public static List<string> Loot(int seed, int count = -1)
         {
             var rng = new System.Random(seed);
             if (count < 0) count = 2 + rng.Next(4);
-            var pool = All.Where(d => d.kind != ItemKind.Upgrade || rng.NextDouble() < 0.3).ToList();
+            var pool = All.Where(d => !DropOnly(d.id) && (d.kind != ItemKind.Upgrade || rng.NextDouble() < 0.3)).ToList();
             var outList = new List<string>();
             for (int i = 0; i < count; i++)
             {
@@ -198,7 +208,7 @@ namespace Rocket
         {
             float[] w = { 40, 35, 20, 5 };
             var rng = new System.Random(seed);
-            var pool = All.Where(d => d.id != "dronecore").ToList();
+            var pool = All.Where(d => !DropOnly(d.id)).ToList();   // (only from beating them)
             double r = rng.NextDouble() * pool.Sum(d => w[d.rarity]);
             foreach (var d in pool) { r -= w[d.rarity]; if (r <= 0) return d.id; }
             return pool[0].id;

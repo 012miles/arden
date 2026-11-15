@@ -162,6 +162,25 @@ namespace Rocket
         /// Milestone 35: a thin trail of smoke from a piece of wreckage (a child of it, so it follows), fading out after a few
         /// seconds. Much lighter than a Burst.
         /// </summary>
+        /// <summary>Milestone 42: a rocket's exhaust: a thick white-grey column left behind a moving nozzle.</summary>
+        public static ParticleSystem Exhaust(Transform follow, float size, float seconds)
+        {
+            var ps = Trail(follow, size, seconds);
+            var main = ps.main;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(5f, 10f);
+            main.startSize = new ParticleSystem.MinMaxCurve(size * 0.8f, size * 1.4f);
+            var em = ps.emission; em.rateOverTime = 45f;
+            var col = ps.colorOverLifetime;
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.92f, 0.8f), 0f), new GradientColorKey(new Color(0.85f, 0.85f, 0.86f), 0.15f), new GradientColorKey(new Color(0.7f, 0.7f, 0.72f), 1f) },
+                      new[] { new GradientAlphaKey(0.8f, 0f), new GradientAlphaKey(0.5f, 0.4f), new GradientAlphaKey(0f, 1f) });
+            col.color = g;
+            var sol = ps.sizeOverLifetime;
+            sol.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0, 0.5f), new Keyframe(1, 3.2f)));
+            ps.GetComponent<ParticleSystemRenderer>().maxParticleSize = 6f;
+            return ps;
+        }
+
         public static ParticleSystem Trail(Transform follow, float size, float seconds)
         {
             if (mat == null) mat = new Material(Resources.Load<Shader>("Shaders/RocketSmoke")) { name = "Smoke" };
@@ -343,6 +362,43 @@ namespace Rocket
                 mist.Emit(Mathf.Clamp((int)(size * 6), 8, 40));
             }
             Object.Destroy(go, 6f);
+        }
+
+        /// <summary>Milestone 42: a ring of dust thrown out along the ground (the Hollow's slam; a Shiftling falling). 'up' is the local vertical.</summary>
+        public static void Dust(Vector3 at, Vector3 up, float radius)
+        {
+            if (mat == null) mat = new Material(Resources.Load<Shader>("Shaders/RocketSmoke")) { name = "Smoke" };
+            var go = new GameObject("Dust");
+            go.transform.SetPositionAndRotation(at, Quaternion.FromToRotation(Vector3.up, up));
+            var ps = go.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.loop = false; main.playOnAwake = false; main.duration = 1f;
+            main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
+            main.simulationSpace = ParticleSystemSimulationSpace.Custom;
+            main.customSimulationSpace = Anchor;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2.4f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(radius * 0.8f, radius * 1.6f);
+            main.startSize = new ParticleSystem.MinMaxCurve(radius * 0.18f, radius * 0.4f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startColor = new Color(0.62f, 0.55f, 0.45f, 0.7f);
+            main.gravityModifier = -0.02f;
+            var em = ps.emission; em.rateOverTime = 0f;
+            var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Circle; shape.radius = Mathf.Max(0.3f, radius * 0.15f); shape.radiusThickness = 0f;
+            shape.rotation = new Vector3(90f, 0, 0);   // (the circle lies flat on the ground)
+            var drag = ps.limitVelocityOverLifetime; drag.enabled = true; drag.limit = 0.5f; drag.dampen = 0.25f;
+            var col = ps.colorOverLifetime; col.enabled = true;
+            var g = new Gradient();
+            g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.8f, 0.78f, 0.74f), 1f) },
+                      new[] { new GradientAlphaKey(0.75f, 0f), new GradientAlphaKey(0.4f, 0.4f), new GradientAlphaKey(0f, 1f) });
+            col.color = g;
+            var sol = ps.sizeOverLifetime; sol.enabled = true;
+            sol.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0, 0.6f), new Keyframe(1, 2f)));
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = mat; r.renderMode = ParticleSystemRenderMode.Billboard; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+            r.maxParticleSize = 4f;
+            ps.Emit(Mathf.Clamp((int)(radius * 7), 12, 70));
+            Object.Destroy(go, 4f);
         }
 
         /// <summary>

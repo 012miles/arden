@@ -98,7 +98,7 @@ namespace Rocket
             yield return Shot("484_file_menu");
             h.TestShowFile(false);
             // the tutorial, at a few steps
-            foreach (var (stepNo, name) in new[] { (0, "485_tutorial_welcome"), (1, "486_tutorial_parts"), (4, "487_tutorial_tank"), (9, "488_tutorial_launch") })
+            foreach (var (stepNo, name) in new[] { (0, "485_tutorial_welcome"), (1, "486_tutorial_parts"), (4, "487_tutorial_tank"), (7, "487b_tutorial_stages"), (8, "487c_tutorial_undo"), (9, "488_tutorial_launch") })
             {
                 if (stepNo == 4) { h.TutorialClear(); h.TestHold("pod.wren"); h.TestPlace(0, true); }
                 if (stepNo == 9) h.TestPresetStarter();
@@ -113,6 +113,13 @@ namespace Rocket
             Tutorial.TestGoto(11);
             yield return new WaitForSecondsRealtime(0.8f);
             yield return Shot("490_tutorial_flight_height");
+            Tutorial.TestGoto(12);   // (milestone 42: the navball comes in)
+            yield return new WaitForSecondsRealtime(0.8f);
+            yield return Shot("490b_tutorial_flight_navball");
+            Tutorial.TestGoto(15);   // (and then everything)
+            yield return new WaitForSecondsRealtime(0.8f);
+            yield return Shot("490c_tutorial_flight_all");
+            Log($"tutorial: {Tutorial.StepCount} steps; builder shows parts at step 0: {(Tutorial.TestShowsAt(0, Tutorial.Show.Parts))}, at 1: {Tutorial.TestShowsAt(1, Tutorial.Show.Parts)}");
             Tutorial.Stop(false);
             Words.Level = was;
             // multiplayer: the one-screen lobby, and a rocket room's builder with the team panel

@@ -55,11 +55,11 @@ namespace Rocket
         static void DrawBuy(Universe u, Rect body, bool free)
         {
             var c = u.career;
-            var view = new Rect(0, 0, body.width - 20, Items.All.Length * 40 + 30);
+            var view = new Rect(0, 0, body.width - 20, Items.All.Count(x => !Items.DropOnly(x.id)) * 40 + 30);
             scroll = GUI.BeginScrollView(body, scroll, view);
             float y = 0;
             ItemKind? last = null;
-            foreach (var d in Items.All.OrderBy(x => x.kind))
+            foreach (var d in Items.All.Where(x => !Items.DropOnly(x.id)).OrderBy(x => x.kind))   // (milestone 42: not what only comes from beating them)
             {
                 if (last != d.kind) { Ui.Text(new Rect(4, y + 2, 300, 22), $"<color=#f0c860><b>{KindName(d.kind)}</b></color>", Ui.Small); y += 26; last = d.kind; }
                 Ui.Text(new Rect(8, y + 6, 230, 22), d.name, Ui.Small);

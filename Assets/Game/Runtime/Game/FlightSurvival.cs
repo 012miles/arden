@@ -182,7 +182,8 @@ namespace Rocket
                     st.vitals = st.players.Select(q => U.career.VitalsOf(q.name)).Where(x => x != null)
                         .Select(x => new Vitals { name = x.name, health = Mathf.Round(x.health), hunger = Mathf.Round(x.hunger), stamina = Mathf.Round(x.stamina), downedAt = x.downedAt, tired = x.tired }).ToList();
                     st.items = U.items.Select(w => new WorldItem { uid = w.uid, id = w.id, body = w.body, x = w.x, y = w.y, z = w.z, yaw = w.yaw, flying = w.flying }).ToList();
-                    st.drones = drones.Select(d => new Drone { uid = d.uid, kind = d.kind, body = d.body, home = d.home, x = d.x, y = d.y, z = d.z, hx = d.hx, hy = d.hy, hz = d.hz, health = d.health, state = d.state, target = d.target }).ToList();
+                    st.drones = drones.Select(d => new Drone { uid = d.uid, kind = d.kind, body = d.body, home = d.home, x = d.x, y = d.y, z = d.z, hx = d.hx, hy = d.hy, hz = d.hz, health = d.health, state = d.state, target = d.target,
+                        look = d.look, phase = d.phase, slams = d.slams, maxHealth = d.maxHealth }).ToList();   // (milestone 42: a Shiftling's disguise, the boss's phase and slams)
                     Coop.Current.room.Touch();
                 }
             }
@@ -259,7 +260,14 @@ namespace Rocket
         void UsePackKeys(string me)
         {
             K[] keys = { K.Alpha1, K.Alpha2, K.Alpha3, K.Alpha4, K.Alpha5, K.Alpha6, K.Alpha7, K.Alpha8 };
-            for (int i = 0; i < keys.Length; i++) if (In.Down(keys[i])) ItemOp(me, "use", i.ToString(CultureInfo.InvariantCulture));
+            for (int i = 0; i < keys.Length; i++)
+            {
+                if (!In.Down(keys[i])) continue;
+                // (milestone 42: a weapon goes in hand here too, so this game knows what you hold)
+                var pk = Coop.Active && remote ? Coop.Current.room.State.packs.Find(p => p.name == me)?.items : PackOf(me, out _);
+                if (pk != null && i < pk.Count && Weapons.IsWeapon(pk[i])) heldBy[me ?? ""] = pk[i];
+                ItemOp(me, "use", i.ToString(CultureInfo.InvariantCulture));
+            }
         }
 
         void TogglePack() { packOpen = !packOpen; }
@@ -357,7 +365,7 @@ namespace Rocket
                     return;
                 }
                 case "use": UseFromPack(who, pack, n, eva); return;
-                case "attack": DoAttack(who, n); return;              // milestone 40
+                case "attack": { var f = (arg ?? "").Split('|'); int.TryParse(f[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int au); DoAttack(who, au, f.Length > 1 ? f[1] : null); return; }   // milestone 40 (42: with a weapon)
                 case "buy": case "sell": DoTrade(who, op, arg); return;
                 case "revive":
                 {
@@ -382,6 +390,14 @@ namespace Rocket
             var d = Items.Get(pack[n]);
             var vit = U.career.VitalsOf(who);
             if (d == null || vit == null) return;
+            if (Weapons.IsWeapon(d.id))
+            {
+                // milestone 42: its number puts a weapon in hand
+                var w = Weapons.Get(d.id);
+                heldBy[who] = d.id;
+                TellPlayer(who, $"{w.name} in hand: left click to {w.verb}" + (w.ranged ? $" (up to {w.reach:0} m)." : " (up close)."), 2.5f);
+                return;
+            }
             string msg = null;
             bool keep = false;
             switch (d.id)
@@ -650,6 +666,11 @@ namespace Rocket
                 Bar(r.y + 26, "Health", vit.health, vit.health < 30 ? new Color(1f, 0.35f, 0.25f) : new Color(0.45f, 0.9f, 0.5f));
                 Bar(r.y + 46, "Food", vit.hunger, vit.hunger < 20 ? new Color(1f, 0.55f, 0.2f) : new Color(0.95f, 0.8f, 0.35f));
                 Bar(r.y + 66, "Stamina", vit.stamina, vit.tired ? new Color(0.6f, 0.6f, 0.65f) : new Color(0.4f, 0.75f, 1f));
+                if (active.IsEva)
+                {
+                    var hw = HeldWeapon(me);   // milestone 42
+                    Ui.Text(new Rect(r.x + 2, r.y - 20, r.width + 40, 18), hw.id == "kick" ? "<color=#9aa4ae>In hand: nothing (click kicks)</color>" : $"In hand: <b>{hw.name}</b> <color=#9aa4ae>(1-8 picks)</color>", Ui.Small);
+                }
                 if (vit.Down)
                 {
                     double left = Survival.DownSeconds - (ut - vit.downedAt);

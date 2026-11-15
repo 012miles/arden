@@ -14,7 +14,16 @@ namespace Rocket
     public static class Tutorial
     {
         enum Wait { Next, Command, Tank, Engine, Chute, Launch, Lit, Climb, MapOpen, MapClosed }
-        enum Spot { None, Parts, Search, Rocket, Stages, Undo, Launch, Telemetry, Bottom }
+        enum Spot { None, Parts, Search, Rocket, Stages, Undo, Launch, Telemetry, Bottom, Navball }
+
+        /// <summary>
+        /// Milestone 42 (captaincarl24: "hide everything and show it once you get to that step ... once you load in you only see
+        /// the rocket, no gui; the first step shows the parts list ... then another thing with the other two"): what of the
+        /// screen each step lets you see. The builder starts empty but for the hangar; each step brings in the one thing it's
+        /// about (the parts list, then the stages, then the top bar with Undo and LAUNCH). In flight: the LAUNCH button, then
+        /// the height and speed, then the navball, then the top bar; the rest comes back at the end.
+        /// </summary>
+        [Flags] public enum Show { None = 0, Parts = 1, Stages = 2, TopBar = 4, Extras = 8, Telemetry = 16, Navball = 32, Controls = 64, All = ~0 }
 
         struct Step
         {
@@ -22,58 +31,59 @@ namespace Rocket
             public Spot spot;
             public Wait wait;
             public bool flight;
+            public Show show;
         }
 
         static readonly Step[] Steps =
         {
-            new Step { title = "Welcome to the rocket builder!", spot = Spot.None, wait = Wait.Next,
-                text = "This quick tutorial shows you how to build a rocket and fly it, one step at a time. Skip it whenever you like.",
-                easy = "Let's build a rocket and fly it together, one step at a time. You can skip this whenever you like." },
-            new Step { title = "The parts list", spot = Spot.Parts, wait = Wait.Next,
+            new Step { title = "Welcome to the rocket builder!", spot = Spot.None, wait = Wait.Next, show = Show.None,
+                text = "This is the hangar, where rockets are built. The buttons and panels will appear one at a time as you need them. Skip whenever you like.",
+                easy = "This is the hangar, where you build rockets. Everything you need will show up one step at a time. You can skip this whenever you like." },
+            new Step { title = "The parts list", spot = Spot.Parts, wait = Wait.Next, show = Show.Parts,
                 text = "Everything you can build with is here. Point at a part to read what it does.",
                 easy = "These are all the parts you can use. Point at one to see what it does." },
-            new Step { title = "Search", spot = Spot.Search, wait = Wait.Next,
+            new Step { title = "Search", spot = Spot.Search, wait = Wait.Next, show = Show.Parts,
                 text = "Looking for something? Type here to find it: try \"engine\" or \"fin\".",
                 easy = "Type here to find a part, like \"engine\" or \"fin\"." },
-            new Step { title = "Start at the top: a capsule", spot = Spot.Parts, wait = Wait.Command, search = "command",
+            new Step { title = "Start at the top: a capsule", spot = Spot.Parts, wait = Wait.Command, search = "command", show = Show.Parts,
                 text = "Click the Wren Capsule, then click in the middle of the hangar to put it down. It's the brain of the rocket, and holds the crew.",
                 easy = "Click the Wren Capsule, then click in the middle of the hangar to put it down. It steers the rocket and carries the crew." },
-            new Step { title = "Now a fuel tank", spot = Spot.Rocket, wait = Wait.Tank, search = "tank",
+            new Step { title = "Now a fuel tank", spot = Spot.Rocket, wait = Wait.Tank, search = "tank", show = Show.Parts,
                 text = "Click a tank in the list (the FT-2 is a good size), then click the green dot under the capsule.",
                 easy = "Click a fuel tank in the list, then click the green dot under the capsule to stick it on." },
-            new Step { title = "Then an engine", spot = Spot.Rocket, wait = Wait.Engine, search = "kestrel",
+            new Step { title = "Then an engine", spot = Spot.Rocket, wait = Wait.Engine, search = "kestrel", show = Show.Parts,
                 text = "Click the Kestrel Lifter and put it under the tank. Tip: a part stays in your hand after you place it, so you can add more. Right-click to put it down.",
                 easy = "Click the Kestrel Lifter and stick it under the tank. The part stays in your hand for more: right-click to let go." },
-            new Step { title = "A parachute on top", spot = Spot.Rocket, wait = Wait.Chute, search = "parachute",
+            new Step { title = "A parachute on top", spot = Spot.Rocket, wait = Wait.Chute, search = "parachute", show = Show.Parts,
                 text = "Put the Main Parachute on the very top of the capsule, so it lands softly when the flight's over.",
                 easy = "Stick the parachute on the very top of the capsule, so it lands softly." },
-            new Step { title = "The stages", spot = Spot.Stages, wait = Wait.Next,
+            new Step { title = "The stages", spot = Spot.Stages, wait = Wait.Next, show = Show.Parts | Show.Stages,
                 text = "These are your stages: what happens each time you press SPACE in flight. The numbers show how much push and fuel each one has.",
                 easy = "These are the steps of your flight: each press of SPACE does the next one." },
-            new Step { title = "Oops? Undo", spot = Spot.Undo, wait = Wait.Next,
+            new Step { title = "Oops? Undo", spot = Spot.Undo, wait = Wait.Next, show = Show.Parts | Show.Stages | Show.TopBar,
                 text = "Undo puts back your last change (Ctrl+Z, or Cmd+Z on a Mac). Backspace deletes the part under the mouse.",
                 easy = "Undo takes back your last change (Ctrl+Z, or Cmd+Z on a Mac). Backspace deletes the part under the mouse." },
-            new Step { title = "Ready to fly!", spot = Spot.Launch, wait = Wait.Launch,
+            new Step { title = "Ready to fly!", spot = Spot.Launch, wait = Wait.Launch, show = Show.Parts | Show.Stages | Show.TopBar | Show.Extras,
                 text = "Press LAUNCH to take your rocket to the pad.",
                 easy = "Press LAUNCH to take your rocket to the launch pad." },
             // ---- in flight
-            new Step { title = "Light the engine", spot = Spot.Bottom, wait = Wait.Lit, flight = true,
+            new Step { title = "Light the engine", spot = Spot.Bottom, wait = Wait.Lit, flight = true, show = Show.None,
                 text = "Press SPACE to start the engine and lift off!",
                 easy = "Press SPACE to start the engine and take off!" },
-            new Step { title = "How high, how fast", spot = Spot.Telemetry, wait = Wait.Next, flight = true,
+            new Step { title = "How high, how fast", spot = Spot.Telemetry, wait = Wait.Next, flight = true, show = Show.Telemetry,
                 text = "This box shows your altitude and how fast you're climbing. Space starts at 70 km.",
                 easy = "This shows how high you are and how fast you're going up. Space starts at 70 km." },
-            new Step { title = "Steering", spot = Spot.None, wait = Wait.Climb, flight = true,
-                text = "A and D lean the rocket left and right, W and S tip it forward and back. Keep it pointing up for now: watch it climb past 3 km.",
-                easy = "A and D lean left and right, W and S tip forward and back. Keep it pointing up and watch it climb past 3 km." },
-            new Step { title = "The map", spot = Spot.None, wait = Wait.MapOpen, flight = true,
+            new Step { title = "Steering", spot = Spot.Navball, wait = Wait.Climb, flight = true, show = Show.Telemetry | Show.Navball,
+                text = "This ball shows which way the rocket points. A and D lean it left and right, W and S tip it forward and back. Keep it pointing up for now: watch it climb past 3 km.",
+                easy = "This ball shows which way you're pointing. A and D lean left and right, W and S tip forward and back. Keep it pointing up and watch it climb past 3 km." },
+            new Step { title = "The map", spot = Spot.None, wait = Wait.MapOpen, flight = true, show = Show.Telemetry | Show.Navball | Show.TopBar,
                 text = "Press M to see the map: the line is the path your rocket will follow.",
                 easy = "Press M to see the map: the line shows where your rocket is going." },
-            new Step { title = "Back to the rocket", spot = Spot.None, wait = Wait.MapClosed, flight = true,
+            new Step { title = "Back to the rocket", spot = Spot.None, wait = Wait.MapClosed, flight = true, show = Show.Telemetry | Show.Navball | Show.TopBar,
                 text = "Press M again to come back to your rocket.",
                 easy = "Press M again to come back to your rocket." },
-            new Step { title = "You've got it!", spot = Spot.None, wait = Wait.Next, flight = true,
-                text = "When the engine runs out, the capsule falls back: the parachute opens by itself low down (or press SPACE). How to play, in the pause menu (ESC), explains everything else. Have fun!",
+            new Step { title = "You've got it!", spot = Spot.None, wait = Wait.Next, flight = true, show = Show.All,
+                text = "Here's everything else: the throttle and power down here, the stages on the right. When the engine runs out, the capsule falls back: the parachute opens by itself low down (or press SPACE). How to play, in the pause menu (ESC), explains everything else. Have fun!",
                 easy = "When the fuel runs out the capsule falls back, and the parachute opens near the ground. Press ESC for How to play if you get stuck. Have fun!" },
         };
 
@@ -82,6 +92,11 @@ namespace Rocket
         static float stepStart;
 
         public static bool Active => step >= 0 && step < Steps.Length;
+
+        /// <summary>What of the builder shows now (everything when the tutorial isn't on, or once it's in flight).</summary>
+        public static bool BuilderShows(Show what) => !Active || Steps[step].flight || (Steps[step].show & what) != 0;
+        /// <summary>What of the flight screen shows now (everything when the tutorial isn't on its flight steps).</summary>
+        public static bool FlightShows(Show what) => !Active || !Steps[step].flight || (Steps[step].show & what) != 0;
         public static int StepIndex => step;
         public static int StepCount => Steps.Length;
         public static string StepTitle => Active ? Steps[step].title : null;
@@ -89,14 +104,15 @@ namespace Rocket
         /// <summary>Finished or skipped once (saved): it doesn't start by itself again.</summary>
         public static bool Done
         {
-            get { try { return PlayerPrefs.GetInt("tutorialDone", 0) == 1; } catch { return true; } }
-            set { if (Universe.IsAutotest) return; try { PlayerPrefs.SetInt("tutorialDone", value ? 1 : 0); PlayerPrefs.Save(); } catch { } }
+            get { try { return PlayerPrefs.GetInt("tutorialDone2", 0) == 1; } catch { return true; } }   // (milestone 42: the new step-by-step one plays again once)
+            set { if (Universe.IsAutotest) return; try { PlayerPrefs.SetInt("tutorialDone2", value ? 1 : 0); PlayerPrefs.Save(); } catch { } }
         }
 
         /// <summary>Starts from the beginning (How to play's "Play the tutorial", or a first game).</summary>
         public static void Start() { step = 0; stepStart = Time.unscaledTime; offered = true; mapSeen = false; }
         public static void Stop(bool finished) { step = -1; Done = true; }
         /// <summary>For the screenshot tour: straight to a step.</summary>
+        public static bool TestShowsAt(int i, Show what) => (Steps[Mathf.Clamp(i, 0, Steps.Length - 1)].show & what) != 0;
         public static void TestGoto(int i) { step = Mathf.Clamp(i, 0, Steps.Length - 1); stepStart = Time.unscaledTime; offered = true; }
 
         static VesselDesign lastDesign;
@@ -179,7 +195,7 @@ namespace Rocket
                 case Wait.MapOpen: if (f.mapView) { mapSeen = true; Advance(); return; } break;
                 case Wait.MapClosed: if (!f.mapView) { Advance(); return; } break;
             }
-            Rect target = s.spot == Spot.Telemetry ? f.TelemetryRect : default;
+            Rect target = s.spot == Spot.Telemetry ? f.TelemetryRect : s.spot == Spot.Navball ? f.NavballRect : default;
             int r = Draw(s, target, s.wait == Wait.Next || (s.wait == Wait.Climb && Time.unscaledTime - stepStart > 25f), null);
             if (r == 1) Advance();
         }

@@ -198,7 +198,7 @@ namespace Rocket.EditorTools
         static string UpdateLogTrimTest()
         {
             var all = UpdateLog.All;
-            Check(all.Last().n == 1 && all.First().n == 41, "the log should run from update 41 down to the first version");
+            Check(all.Last().n == 1 && all.First().n == UpdateLog.Latest.n && all.First().n >= 41, "the log should run from the newest update down to the first version");
             Check(!all.Any(u => u.n > 1 && u.n < 31), "older updates are still listed: " + string.Join(",", all.Where(u => u.n > 1 && u.n < 31).Select(u => u.n)));
             return string.Join(", ", all.Select(u => u.n));
         }

@@ -10,7 +10,7 @@ namespace Rocket
     /// games, and settings. Behind it (milestone 23) the camera drifts round the space center on a sunny morning: the
     /// last rocket built stands on the pad, with the assembly building, the campus and the airport beyond.
     /// </summary>
-    public class MenuMode
+    public partial class MenuMode
     {
         readonly GameRoot root;
         enum Page { Main, New, Load, Settings, Credits, Help, Controls, Single, Updates, Defs }
@@ -71,6 +71,7 @@ namespace Rocket
             padRocket = null;
             centre = false;
             if (glow != null) glow.SetActive(false);   // milestone 41
+            ClearAmbient();                            // milestone 42
         }
 
         // ---------------------------------------------------------------- the space centre, clickable (milestone 25)
@@ -342,6 +343,7 @@ namespace Rocket
             var cam = root.farCam;
             cam.transform.position = camPos;
             cam.transform.rotation = Quaternion.LookRotation(look, upF);
+            if (siteView != null) UpdateAmbient(siteView, cam, Time.unscaledDeltaTime);   // milestone 42: rockets, planes, people, traffic
             cam.nearClipPlane = 5f;
             cam.farClipPlane = 1e9f;
             cam.cullingMask = 1 << GameRoot.LayerFar;

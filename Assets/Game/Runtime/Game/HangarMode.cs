@@ -1940,6 +1940,10 @@ namespace Rocket
             // the open middle between the parts list and the stages (and the team's panel in a rocket room)
             float midL = 300, midR = coop ? W - 740 : W - 390;
 
+            // milestone 42: in the tutorial, each part of the screen appears when its step comes (hidden: drawn far off screen,
+            // so it neither shows nor takes clicks)
+            bool hideTop = !Tutorial.BuilderShows(Tutorial.Show.TopBar);
+            if (hideTop) GUI.BeginGroup(new Rect(-20000, -20000, W, H));
             // Top bar (milestone 24: tidier; milestone 32: fits any width). Row 1: title, name, rocket/plane, money on the
             // left; file, undo, menu, launch site and LAUNCH on the right.
             Ui.Box(new Rect(0, 0, W, 88));
@@ -2073,12 +2077,14 @@ namespace Rocket
                 rx -= 6;
             }
             if (goCentre) { root.ShowCentre(); return; }   // the site from the air (milestone 25)
+            if (hideTop) GUI.EndGroup();
 
             partsRect = new Rect(10, 96, 280, H - 106);
-            DrawPartsPanel(partsRect);
+            if (Tutorial.BuilderShows(Tutorial.Show.Parts)) DrawPartsPanel(partsRect);
             StagePanelRect = new Rect(W - 380, 96, 370, H - 106);
-            DrawStagePanel(StagePanelRect);
-            if (markers && !easy && !showVessels && !showLoad && !showPresets && !painting) DrawCenterMarkers();   // (a menu dropping over the legend hides it)
+            if (Tutorial.BuilderShows(Tutorial.Show.Stages)) DrawStagePanel(StagePanelRect);
+            bool extras = Tutorial.BuilderShows(Tutorial.Show.Extras);
+            if (markers && !easy && !showVessels && !showLoad && !showPresets && !painting && extras) DrawCenterMarkers();   // (a menu dropping over the legend hides it)
             if (held != null) DrawNodeMarkers();
             if (menuPart >= 0 && menuPart < design.nodes.Count) DrawPartMenu();
             checklistBottom = 0;
@@ -2088,7 +2094,7 @@ namespace Rocket
 
             string blocker = validation ?? careerProblem;
             float guideBottom = H - 36;
-            if ((warnings.Count > 0 || blocker != null) && !showPresets)   // (the Presets window covers the middle)
+            if ((warnings.Count > 0 || blocker != null) && !showPresets && extras)   // (the Presets window covers the middle; milestone 42: not mid-tutorial)
             {
                 var lines = blocker != null ? new List<string> { blocker } : warnings;
                 float wh = 34 + lines.Count * 19;

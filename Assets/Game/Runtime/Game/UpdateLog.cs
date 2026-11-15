@@ -23,6 +23,17 @@ namespace Rocket
         /// <summary>Every update, newest first (milestone 41, captaincarl24: just the first version and the latest updates).</summary>
         public static readonly Update[] All =
         {
+            U(42, "Nov 15, 2026", "Shiftlings, the Hollow and weapons",
+                "Shiftlings: something in the old wrecks copies Ardlings. They walk about in ordinary suits (in a room, sometimes in a teammate's look) and turn when you get close",
+                "Lurkers: Shiftlings gone feral, fast on all fours",
+                "Boss fights: the Hollow waits in the wrecks on Tal, Ochre and Rime. It slams the ground, calls its Shiftlings when hurt and gets angrier near the end, with a big health bar",
+                "Weapons: a wrench and a shock baton up close, the blaster and the bolt rifle from afar (and the zapper). Press a weapon's number to hold it, click to use it",
+                "Ardlings hold their weapon in hand, aim it, swing and kick; they crouch low, carry with both arms, lie flat when knocked out and look round when idle",
+                "The title screen and the building picker are busy: rockets lifting off from the other pads, planes overhead, technicians and trucks round the pad",
+                "Bigger, better explosions: a flash of light, a shockwave ring, a churning fireball, burning debris on smoke trails, embers and a smoke column",
+                "A new tutorial that starts with just your rocket and brings in each part of the screen when it's that step's turn (it plays again once, and File > Tutorials replays it)",
+                "More in the cabin: a snack box, a hot-drink maker, a desk toy, a guitar, a crew photo, a poster of the worlds, a mirror, a toolbox and a handheld game",
+                "Drone cores, samples and Hollow hearts only come from beating them (no more buying them at the store)"),
             U(41, "Nov 15, 2026", "Fixes, water and landings",
                 "Real water: ships float on the parts under water, capsules sit upright, tall rockets tip onto their side, heavy engines sink",
                 "Splashdowns plunge in and bob back up with spray; engines push you across the sea and lift you off it; drifting ships wash up on beaches",

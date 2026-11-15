@@ -53,6 +53,8 @@ namespace Rocket
 
         /// <summary>Where the height-and-speed box is (the tutorial points at it).</summary>
         public Rect TelemetryRect { get; private set; }
+        /// <summary>Where the navball is (milestone 42: the tutorial points at it).</summary>
+        public Rect NavballRect { get; private set; }
 
         public void OnGUI()
         {
@@ -94,6 +96,10 @@ namespace Rocket
             var body = v.body;
             Orbit orbit = trajectory.Count > 0 ? trajectory[0].orbit : null;
 
+            // milestone 42: the tutorial's flight steps bring the screen in a piece at a time (hidden: drawn far off screen)
+            bool hideTel = !Tutorial.FlightShows(Tutorial.Show.Telemetry), hideTop = !Tutorial.FlightShows(Tutorial.Show.TopBar);
+            bool hideCtl = !Tutorial.FlightShows(Tutorial.Show.Controls), hideNav = !Tutorial.FlightShows(Tutorial.Show.Navball);
+            if (hideTel) GUI.BeginGroup(new Rect(-20000, -20000, W, H));
             // ---- Telemetry (milestone 24: the basics, the rest under "More", in the player's words)
             double alt = v.Altitude;
             Vector3d up = v.pos.normalized;
@@ -158,6 +164,8 @@ namespace Rocket
                 if (!easy && Ui.Press(new Rect(tr.xMax - 70, tr.yMax - 24, 60, 18), HudMore ? "Less" : "More", Ui.ButtonSmall)) HudMore = !HudMore;
             }
 
+            if (hideTel) GUI.EndGroup();
+            if (hideTop) GUI.BeginGroup(new Rect(-20000, -20000, W, H));
             // ---- Clock and warp
             var cr = new Rect(W / 2 - 150, 10, 300, 52);
             Ui.Box(cr);
@@ -180,6 +188,8 @@ namespace Rocket
             float hx = cr.x - (v.HasMiningKit ? 358 : 232);
             if (hx >= 310 && Ui.Press(new Rect(hx, cr.y + 12, 100, 28), $"Hide UI ({In.Name(K.F1)})", Ui.ButtonSmall)) Ui.ToggleHidden();
 
+            if (hideTop) GUI.EndGroup();
+            if (hideCtl) GUI.BeginGroup(new Rect(-20000, -20000, W, H));
             // ---- Controls / gauges (bottom left): four bars, then only the lines that matter right now
             bool probe = v.IsControllable && v.CrewCount == 0;
             double ecCap = v.EcCapacity, ec = v.EcStored;
@@ -239,8 +249,9 @@ namespace Rocket
                 if (Ui.Press(new Rect(tx + 2, kr.yMax - 40, bw - 2, 30), Words.T("Abort", "Abort", "Eject"), Ui.ButtonStopSmall)) DoAbort();   // red for stop (milestone 35)
             }
 
-            DrawNavball(W, H, v);
-            float stagesBottom = DrawStages(W, v);
+            if (hideCtl) GUI.EndGroup();
+            if (!hideNav) DrawNavball(W, H, v);
+            float stagesBottom = hideCtl ? 60 : DrawStages(W, v);
             float rightY = stagesBottom + 10;
             if (node != null && node.valid) { float mh = laterNodes.Count > 0 ? 286 : 264; DrawManeuverPanel(new Rect(W - 390, rightY, 380, mh)); rightY += mh + 10; }
             else if (trajectory.Count > 0 && !v.landed && v.hasLaunched && !Words.Easy)
@@ -249,13 +260,13 @@ namespace Rocket
                     AddNodeAtNextApsis();
                 rightY += 30;
             }
-            DrawGuide(W, rightY);
+            if (!hideCtl) DrawGuide(W, rightY);
 
             if (mapView) DrawMapOverlay();
-            if (U.career.IsCareer) DrawContractTracker(W, H);
+            if (U.career.IsCareer && !hideCtl) DrawContractTracker(W, H);
 
             float popTop = 70;   // where pop-up panels and messages start: under the help bar when it's showing
-            if (HelpVisible && !paused)   // (milestone 32: the pause menu used to sit on top of it)
+            if (HelpVisible && !paused && !hideTop)   // (milestone 32: the pause menu used to sit on top of it)
             {
                 string N(K k) => In.Name(k);
                 string warpKeys = $"{N(K.Comma)} {N(K.Period)} {N(K.Slash)}";
@@ -335,6 +346,7 @@ namespace Rocket
         {
             const float size = 210;
             var panel = new Rect(W / 2 - 200, H - size - 52, 400, size + 46);
+            NavballRect = panel;
             Ui.Box(panel);
 
             // Speed readout (click to change mode). Switches to Target by itself when a target vessel is within 5 km.

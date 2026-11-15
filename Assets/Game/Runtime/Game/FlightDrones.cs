@@ -58,7 +58,22 @@ namespace Rocket
                 var dir = d.Pos.normalized;
                 double ground = b.radius + LaunchSite.SurfaceHeight(b, dir);
                 var was = d.state;
-                var hit = Drones.Step(d, dt, targets, ground);
+                var slam = d.Def.boss ? new List<(string who, float dmg)>() : null;   // (milestone 42)
+                bool summon = false;
+                var hit = Drones.Step(d, dt, targets, ground, slam, ref summon);
+                if (slam != null)
+                    foreach (var (sw, sd) in slam) HurtArdling(U.career.VitalsOf(sw), sd * (easy ? 0.5f : 1f), EvaOf(sw), "the Hollow's slam");
+                if (summon && drones.Count(x => x.home == d.home && x.kind == DroneKind.Shiftling && x.state != DroneState.Down) < 6)
+                {
+                    for (int k = 0; k < 2; k++)
+                    {
+                        var s = SpawnDrone(DroneKind.Shiftling, b, d.home, d.Pos + RandomFlat(d.Pos, 6), d.Home);
+                        s.state = DroneState.Chase; s.target = d.target;
+                    }
+                    Show("The Hollow calls its Shiftlings!", 3f, true);
+                }
+                if (d.kind == DroneKind.Shiftling && was == DroneState.Idle && d.state == DroneState.Alert) Show("One of the \"crew\" turns: it's a Shiftling!", 2.5f, true);
+                if (d.Def.boss && was == DroneState.Idle && d.state == DroneState.Alert) Show($"{d.Def.name} rises out of the wreck!", 3.5f, true);
                 if (d.kind == DroneKind.Warden && was != DroneState.Chase && d.state == DroneState.Chase && wardensCalled.Add(d.uid))
                 {
                     SpawnDrone(DroneKind.Scout, b, d.home, d.Pos + RandomFlat(d.Pos, 4), d.Home);
@@ -98,8 +113,22 @@ namespace Rocket
         {
             var d = new Drone { uid = nextDroneUid++, kind = k, body = b.name, home = home, health = Drones.Get(k).health, state = DroneState.Idle };
             d.Pos = at; d.Home = at - (at - homePos) * 0.2;
+            if (k == DroneKind.Shiftling) d.look = PickDisguise(d.uid);   // milestone 42
+            if (Drones.Get(k).boss) { d.maxHealth = Drones.BossHealth(Coop.Active ? Coop.Current.room.State.players.Count : 1); d.health = d.maxHealth; d.slamT = 3f; d.summonT = 6f; }
             drones.Add(d);
             return d;
+        }
+
+        /// <summary>Milestone 42: what a Shiftling wears while it passes as crew: in a room, often a teammate's look.</summary>
+        string PickDisguise(int seed)
+        {
+            var rng = new System.Random(seed * 7919 + U.WeatherSeed);
+            if (Coop.Active && rng.NextDouble() < 0.5)
+            {
+                var looks = Coop.Current.room.State.players.Select(p => p.look).Where(l => !string.IsNullOrEmpty(l)).ToList();
+                if (looks.Count > 0) return looks[rng.Next(looks.Count)];
+            }
+            return Ardlings.Code(rng.Next(Ardlings.SuitCount), rng.Next(Ardlings.PaperCount), rng.Next(Ardlings.Faces), rng.NextDouble() < 0.6 ? 0 : rng.Next(Ardlings.Hats));
         }
 
         /// <summary>A drone knocked out: it drops a drone core (and maybe more); the last guard down clears the place.</summary>
@@ -108,10 +137,17 @@ namespace Rocket
             var b = root.bodies.FirstOrDefault(x => x.name == d.body);
             if (b == null) return;
             var dir = d.Pos.normalized;
-            SettleItem(U.AddItem("dronecore", b, d.Pos, UnityEngine.Random.Range(0f, 360f)), b);
-            if (UnityEngine.Random.value < 0.4f) SettleItem(U.AddItem(Items.Loot(d.uid * 31 + U.nextItemUid, 1)[0], b, d.Pos + RandomFlat(d.Pos, 1.2), 0), b);
-            SpawnBoom(b, b.FixedToInertial(d.Pos, ut), 1.5f);
-            Show($"{by} knocked out the {d.Def.name.ToLowerInvariant()}! It dropped its core.", 3f, true);
+            var def = d.Def;
+            // milestone 42: each kind drops its own (a Shiftling a sample, the Hollow its heart and a pile of loot)
+            SettleItem(U.AddItem(def.drop, b, d.Pos + dir * (def.walker ? 0.4 : 0), UnityEngine.Random.Range(0f, 360f)), b);
+            int extra = def.boss ? 4 : UnityEngine.Random.value < 0.4f ? 1 : 0;
+            for (int i = 0; i < extra; i++) SettleItem(U.AddItem(Items.Loot(d.uid * 31 + U.nextItemUid + i, 1)[0], b, d.Pos + RandomFlat(d.Pos, 1.2 + i), 0), b);
+            if (def.boss) for (int i = 0; i < 2; i++) SettleItem(U.AddItem("shiftsample", b, d.Pos + RandomFlat(d.Pos, 2.5 + i), 0), b);
+            if (def.walker) Smoke.Dust(RenderPoint(b, d.Pos), b.FixedToInertial(dir, renderUt).ToFloat(), def.boss ? 9f : 1.5f);
+            else SpawnBoom(b, b.FixedToInertial(d.Pos, ut), 1.5f);
+            Show(def.boss ? $"{by} beat {def.name}! It left its heart behind: worth a fortune." : def.walker ? $"{by} knocked out the {def.name.ToLowerInvariant()}! It left a sample behind."
+                : $"{by} knocked out the {def.name.ToLowerInvariant()}! It dropped its core.", def.boss ? 6f : 3f, true);
+            if (def.boss) U.career.news.Add($"{by} beat {def.name} at its wreck on {b.name}.");
             Quest(QuestKind.Drones, 1);
             string home = d.home;
             drones.Remove(d);
@@ -130,26 +166,31 @@ namespace Rocket
             attackCool -= Time.unscaledDeltaTime;
             if (!v.landed || packOpen || !In.LeftDown || In.Held(K.LeftAlt) || attackCool > 0 || Ui.MouseOverUI(In.MousePosition)) return;
             if (CarriedBy(me) != null) return;   // (hands full: R throws)
-            var target = AimedDrone(v, out bool zapper);
-            if (target == null) return;
-            attackCool = zapper ? 0.8f : 0.6f;
-            ItemOp(me, "attack", target.uid.ToString(CultureInfo.InvariantCulture));
+            var target = AimedDrone(v, out var w);
+            attackCool = w.every;
+            struckAt[me ?? ""] = Time.time;   // (milestone 42: the swing or the recoil)
+            if (target == null) { if (w.id != "kick") FireAtNothing(v, w); return; }   // (milestone 42: a shot at nothing still flies)
+            ItemOp(me, "attack", target.uid.ToString(CultureInfo.InvariantCulture) + "|" + w.id);
         }
 
-        Drone AimedDrone(VesselSim v, out bool zapper)
+        Drone AimedDrone(VesselSim v, out WeaponDef w)
         {
             string me = MyArdlingName;
-            zapper = PackOf(me, out _).Contains("zapper") || Coop.Active && remote && (Coop.Current.room.State.packs.Find(p => p.name == me)?.items.Contains("zapper") ?? false);
+            w = HeldWeapon(me);   // milestone 42: whatever's in hand sets the reach and the aim
+            bool zapper = w.ranged;
             var list = Coop.Active && remote ? Coop.Current.room.State.drones : drones;
             Vector3d here = FixedPos(v), up = here.normalized;
             Vector3d fwd = FirstPersonView ? v.body.InertialToFixed(Vector3d.FromFloat(root.farCam.transform.forward), ut) : FixedFacing(v);   // (first person: where you're looking)
             fwd = (fwd - up * Vector3d.Dot(fwd, up)).normalized;
-            double reach = zapper ? 18 : 2.6, cosMax = Math.Cos((zapper ? 25 : 60) * Math.PI / 180);
+            double reach = w.reach, cosMax = Math.Cos(w.cone * Math.PI / 180);
+            _ = zapper;
             Drone best = null;
             double bestD = double.MaxValue;
             foreach (var d in list)
             {
                 if (d.body != v.body.name || d.state == DroneState.Down) continue;
+                if (d.kind == DroneKind.Shiftling && d.state == DroneState.Idle) continue;   // (milestone 42: passing as crew, you can't tell)
+                if (d.Def.walker) reach = w.reach + d.Def.size * 0.3;
                 Vector3d to = d.Pos - here;
                 double dist = to.magnitude;
                 if (dist > reach || dist < 1e-3) continue;
@@ -160,20 +201,20 @@ namespace Rocket
             return best;
         }
 
-        /// <summary>The host (or this game) hits a drone for a player.</summary>
-        void DoAttack(string who, int uid)
+        /// <summary>The host (or this game) hits a drone for a player, with the weapon they hold (milestone 42: only one they carry).</summary>
+        void DoAttack(string who, int uid, string weapon)
         {
             var eva = EvaOf(who);
             var d = drones.Find(x => x.uid == uid);
             if (eva == null || d == null) return;
-            bool zapper = PackOf(who, out _).Contains("zapper");
+            var w = Weapons.Held(PackOf(who, out _), weapon);
             double dist = (d.Pos - FixedPos(eva)).magnitude;
-            if (dist > (zapper ? 20 : 3.2)) return;
+            if (dist > w.reach + 2 + (d.Def.walker ? d.Def.size * 0.3 : 0)) return;
             var b = eva.body;
-            if (zapper) Zap(b, FixedPos(eva) + FixedPos(eva).normalized * 0.8, d.Pos, new Color(0.5f, 0.9f, 1f));
-            else audio?.Clunk(0.4f);
+            Vector3d up = FixedPos(eva).normalized;
+            WeaponFx(w, b, FixedPos(eva) + up * 0.8, d.Pos + (d.Def.walker ? d.Pos.normalized * (0.8 * (d.Def.boss ? 3.6 : 1)) : Vector3d.zero));
             if (d.state == DroneState.Idle || d.target == null) { d.target = who; d.state = DroneState.Chase; }
-            if (Drones.Damage(d, zapper ? 20 : 6)) DroneDown(d, who);
+            if (Drones.Damage(d, w.damage)) DroneDown(d, who);
         }
 
         /// <summary>Things thrown at a drone hurt it.</summary>
@@ -226,7 +267,8 @@ namespace Rocket
             {
                 if (d.body != b.name) continue;
                 want.Add(d.uid);
-                if (!droneViews.TryGetValue(d.uid, out var go) || go == null) { go = BuildDroneView(d.Def); droneViews[d.uid] = go; }
+                if (!droneViews.TryGetValue(d.uid, out var go) || go == null) { go = d.Def.walker ? BuildWalkerView(d) : BuildDroneView(d.Def); droneViews[d.uid] = go; }
+                if (d.Def.walker) { UpdateWalkerView(d, go, b); continue; }   // milestone 42
                 bool asleepMimic = d.kind == DroneKind.Mimic && d.state == DroneState.Idle;
                 Vector3d up = d.Pos.normalized;
                 Vector3d p = d.Pos + (asleepMimic ? -up * (Drones.Hover + 0.2) : up * (0.15 * Math.Sin(Time.time * 2.3f + d.uid)));
@@ -241,7 +283,7 @@ namespace Rocket
                 var eye = go.transform.Find("Eye");
                 if (eye != null) eye.gameObject.SetActive(!asleepMimic);
             }
-            foreach (var k in droneViews.Keys.ToList()) if (!want.Contains(k)) { if (droneViews[k] != null) UnityEngine.Object.Destroy(droneViews[k]); droneViews.Remove(k); }
+            foreach (var k in droneViews.Keys.ToList()) if (!want.Contains(k)) { if (droneViews[k] != null) UnityEngine.Object.Destroy(droneViews[k]); droneViews.Remove(k); walkAnim.Remove(k); slamsSeen.Remove(k); }
         }
 
         GameObject BuildDroneView(DroneDef def)
@@ -304,7 +346,7 @@ namespace Rocket
             var cam = root.farCam;
             foreach (var d in list)
             {
-                if (d.body != active.body.name || d.state == DroneState.Idle || d.state == DroneState.Down) continue;
+                if (d.body != active.body.name || d.state == DroneState.Idle || d.state == DroneState.Down || d.Def.boss) continue;
                 if (!droneViews.TryGetValue(d.uid, out var go) || go == null) continue;
                 Vector3 sp = cam.WorldToScreenPoint(go.transform.position + (renderRot * Vector3.up) * (d.Def.size + 0.4f));
                 if (sp.z <= 0) continue;
@@ -315,9 +357,10 @@ namespace Rocket
             }
             if (active.IsEva && active.landed && CarriedBy(MyArdlingName) == null)
             {
-                var t = AimedDrone(active, out bool zapper);
-                if (t != null) Ui.Shadowed(new Rect(W / 2 - 300, H * 0.7f, 600, 24), zapper ? $"Click: zap the {t.Def.name.ToLowerInvariant()}" : $"Click: kick the {t.Def.name.ToLowerInvariant()} (a zapper from the store works from further away)", new GUIStyle(Ui.BigCenter) { fontSize = 17 });
+                var t = AimedDrone(active, out var w);
+                if (t != null) Ui.Shadowed(new Rect(W / 2 - 300, H - 334, 600, 24), w.id == "kick" ? $"Click: kick the {t.Def.name.ToLowerInvariant()} (a weapon from the store hits harder)" : $"Click: {w.verb} the {t.Def.name.ToLowerInvariant()} ({w.name})", new GUIStyle(Ui.BigCenter) { fontSize = 17 });
             }
+            DrawBossBar(W);   // milestone 42
         }
 
         void ClearDrones()
@@ -325,6 +368,8 @@ namespace Rocket
             drones.Clear();
             placesAwake.Clear();
             wardensCalled.Clear();
+            walkAnim.Clear();
+            slamsSeen.Clear();
             foreach (var go in droneViews.Values) if (go != null) UnityEngine.Object.Destroy(go);
             droneViews.Clear();
             foreach (var (go, _) in zapFx) if (go != null) UnityEngine.Object.Destroy(go);
@@ -335,7 +380,7 @@ namespace Rocket
 
         public int TestDroneCount => drones.Count;
         public Drone TestNearestDrone() => drones.OrderBy(d => (d.Pos - FixedPos(active)).magnitude).FirstOrDefault();
-        public void TestAttack(int uid) => DoAttack(MyArdlingName, uid);
+        public void TestAttack(int uid) => DoAttack(MyArdlingName, uid, null);
         public void TestSpawnDrone(DroneKind k, float metres) { var at = FixedPos(active); var p = at + RandomFlat(at, metres); SpawnDrone(k, active.body, "test", p, p); }
     }
 }

@@ -890,7 +890,41 @@ captaincarl24's bug reports and asks, all in one update:
 - The update log keeps the first version and the latest updates only.
 - 7 new sim tests; `-autotestArdling` (790-799).
 
+### Milestone 42: Shiftlings, the Hollow and weapons (2026-11-15)
+captaincarl24: "a new enemy which are like mutants of ardlings ... also like boss fights", "add new weapons like guns and melee
+weapons", "make the main menu screen animated like theres rockets taking off, moving cars, people", "better animations":
+- **Shiftlings, Lurkers and the Hollow** (Sim/Drones.cs, Game/FlightMutants.cs): walker DroneKinds (no hovering). A Shiftling
+  strolls round its place in a disguise (a look code; in a room half the time a player's look), sight 6 m (crouching 3), turns
+  in 0.9 s (the suits flicker), runs at 4.4 m/s and claws for 8 every 1.3 s; disguised ones can't be aimed at, twitch now and
+  then, and have no health bar. Lurkers crawl (6.2 m/s, 30 hp). The Hollow (1500 hp, +50% per extra player, 3.6x size) guards
+  the wrecks (tal.lander, ochre.wreck, rime.wreck) with two Shiftlings: slams everyone within 8 m for 16 every 5 s (3.2 s
+  enraged below a third), calls two Shiftlings every 14 s once below two thirds (up to 6), 1.5x speed enraged, leash 140 m;
+  a health bar across the top for everyone near. Outposts add one disguised Shiftling to the warden's guards; random places can
+  have them. Drops: shiftsample (220) and hollowheart (2500) (Items.DropOnly: never loot, the machine or the shop; drone cores too).
+- **Weapons** (Sim/Weapons.cs): kick 6 (2.6 m), wrench 13, shock baton 18 (melee); zapper 20 (18 m), blaster 11 every 0.3 s
+  (30 m), bolt rifle 42 every 1.6 s (60 m). A weapon's backpack number holds it (else the best carried); left click uses it
+  (a shot at nothing still flies); the host takes the weapon named with the attack only if that player carries it.
+- **Animations** (View/Views.cs AnimateArdling): crouch, carry, aim (gun arm up), strike (swing, recoil, kick), knocked out
+  (flat on the back), a look round when idle, a squash on landing; the held weapon modelled in the right glove (HeldMesh).
+- **The busy space centre** (Game/MenuAmbient.cs): title screen and building picker: a launch every 28-50 s from a pad in view
+  (or a distant one off to the right): steam, flame, exhaust column (Smoke.Exhaust), the turn east; a plane overhead every
+  35-60 s; technicians round the pad, a van/tanker/truck on its ring road, a bus and a van to the assembly building.
+- **Explosions** (View/Explosions.cs, captaincarl24: "a better explosion effect instead of a simple circle"): the additive
+  spheres are gone; a blast is a point-light flash (FxFade), a shockwave ring, a fireball in three bursts with noise and
+  rotation cooling white to soot, debris with smoke trails (particle trails), embers, a smoke column in air with bursts and
+  upward drift, and a dust ring near the ground; all under Smoke.Anchor so it stays on the world.
+- **Cabin props** (Game/FlightCabinMore.cs, "add more props inside the spaceship"): snack box (food +20, a minute to refill),
+  hot-drink maker (stamina full), a swinging-ball desk toy (animated), a guitar, a crew photo, a poster of the worlds (a fact
+  each look), a mirror, a toolbox (a repair kit once a flight) and a handheld game (a best score).
+- **The tutorial reveals the screen step by step** ("hide everything and show it once you get to that step"): Tutorial.Show
+  flags per step; HangarMode hides the top bar (drawn in a group far off screen, so it neither shows nor takes clicks), the
+  parts list, the stages and the extras until their step; in flight the telemetry, the top bar, the controls and stages, and
+  the navball likewise (the last step shows everything). A new PlayerPrefs key (tutorialDone2) so it plays once more for
+  everyone (it only ever started by itself once, which was the "tutorial isn't playing").
+- Smoke.Dust (slams, falls). 4 new sim tests; `-autotestMutants` (800-810). Rooms: only the host walks outside (next: everyone).
+
 ## Next
+- Milestone 43: every player on foot in a room (their own Ardling, input to the host, positions back), co-op boss fights, PvP.
 - Ideas welcome. (Controller support: not wanted.)
 
 ## Deliberate differences

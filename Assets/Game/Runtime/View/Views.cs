@@ -18,6 +18,14 @@ namespace Rocket
         readonly Dictionary<int, ParticleSystem> smokes = new Dictionary<int, ParticleSystem>();
         readonly Dictionary<int, Transform[]> ardlingLimbs = new Dictionary<int, Transform[]>();
         float walkPhase, walkAmp, floatAmp, runAmp, airAmp, swimAmp, swimMove, strokePhase;
+        // milestone 42: more body language (crouching, carrying, aiming, knocked out, a look round now and then, landing)
+        float crouchAmp, carryAmp, aimAmp, downAmp, lookYaw, lookTarget, lookTimer, landSquash;
+        bool wasAir;
+        string heldShown;
+        /// <summary>Milestone 42: what the game knows about an Ardling (by name): knocked out, carrying something, the weapon in hand, seconds since they last struck.</summary>
+        public static System.Func<string, bool> ArdlingDown, ArdlingCarrying;
+        public static System.Func<string, string> ArdlingHolds;
+        public static System.Func<string, float> ArdlingStruck;
 
         /// <summary>
         /// The Ardling's body language (milestone 35: richer). Standing, they breathe and sway a little; walking, arms and
@@ -29,6 +37,12 @@ namespace Rocket
         {
             float dt = Mathf.Min(UnityEngine.Time.deltaTime, 0.05f), t = UnityEngine.Time.time;
             bool ground = sim.landed, water = ground && sim.InWater;
+            string who = p.crew.Count > 0 ? p.crew[0] : null;
+            bool down = who != null && ArdlingDown != null && ArdlingDown(who);
+            bool carrying = who != null && ArdlingCarrying != null && ArdlingCarrying(who);
+            string holds = who != null && ArdlingHolds != null ? ArdlingHolds(who) : null;
+            float struck = who != null && ArdlingStruck != null ? ArdlingStruck(who) : 99f;
+            ShowHeld(limbs[1], holds);
             float fwd = ground ? Mathf.Clamp(sim.inputPitch, -1f, 1f) : 0f, strafe = ground ? Mathf.Clamp(sim.evaStrafe, -1f, 1f) : 0f;
             float move = Mathf.Max(Mathf.Max(Mathf.Abs(fwd), Mathf.Abs(strafe)), ground ? Mathf.Abs(sim.inputYaw) * 0.5f : 0f);
             bool nearGround = !ground && sim.Altitude < 3000 && sim.body.SurfaceGravity > 0.2;
@@ -38,6 +52,21 @@ namespace Rocket
             floatAmp = Mathf.MoveTowards(floatAmp, !ground && !nearGround ? 1f : 0f, dt * 2f);
             swimAmp = Mathf.MoveTowards(swimAmp, water ? 1f : 0f, dt * 3f);
             swimMove = Mathf.MoveTowards(swimMove, water && move > 0.05f ? 1f : 0f, dt * 2.5f);
+            crouchAmp = Mathf.MoveTowards(crouchAmp, ground && !water && sim.evaCrouch && !down ? 1f : 0f, dt * 5f);
+            carryAmp = Mathf.MoveTowards(carryAmp, carrying && !down ? 1f : 0f, dt * 5f);
+            bool rangedHeld = holds == "zapper" || holds == "blaster" || holds == "boltrifle";
+            aimAmp = Mathf.MoveTowards(aimAmp, rangedHeld && ground && !water && !carrying && !down ? 1f : 0f, dt * 4f);
+            downAmp = Mathf.MoveTowards(downAmp, down && ground ? 1f : 0f, dt * 2.5f);
+            // landing from a jump: a quick squash
+            bool air = !ground && airAmp > 0.5f;
+            if (wasAir && ground) landSquash = 1f;
+            wasAir = air;
+            landSquash = Mathf.MoveTowards(landSquash, 0f, dt * 4f);
+            // standing still a while: a look round now and then
+            lookTimer -= dt;
+            if (lookTimer <= 0) { lookTimer = 3f + Mathf.Abs(Mathf.Sin(t * 7.3f + p.index)) * 5f; lookTarget = walkAmp < 0.1f && !down ? Mathf.Sin(t * 3.1f) * 28f : 0f; }
+            if (walkAmp > 0.2f) lookTarget = 0f;
+            lookYaw = Mathf.MoveTowards(lookYaw, lookTarget, dt * 60f);
             walkPhase += dt * (8f + 5f * runAmp) * Mathf.Max(move, 0.35f) * (fwd < 0 ? -1f : 1f);
             strokePhase += dt * (2.6f + 1.4f * (sim.evaRun ? 1f : 0f)) * Mathf.Max(move, 0.3f);
             float swing = Mathf.Sin(walkPhase) * (34f + 16f * runAmp) * walkAmp;
@@ -61,20 +90,111 @@ namespace Rocket
                 var q = Quaternion.Slerp(standing, jumping, airAmp);
                 q = Quaternion.Slerp(q, floating, floatAmp);
                 q = Quaternion.Slerp(q, swimming, swimAmp);
+                // milestone 42: crouching (knees forward, arms ready), carrying (both arms out in front), aiming (the gun arm up
+                // and steady), striking (a swing or a kick of recoil), knocked out (flat out, arms wide)
+                Quaternion crouched = arm ? Quaternion.Euler(-30f + swing * side * 0.4f, 0, side * 14f) : Quaternion.Euler(-38f - swing * side * 0.5f, 0, side * 4f);
+                q = Quaternion.Slerp(q, crouched, crouchAmp);
+                if (arm) q = Quaternion.Slerp(q, Quaternion.Euler(-62f, 0, side * -10f), carryAmp);
+                if (arm && side > 0) q = Quaternion.Slerp(q, Quaternion.Euler(-82f, 0, -4f), aimAmp);
+                if (arm && side < 0) q = Quaternion.Slerp(q, Quaternion.Euler(-30f, 0, 18f), aimAmp * 0.6f);   // (the other hand steadies it)
+                if (arm && side > 0 && struck < 0.35f && !down)
+                {
+                    float f = struck / 0.35f;
+                    q = rangedHeld ? q * Quaternion.Euler(-14f * (1f - f), 0, 0)                                         // recoil
+                                   : Quaternion.Euler(Mathf.Lerp(-130f, 25f, Mathf.SmoothStep(0, 1, f)), 0, -12f);       // a swing
+                }
+                if (!arm && side > 0 && struck < 0.35f && holds == null && !down) q = Quaternion.Euler(-70f * Mathf.Sin(struck / 0.35f * Mathf.PI), 0, 0);   // a kick
+                Quaternion flat = arm ? Quaternion.Euler(-10f, 0, side * 75f) : Quaternion.Euler(4f, 0, side * 12f);
+                q = Quaternion.Slerp(q, flat, downAmp);
                 limbs[k].localRotation = q;
             }
             // the whole body: a bob in each step, leaning into a run, flat and low in the water when swimming
             if (partGo.TryGetValue(p.index, out var go))
             {
-                float stepBob = Mathf.Abs(Mathf.Sin(walkPhase)) * (0.03f + 0.03f * runAmp) * walkAmp;
+                float stepBob = Mathf.Abs(Mathf.Sin(walkPhase)) * (0.03f + 0.03f * runAmp) * walkAmp * (1f - 0.5f * crouchAmp);
                 float waves = Mathf.Sin(t * 1.3f) * 0.05f * swimAmp;
-                float sink = Mathf.Lerp(0.72f, 0.42f, swimMove) * swimAmp;
-                float lean = 9f * runAmp * (fwd < 0 ? -1f : 1f) + 72f * swimMove * swimAmp;
+                float sink = Mathf.Lerp(0.72f, 0.42f, swimMove) * swimAmp + 0.13f * crouchAmp + 0.07f * landSquash + 0.78f * downAmp;
+                float lean = 9f * runAmp * (fwd < 0 ? -1f : 1f) + 72f * swimMove * swimAmp + 16f * crouchAmp + 6f * carryAmp * (1f - crouchAmp) - 4f * aimAmp;
+                lean = Mathf.Lerp(lean, -88f, downAmp);   // (on their back)
                 float sway = Mathf.Sin(t * 0.8f) * 1.2f * (1f - walkAmp) * (1f - swimAmp) + Mathf.Sin(strokePhase) * 8f * swimMove;
                 go.transform.localPosition = p.localPos + p.localRot * new Vector3(0, stepBob + waves - sink, 0);
-                go.transform.localRotation = p.localRot * Quaternion.Euler(lean, 0, sway);
+                go.transform.localRotation = p.localRot * Quaternion.Euler(lean, lookYaw * (1f - downAmp), sway * (1f - downAmp));
             }
         }
+        /// <summary>Milestone 42: the weapon in an Ardling's right hand (built along the arm, so raising the arm aims it).</summary>
+        void ShowHeld(Transform rightArm, string id)
+        {
+            if (rightArm == null || id == heldShown) return;
+            heldShown = id;
+            var old = rightArm.Find("Held");
+            if (old != null) UnityEngine.Object.Destroy(old.gameObject);
+            if (id == null) return;
+            var mesh = HeldMesh(id);
+            if (mesh == null) return;
+            var g = new GameObject("Held");
+            g.transform.SetParent(rightArm, false);
+            g.transform.localPosition = new Vector3(0.074f, -0.235f, 0.04f);   // (in the glove)
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = g.AddComponent<MeshRenderer>();
+            r.sharedMaterial = Mats.Lit;
+            r.shadowCastingMode = ShadowCastingMode.On;
+        }
+
+        static readonly Dictionary<string, Mesh> heldMeshes = new Dictionary<string, Mesh>();
+
+        /// <summary>The weapons as models: the grip at the origin, the business end down the arm (-Y).</summary>
+        public static Mesh HeldMesh(string id)
+        {
+            if (heldMeshes.TryGetValue(id, out var m)) return m;
+            var b = new MeshBuilder { Mat = MeshBuilder.MatPaint };
+            Color metal = new Color(0.62f, 0.64f, 0.68f), dark = new Color(0.16f, 0.17f, 0.19f);
+            Quaternion I = Quaternion.identity;
+            switch (id)
+            {
+                case "wrench":
+                    b.Mat = MeshBuilder.MatGloss;
+                    b.AddBox(new Vector3(0, -0.12f, 0), new Vector3(0.022f, 0.26f, 0.012f), metal, I);
+                    b.AddBox(new Vector3(0, -0.26f, 0), new Vector3(0.07f, 0.04f, 0.016f), metal, I);
+                    b.AddBox(new Vector3(0.022f, -0.29f, 0), new Vector3(0.02f, 0.04f, 0.016f), metal, I);
+                    b.AddBox(new Vector3(-0.022f, -0.29f, 0), new Vector3(0.02f, 0.04f, 0.016f), metal, I);
+                    b.Mat = MeshBuilder.MatRubber;
+                    b.AddBox(new Vector3(0, -0.02f, 0), new Vector3(0.03f, 0.08f, 0.02f), new Color(0.75f, 0.2f, 0.15f), I);
+                    break;
+                case "baton":
+                    b.Mat = MeshBuilder.MatRubber;
+                    b.AddFrustum(0.04f, -0.08f, 0.016f, 0.016f, dark, 10, true, true);
+                    b.Mat = MeshBuilder.MatGloss;
+                    b.AddFrustum(-0.08f, -0.3f, 0.012f, 0.012f, new Color(0.3f, 0.35f, 0.42f), 10, false, false);
+                    b.AddFrustum(-0.3f, -0.34f, 0.018f, 0.018f, new Color(0.35f, 0.75f, 1f), 10, false, true);
+                    break;
+                case "zapper":
+                    b.AddFrustum(0.03f, -0.2f, 0.024f, 0.022f, new Color(0.3f, 0.7f, 0.95f), 12, true, false);
+                    b.Mat = MeshBuilder.MatGloss;
+                    b.AddFrustum(-0.2f, -0.24f, 0.03f, 0.016f, metal, 12, false, true);
+                    b.AddBox(new Vector3(0, -0.03f, 0.03f), new Vector3(0.02f, 0.05f, 0.03f), dark, I);
+                    break;
+                case "blaster":
+                    b.AddBox(new Vector3(0, -0.09f, 0.02f), new Vector3(0.034f, 0.16f, 0.05f), new Color(0.95f, 0.5f, 0.2f), I);
+                    b.AddBox(new Vector3(0, 0.0f, -0.02f), new Vector3(0.028f, 0.05f, 0.06f), dark, I);    // the grip
+                    b.Mat = MeshBuilder.MatGloss;
+                    b.AddFrustum(-0.17f, -0.24f, 0.012f, 0.012f, metal, 10, false, true);                   // the barrel
+                    b.AddBox(new Vector3(0, -0.1f, 0.05f), new Vector3(0.012f, 0.06f, 0.012f), new Color(1f, 0.85f, 0.3f), I);
+                    break;
+                case "boltrifle":
+                    b.AddBox(new Vector3(0, -0.15f, 0.02f), new Vector3(0.036f, 0.3f, 0.052f), new Color(0.3f, 0.36f, 0.3f), I);
+                    b.AddBox(new Vector3(0, 0.06f, 0.0f), new Vector3(0.03f, 0.12f, 0.07f), dark, I);       // the stock
+                    b.Mat = MeshBuilder.MatGloss;
+                    b.AddFrustum(-0.3f, -0.5f, 0.014f, 0.012f, metal, 10, false, true);                     // the long barrel
+                    b.AddFrustum(-0.08f, -0.2f, 0.016f, 0.016f, dark, 10, true, true);                      // the scope
+                    b.AddBox(new Vector3(0, -0.2f, 0.05f), new Vector3(0.012f, 0.1f, 0.012f), new Color(0.6f, 0.95f, 0.35f), I);
+                    break;
+                default: return null;
+            }
+            m = b.ToMesh("Held " + id);
+            heldMeshes[id] = m;
+            return m;
+        }
+
         static readonly Dictionary<string, Material> plumeMats = new Dictionary<string, Material>();
 
         /// <summary>
