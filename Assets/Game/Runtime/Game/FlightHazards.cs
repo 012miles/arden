@@ -137,6 +137,7 @@ namespace Rocket
         {
             if (hazard == null) return;
             if (!string.IsNullOrEmpty(hazard.end)) Show(hazard.end, 3f);
+            if (hazardT >= hazard.duration - 0.5f && active != null && !active.destroyed) Quest(QuestKind.Survive, 1);   // milestone 40
             if (hazard.kind == HazardKind.HeatWave) VesselSim.HeatBoost = 1f;
             hazard = null;
             hazardWarnLeft = 0;

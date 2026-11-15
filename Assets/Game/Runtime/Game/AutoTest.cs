@@ -87,7 +87,7 @@ namespace Rocket
                 yield break;
             }
 
-            foreach (var (flag, tour) in new (string, Func<IEnumerator>)[] { ("-autotestExpedition", ExpeditionTour), ("-autotest35", Tour35), ("-autotestTrip", TripTour), ("-autotestCabin", CabinTour), ("-autotestSurvival", SurvivalTour), ("-autotestHazards", HazardsTour) })
+            foreach (var (flag, tour) in new (string, Func<IEnumerator>)[] { ("-autotestExpedition", ExpeditionTour), ("-autotest35", Tour35), ("-autotestTrip", TripTour), ("-autotestCabin", CabinTour), ("-autotestSurvival", SurvivalTour), ("-autotestHazards", HazardsTour), ("-autotestDrones", DronesTour) })
             {
                 if (Array.IndexOf(Environment.GetCommandLineArgs(), flag) < 0) continue;
                 yield return tour();

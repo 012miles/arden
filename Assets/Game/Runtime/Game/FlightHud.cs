@@ -88,6 +88,8 @@ namespace Rocket
             DrawTripPanel(W, H);     // milestone 35: the Easy autopilot
             DrawSurvivalHud(W, H);   // milestone 38: health, food, stamina, what F does, the backpack
             DrawHazardHud(W, H);     // milestone 39: what's going on out there
+            DrawDroneHud(W, H);      // milestone 40: drones' health, what a click does; trading
+            DrawTrade(W, H);
             var v = active;
             var body = v.body;
             Orbit orbit = trajectory.Count > 0 ? trajectory[0].orbit : null;

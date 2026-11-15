@@ -427,6 +427,10 @@ namespace Rocket
         public List<Vitals> vitals = new List<Vitals>();
         public List<string> backpack = new List<string>(), locker = new List<string>();
         public int backpackSize, lockerSize;
+        // milestone 40: quests, places cleared of drones
+        public int questsVersion, questDay, questWeek;
+        public List<Quest> quests = new List<Quest>();
+        public List<string> cleared = new List<string>(), questLanded = new List<string>();
     }
 
     /// <summary>
@@ -491,6 +495,7 @@ namespace Rocket
             creditsSeen = false;
             scavenged.Clear();
             ResetSurvival();   // milestone 38
+            ResetQuests();     // milestone 40
             unlocked.Clear();
             unlocked.Add("start");
             subjects.Clear();
@@ -1055,6 +1060,7 @@ namespace Rocket
             presetSlots = presetSlots, scavenged = scavenged.ToList(), creditsSeen = creditsSeen,
             };
             SaveSurvival(save);   // milestone 38
+            SaveQuests(save);     // milestone 40
             return save;
         }
 
@@ -1082,6 +1088,7 @@ namespace Rocket
             badgeNews.Clear();
             LoadCenter(s);
             LoadSurvival(s);   // milestone 38
+            LoadQuests(s);     // milestone 40
         }
     }
 }

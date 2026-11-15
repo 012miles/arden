@@ -18,6 +18,8 @@ Developed by captaincarl24
   them in your backpack (I) between flights, and buy kit or sell finds at the space centre's supply store.
 - **Out there**: random places to find on every world, and things that happen: lightning, dust devils, heat waves, meteor
   showers, solar flares, micrometeoroids. Engines heat up (radiators and coolant help) and parts get damaged (repair kits fix them).
+- **Drones, traders, quests**: rogue drones guard outposts and wrecks (crouch past them, or zap them: left click with a zapper);
+  traders at the big outposts; daily and weekly quests and a mystery machine at the space centre.
 - **Make it yours**: paint your rocket in 16 colours and stick on decals (built-in ones or your own pictures), save your own presets, and
   dress your Ardling (suit colour, visor note, hat) for multiplayer.
 - **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole
@@ -78,6 +80,7 @@ land within 300 m of an outpost or wreck (⌂ on the map) to **Scavenge** it; **
 | R | Throw what you're holding |
 | Z | Crouch |
 | I | Backpack (1-8 use what's in it) |
+| Left click | Zap (with a zapper) or kick a drone |
 | TAB | Go inside the cabin (look at something and press E to use it: the seats fly, the hatch goes out) |
 | Alt | Free the mouse pointer in first person |
 

@@ -23,6 +23,12 @@ namespace Rocket
         /// <summary>Every update, newest first.</summary>
         public static readonly Update[] All =
         {
+            U(40, "Nov 15, 2026", "Drones, traders and quests",
+                "Rogue drones guard the outposts and wrecks: they notice you (crouch to sneak), chase, zap, and give up if you lead them far enough",
+                "Seven kinds, from little scouts and fast darts to sparkers that sap stamina, mimic crates, leakers and the wardens at the big outposts",
+                "Fight back: a zapper in your backpack (left click), a kick up close, or throw things at them. They drop drone cores worth money",
+                "Traders at the big outposts (F to trade): a new stock every day, and they pay more for valuables",
+                "The quest board (daily and weekly quests with rewards) and the mystery machine at the space centre"),
             U(39, "Nov 15, 2026", "Out there",
                 "Random places to find on every world, different in every game: supply caches, camps, crashed probes, depots... ten within driving distance of the space centre",
                 "Things happen: lightning, dust devils, wind and heat waves where there's air; meteor showers and a strange shimmer on airless worlds; solar flares, micrometeoroids and blackouts in space",

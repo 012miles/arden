@@ -841,6 +841,27 @@ Stage two of the survival systems (captaincarl24: "add the rest of all the syste
 - 4 new sim tests (places, hazards, engine heat, damage; the older tests run with engine heat off so their numbers stay put);
   `-autotestHazards` (770-778).
 
+### Milestone 40: drones, traders and quests (2026-11-15)
+Stage three, the last, of captaincarl24's "add the rest of all the systems in the doc", in Arden's own style:
+- **Rogue drones** (Sim/Drones.cs, Game/FlightDrones.cs): maintenance drones left at the outposts and wrecks have gone haywire.
+  Come within 800 m of a place nobody's cleared and its guards wake (1-3 at a random place; a warden and two scouts at the big
+  outposts). Each hovers at home, notices an Ardling inside its sight (crouching halves it), waits a moment (1.5 s to react), chases, zaps on a
+  cooldown, gives up if led more than 70 m from home (or out of sight for 8 s), and floats home healing. Seven kinds: scout
+  (30 hp, zaps 5), hauler (120 hp, slow, hits 16), dart (18 hp, very fast), sparker (saps 25 stamina), mimic crate (looks like
+  loot until you're 5 m away), leaker (hurts anyone within 4 m) and the warden (400 hp, zaps 10 from 10 m, calls a scout).
+  Health bars show over drones that are after someone.
+- **Fighting back**: with a zapper in your backpack, left click zaps the drone you're facing (18 m, 20 damage); without one, a
+  kick up close (6); thrown things hit for 15. A drone knocked out drops a drone core (a valuable) and sometimes loot; once a
+  place's guards are all down it stays clear (saved).
+- **Traders** (Game/FlightTrade.cs): an Ardling trader at each big outpost; F within reach opens trading. Six things in stock,
+  new every day, at 1.25x the store's price; they buy everything at 0.6x, valuables at 1.15x (more than the store at home).
+- **The mystery machine** (a store tab): 250 a pull; common 40, uncommon 35, rare 20, very rare 5.
+- **Daily and weekly quests** (Sim/Quests.cs; the quest board, a store tab and a new building): three a day and two bigger ones a
+  week, the same for everyone on that day: walk, search places, eat, pick things up, knock out drones, plant flags, land on new
+  worlds, sell, drive, ride out hazards. Each pays funds and something for the backpack; claim on the board.
+- **Rooms**: the host runs the drones and sends them round; players' attacks, buying and selling go to the host.
+- 4 new sim tests (drones, guards, quests, trading and the machine); `-autotestDrones` (780-785).
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

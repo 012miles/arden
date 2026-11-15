@@ -96,6 +96,7 @@ namespace Rocket
                 new Place { name = "Astronaut complex", does = "Your crew", e = 150, n = 320, h = 22, go = Builder(() => h.ShowCrew(true)) },
                 new Place { name = "Visitor centre", does = "Badges you've earned", e = 655, n = 1218, h = 40, go = Builder(() => h.ShowBadges(true)) },
                 new Place { name = "Supply store", does = "Food, kit, your locker; sell finds", e = -48, n = 307, h = 14, go = () => StorePanel.Open = true },   // milestone 38
+                new Place { name = "Quest board", does = "Daily and weekly quests", e = 330, n = 380, h = 12, go = () => StorePanel.OpenAt(3) },   // milestone 40
             };
             for (int i = 0; i < LaunchSite.Pads.Length; i++)
             {

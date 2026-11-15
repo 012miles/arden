@@ -170,6 +170,7 @@ namespace Rocket
                 fallWasLanded = active.landed;
             }
             UpdateWorldItems(Mathf.Min((float)dtGame, 0.1f));
+            QuestProgress();   // milestone 40: walking, driving, landing
             // a room: everyone's numbers, now and then
             if (Coop.Active && Coop.Current.IsHost)
             {
@@ -181,6 +182,7 @@ namespace Rocket
                     st.vitals = st.players.Select(q => U.career.VitalsOf(q.name)).Where(x => x != null)
                         .Select(x => new Vitals { name = x.name, health = Mathf.Round(x.health), hunger = Mathf.Round(x.hunger), stamina = Mathf.Round(x.stamina), downedAt = x.downedAt, tired = x.tired }).ToList();
                     st.items = U.items.Select(w => new WorldItem { uid = w.uid, id = w.id, body = w.body, x = w.x, y = w.y, z = w.z, yaw = w.yaw, flying = w.flying }).ToList();
+                    st.drones = drones.Select(d => new Drone { uid = d.uid, kind = d.kind, body = d.body, home = d.home, x = d.x, y = d.y, z = d.z, hx = d.hx, hy = d.hy, hz = d.hz, health = d.health, state = d.state, target = d.target }).ToList();
                     Coop.Current.room.Touch();
                 }
             }
@@ -239,11 +241,18 @@ namespace Rocket
             if (In.Down(K.F))
             {
                 var down = DownedNear(v, me);
-                if (down != null) ItemOp(me, "revive", down);
+                if (tradeOpen) tradeOpen = false;
+                else if (down != null) ItemOp(me, "revive", down);
                 else if (holding != null) ItemOp(me, "put", "");
-                else { var w = NearestItem(v, out _); if (w != null) ItemOp(me, "pick", w.uid.ToString(CultureInfo.InvariantCulture)); }
+                else
+                {
+                    var w = NearestItem(v, out _);
+                    if (w != null) ItemOp(me, "pick", w.uid.ToString(CultureInfo.InvariantCulture));
+                    else if (TraderNear(v) != null) { tradeOpen = true; packOpen = false; }   // milestone 40: trade
+                }
             }
             if (In.Down(K.R) && holding != null) ItemOp(me, "throw", "");
+            HandleAttack(v, me);   // milestone 40: left click zaps or kicks a drone
             return false;
         }
 
@@ -309,6 +318,7 @@ namespace Rocket
                     if (w == null || w.body != eva.body.name || (w.Pos - FixedPos(eva)).magnitude > Items.PickupReach + 1.5) return;
                     U.items.Remove(w);
                     SetCarried(who, w.id);
+                    Quest(QuestKind.PickUp, 1);
                     TellPlayer(who, $"Picked up: {w.Def.name}. F puts it down, R throws it, I puts it in your backpack. ({w.Def.about})", 4f);
                     return;
                 }
@@ -347,6 +357,8 @@ namespace Rocket
                     return;
                 }
                 case "use": UseFromPack(who, pack, n, eva); return;
+                case "attack": DoAttack(who, n); return;              // milestone 40
+                case "buy": case "sell": DoTrade(who, op, arg); return;
                 case "revive":
                 {
                     int k = pack.IndexOf("revive");
@@ -409,6 +421,7 @@ namespace Rocket
                     }
                     if (d.kind == ItemKind.Valuable) { msg = $"{d.name}: worth {d.price} at the store back home. ({d.about})"; keep = true; break; }
                     msg = Items.UseOn(d, vit, ShipInReach(eva, who), eva);
+                    if (msg != null && d.kind == ItemKind.Food) Quest(QuestKind.Eat, 1);
                     if (msg == null)
                     {
                         keep = true;
@@ -458,6 +471,7 @@ namespace Rocket
             foreach (var w in U.items)
             {
                 if (!w.flying) continue;
+                ThrownHits(w);   // milestone 40: things thrown at drones hurt them
                 var b = root.bodies.FirstOrDefault(x => x.name == w.body);
                 if (b == null) { w.flying = false; continue; }
                 Vector3d p = w.Pos, up = p.normalized;
@@ -650,7 +664,7 @@ namespace Rocket
                 var down = DownedNear(active, me);
                 if (down != null) hint = $"F: revive {down} (uses your revive kit)";
                 else if (holding != null) hint = $"Holding: {Items.Get(holding)?.name}   ·   F: put down   ·   R: throw   ·   I: backpack";
-                else { var w = NearestItem(active, out double d); if (w != null) hint = $"F: pick up {w.Def?.name}"; }
+                else { var w = NearestItem(active, out double d); if (w != null) hint = $"F: pick up {w.Def?.name}"; else { var tl = TraderNear(active); if (tl != null && !tradeOpen) hint = $"F: trade with {TraderName(tl.id)}"; } }
                 if (hint != null) Ui.Shadowed(new Rect(W / 2 - 400, H * 0.66f, 800, 26), hint, new GUIStyle(Ui.BigCenter) { fontSize = 18 });
             }
             if (Time.unscaledTime < scanUntil) DrawScanner(W, boxY);
@@ -725,6 +739,41 @@ namespace Rocket
                 case ItemKind.Upgrade: return "backpack upgrade";
                 default: return d.kind.ToString().ToLowerInvariant();
             }
+        }
+
+        // ---------------------------------------------------------------- milestone 40: quests
+
+        double walkAcc, driveAcc, questCheckT;
+        Vector3d walkLast;
+        int walkFor = -1, landFor = -1;
+        bool landWas;
+
+        /// <summary>Counts towards the quests, and says so when one's done.</summary>
+        void Quest(QuestKind k, int n)
+        {
+            if (!SurvivalHere || n <= 0) return;
+            if (U.career.NoteQuest(k, n)) Show("Quest done! Claim the reward on the quest board (the supply store).", 4f, true);
+        }
+
+        /// <summary>Walking and driving distance, and landings on new worlds, for the quests; new quests on a new day.</summary>
+        void QuestProgress()
+        {
+            questCheckT -= Time.unscaledDeltaTime;
+            if (questCheckT <= 0) { questCheckT = 30; U.career.RefreshQuests(DateTime.UtcNow); }
+            var v = active;
+            bool moving = v.landed && (v.IsEva || v.HasDriveWheels);
+            if (moving)
+            {
+                var p = FixedPos(v);
+                if (walkFor == v.id) { double d = (p - walkLast).magnitude; if (d < 30) { if (v.IsEva) walkAcc += d; else driveAcc += d; } }
+                walkLast = p; walkFor = v.id;
+                if (walkAcc >= 10) { Quest(QuestKind.Walk, (int)walkAcc); walkAcc -= (int)walkAcc; }
+                if (driveAcc >= 1000) { Quest(QuestKind.Drive, 1); driveAcc -= 1000; }
+            }
+            else walkFor = -1;
+            if (landFor == v.id && !landWas && v.landed && v.hasLaunched && !v.IsEva && U.career.NoteLanding(v.body.name))
+                Show("Quest done! Claim the reward on the quest board (the supply store).", 4f, true);
+            landWas = v.landed; landFor = v.id;
         }
 
         // ---------------------------------------------------------------- for tours

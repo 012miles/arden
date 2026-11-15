@@ -133,7 +133,7 @@ namespace Rocket
             string got = Outposts.Scavenge(l, ship, U.career);
             Show(got, 7f, true);
             audio?.Clunk(0.35f);
-            if (fresh && U.career.scavenged.Contains(l.id)) DropLoot(active.IsEva ? active : ship, l.id);   // milestone 38: things to pick up
+            if (fresh && U.career.scavenged.Contains(l.id)) { DropLoot(active.IsEva ? active : ship, l.id); Quest(QuestKind.Search, 1); }   // milestone 38: things to pick up (40: a quest)
         }
 
         // ---------------------------------------------------------------- the end

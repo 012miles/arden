@@ -203,6 +203,8 @@ namespace Rocket
             LeaveInterior();
             ClearItemViews();   // milestone 38
             ClearHazards();     // milestone 39
+            ClearDrones();      // milestone 40
+            ClearTraders();
             for (int i = U.vessels.Count - 1; i >= 0; i--) if (U.vessels[i].destroyed) U.vessels.RemoveAt(i);
             ClearScene();
             active = null;
@@ -494,6 +496,7 @@ namespace Rocket
             TripTick(Time.unscaledDeltaTime);              // milestone 35: the Easy autopilot to a moon and down
             SurvivalTick();                                // milestone 38: health, hunger, stamina; things flying through the air
             HazardsTick(Mathf.Min(Time.unscaledDeltaTime, 0.1f));   // milestone 39: storms, meteors, flares...
+            DronesTick(Mathf.Min(Time.unscaledDeltaTime, 0.1f));    // milestone 40: rogue drones
             if (replay != null)
             {
                 float rdt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
@@ -563,6 +566,8 @@ namespace Rocket
             UpdateBooms(Time.unscaledDeltaTime);
             UpdateChunks(Time.unscaledDeltaTime);   // milestone 35: the pieces of a crash
             UpdateItemViews();   // milestone 38: things lying about
+            UpdateDroneViews();  // milestone 40: drones and traders
+            UpdateTraderViews();
             reportTimer -= Time.unscaledDeltaTime;
             if (reportTimer <= 0)
             {
@@ -787,6 +792,7 @@ namespace Rocket
             if (eva == null || !eva.IsEva) return null;
             var flag = eva.PlantFlag(ut, out string why);
             if (flag == null) { Show(why, 2.5f); return null; }
+            Quest(QuestKind.Flag, 1);   // milestone 40
             U.Add(flag);
             views[flag] = VesselView.Create(flag);
             if (eva.body != Home) U.career.SetRecord(eva.body.name == "Vesk" ? Records.VeskFlag : Records.TalFlag);

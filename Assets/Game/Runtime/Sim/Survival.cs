@@ -154,12 +154,14 @@ namespace Rocket
             new ItemDef { id = "repairkit", name = "Repair kit", kind = ItemKind.Tool, price = 180, rarity = 1, color = C(0.9f, 0.55f, 0.1f), shape = "kit", about = "Fixes a broken part within reach. Anyone can use it, not just engineers." },
             new ItemDef { id = "scanner", name = "Scanner", kind = ItemKind.Tool, price = 160, rarity = 1, color = C(0.3f, 0.8f, 0.7f), shape = "box", about = "Shows what's lying about, and outposts, for a minute." },
             new ItemDef { id = "torch", name = "Torch", kind = ItemKind.Tool, price = 60, rarity = 0, color = C(0.95f, 0.8f, 0.2f), shape = "tube", about = "A light for dark places. Use it again to switch it off." },
+            new ItemDef { id = "zapper", name = "Zapper", kind = ItemKind.Tool, price = 650, rarity = 2, color = C(0.3f, 0.75f, 1f), shape = "tube", about = "Keep it in your backpack: left click zaps the drone you're facing, up to 18 m away." },
             new ItemDef { id = "flagpack", name = "Spare flag", kind = ItemKind.Tool, price = 70, rarity = 1, color = C(0.9f, 0.9f, 0.95f), shape = "tube", about = "One more flag to plant." },
             // things worth money
             new ItemDef { id = "meteorite", name = "Meteorite chunk", kind = ItemKind.Valuable, price = 180, rarity = 1, color = C(0.3f, 0.28f, 0.27f), shape = "rock", about = "Fell from space a long time ago. Collectors love them." },
             new ItemDef { id = "probepart", name = "Old probe part", kind = ItemKind.Valuable, price = 120, rarity = 0, color = C(0.75f, 0.7f, 0.4f), shape = "box", about = "From one of the first probes. A museum will pay for it." },
             new ItemDef { id = "geode", name = "Crystal geode", kind = ItemKind.Valuable, price = 420, rarity = 2, color = C(0.6f, 0.4f, 0.85f), shape = "gem", about = "Sparkling crystals inside a dull rock." },
             new ItemDef { id = "patch", name = "Lost mission patch", kind = ItemKind.Valuable, price = 90, rarity = 0, color = C(0.2f, 0.35f, 0.75f), shape = "bar", about = "From a mission nobody remembers." },
+            new ItemDef { id = "dronecore", name = "Drone core", kind = ItemKind.Valuable, price = 150, rarity = 3, color = C(0.95f, 0.35f, 0.3f), shape = "gem", about = "What made a rogue drone tick. Worth a fair bit." },
             new ItemDef { id = "coin", name = "Ancient Ardling coin", kind = ItemKind.Valuable, price = 900, rarity = 3, color = C(0.95f, 0.8f, 0.3f), shape = "gem", about = "Nobody knows how it got here." },
             // upgrades
             new ItemDef { id = "strap", name = "Backpack straps", kind = ItemKind.Upgrade, price = 500, rarity = 2, color = C(0.25f, 0.3f, 0.4f), shape = "bar", about = "Your backpack holds 6 things instead of 4." },
@@ -190,6 +192,18 @@ namespace Rocket
             }
             return outList;
         }
+
+        /// <summary>The mystery machine: a random thing, rare ones more often than in loot (common 40, uncommon 35, rare 20, very rare 5).</summary>
+        public static string Mystery(int seed)
+        {
+            float[] w = { 40, 35, 20, 5 };
+            var rng = new System.Random(seed);
+            var pool = All.Where(d => d.id != "dronecore").ToList();
+            double r = rng.NextDouble() * pool.Sum(d => w[d.rarity]);
+            foreach (var d in pool) { r -= w[d.rarity]; if (r <= 0) return d.id; }
+            return pool[0].id;
+        }
+        public const int MysteryPrice = 250;
 
         /// <summary>
         /// Uses an item (not tools that need the world: those are the flight's job). Food and medicine go to the Ardling;
