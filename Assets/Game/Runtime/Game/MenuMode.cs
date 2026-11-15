@@ -134,7 +134,7 @@ namespace Rocket
             GUI.Box(bar, GUIContent.none, Ui.Panel);
             Ui.Text(new Rect(bar.x + 16, bar.y + 8, 420, 24), "SPACE CENTRE", Ui.Header);
             bool first = root.universe != null && root.universe.vessels.Count == 0;
-            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 440, 20), first ? "Point at the <b>Assembly building</b> and click to build your first rocket." : "Point at a building to see what it is, click to go in. Right-drag turns, scroll zooms.", Ui.Small);
+            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 440, 20), first ? "Point at the <b>Assembly building</b> and click to build a rocket." : "Point at a building, click to go in. Right-drag turns, scroll zooms.", Ui.Small);
             if (Ui.Press(new Rect(bar.xMax - 300, bar.y + 10, 130, 34), "Title screen", Ui.Button)) { centre = false; root.ShowMenu(); return; }
             if (Ui.Press(new Rect(bar.xMax - 162, bar.y + 10, 146, 34), "Rocket builder", Ui.ButtonGo)) { root.EnterHangar(); return; }
             BodyView site = null;

@@ -909,7 +909,14 @@ namespace Rocket
         {
             if (Coop.Active) { DrawCoopPause(Ui.W, Ui.H, atY); return; }
             float W = Ui.W, H = Ui.H;
-            float ph = paused && !active.destroyed ? 596 : active.destroyed && CanReplay ? 418 : 382;   // (milestone 41: + the main menu)
+            float ph = 596;   // (milestone 41: + the main menu)
+            if (!(paused && !active.destroyed))
+            {
+                // just the buttons that show (the box used to leave a gap under them)
+                int rows = 2 + (active.destroyed && CanReplay ? 1 : 0) + (active.destroyed && HasQuicksave ? 1 : 0) + (CanRevert ? 1 : 0)
+                         + (CanRecover || active.destroyed && U.vessels.Count > 1 ? 1 : 0);
+                ph = 92 + rows * 36 + 6;
+            }
             if (title == null) ph -= 76;
             var r = new Rect(W / 2 - 190, Mathf.Max(10, atY >= 0 ? Mathf.Min(atY, H - 10 - ph) : Mathf.Min(H / 2 - ph / 2, H - 266 - ph)), 380, ph);   // clear of the navball (but never off the top)
             Ui.Box(r);
