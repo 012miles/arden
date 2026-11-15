@@ -67,7 +67,7 @@ namespace Rocket
         /// own weather. The weather used to follow only the time and place, and every new game starts at the same time on
         /// the same pad, so every game began with the same storm. (Tests keep 0: the old, fixed weather.)
         /// </summary>
-        public int WeatherSeed { get => weatherSeed; set { weatherSeed = value; Weather.GameSeed = value; } }
+        public int WeatherSeed { get => weatherSeed; set { weatherSeed = value; Weather.GameSeed = value; Outposts.GameSeed = value; } }   // (milestone 39: and the random places)
         int weatherSeed;
         static int NewWeatherSeed() => IsAutotest ? 0 : new System.Random().Next(1, 1_000_000);
 

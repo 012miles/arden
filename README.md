@@ -16,6 +16,8 @@ Developed by captaincarl24
   Real lamps, sunlight falling through the windows and textured cloth, rubber, paint and metal make it look real.
 - **Survive**: every Ardling has health, food and stamina. Search outposts for loot, pick things up (F), throw them (R), keep
   them in your backpack (I) between flights, and buy kit or sell finds at the space centre's supply store.
+- **Out there**: random places to find on every world, and things that happen: lightning, dust devils, heat waves, meteor
+  showers, solar flares, micrometeoroids. Engines heat up (radiators and coolant help) and parts get damaged (repair kits fix them).
 - **Make it yours**: paint your rocket in 16 colours and stick on decals (built-in ones or your own pictures), save your own presets, and
   dress your Ardling (suit colour, visor note, hat) for multiplayer.
 - **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole

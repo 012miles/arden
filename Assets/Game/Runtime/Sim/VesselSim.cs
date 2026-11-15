@@ -52,6 +52,9 @@ namespace Rocket
         public float load;             // drills/converters/scanners: how hard it worked last step (0..1), for the HUD and effects
         public bool used;              // single-use instrument (sample canister) that needs a scientist to clean it
         public bool broken;            // landing leg that gave way on a hard landing: an engineer on EVA can fix it
+        public float damage;           // milestone 39: 0 fine .. 1 wrecked (lightning, meteorites, micrometeoroids): weaker, hotter, leaking
+        public double coolant;         // milestone 39: litres of coolant left (coolant tanks)
+        public bool hot;               // milestone 39: an engine that overheated and shut itself down until it cools
         public Vector3 thrustLocal;    // this step's engine force on the part (kN, vessel frame)
         public Vector3 aeroArea;       // this step's aero "area vector" on the part (times q in kPa = kN)
 
@@ -275,6 +278,7 @@ namespace Rocket
                 {
                     def = defs[i], index = i, parent = n.parent, attach = n.attach, localPos = n.pos, localRot = n.rot,
                     groups = n.groups, variant = n.variant, decal = n.decal, propellant = defs[i].propellant, mono = defs[i].mono, ablator = defs[i].ablator,
+                    coolant = defs[i].coolant,
                 });
                 for (int k = 0; k < defs[i].crew; k++) v.parts[i].crew.Add(CrewNames.Next());
                 if (VaryToughness) v.parts[i].toughness = 0.93f + 0.2f * (float)ToughRng.NextDouble();
@@ -574,8 +578,10 @@ namespace Rocket
                     continue;
                 }
                 if (!p.ignited || !p.def.IsEngine || !EngineHasFuel(p)) continue;
+                if (p.hot) continue;   // milestone 39: overheated, cooling down
                 double thr = p.def.IsSolid ? 1.0 : throttle;
                 if (p.def.IsJet) thr = p.spool * JetFactor(p.def);
+                if (p.damage > 0) thr *= 1 - 0.6 * p.damage;   // milestone 39: a damaged engine pushes less
                 if (thr <= 0) continue;
                 double isp = p.def.ispVac + (p.def.ispAsl - p.def.ispVac) * Math.Min(1, pressure);
                 double f = p.def.MaxMassFlow * thr * G0 * isp;
@@ -1262,6 +1268,7 @@ namespace Rocket
                     qIn = flux * exposure * Math.PI * r * r;
                     if (qIn > best) { best = qIn; leadingPart = i; }
                 }
+                if (EngineHeat && p.def.IsEngine && p.thrustFrac > 0) qIn += EngineHeatW(p) - EngineRegenW(p);   // milestone 39: its waste heat, less what its own cooling carries off
                 double area = SurfaceArea(p);
                 double qRad = Thermal.Sigma * Thermal.Emissivity * area * (Math.Pow(p.temp, 4) - Math.Pow(Thermal.SpaceTemp, 4));
                 double hConv = rho > 0 ? 6 * Math.Sqrt(rho * Math.Max(s, 1)) : 0;
@@ -1279,6 +1286,7 @@ namespace Rocket
                 if (p.temp < 150) p.temp = 150;
             }
 
+            CoolEngines(dt);   // milestone 39: radiators and coolant, and engines shutting down before they melt
             // Burn-up: a part with nothing hanging off it is lost; losing a command part or a structural part ends the flight.
             for (int i = parts.Count - 1; i >= 0; i--)
             {
@@ -1306,6 +1314,110 @@ namespace Rocket
                 double qRad = Thermal.Sigma * Thermal.Emissivity * SurfaceArea(p) * (Math.Pow(p.temp, 4) - Math.Pow(Thermal.SpaceTemp, 4));
                 p.temp = Math.Max(Thermal.SpaceTemp, p.temp - qRad * dt / SkinCapacity(p));
             }
+            CoolEngines(dt);
+            Leak(dt);
+        }
+
+        // ---------------------------------------------------------------- milestone 39: engine heat, radiators, coolant, damage
+
+        /// <summary>Engines make heat as they run (switched off in the older tests, so their numbers stay put).</summary>
+        public static bool EngineHeat = true;
+        /// <summary>A heat wave makes everything run hotter (1 = normal).</summary>
+        public static float HeatBoost = 1f;
+        public const double EngineHeatPerKn = 8000;   // W of waste heat per kN of thrust
+        public const double CoolantJoulesPerLitre = 250000;
+        public const double HotAt = 0.85, CoolAgainAt = 0.6, CoolantFrom = 0.7;
+
+        public double EngineHeatW(PartState p) => p.def.thrustVac * p.thrustFrac * EngineHeatPerKn * (1 + 5 * p.damage) * HeatBoost;   // (a wrecked engine: six times the heat)
+
+        /// <summary>
+        /// An engine's own cooling (fuel run round the nozzle) while it fires: nothing below 45% of its limit, up to 1.6x
+        /// its normal waste heat by 60%. So a healthy engine settles near 55% and never overheats, even in a heat wave;
+        /// a damaged one (two or three times the heat) climbs past 85% and shuts down, unless radiators or coolant help.
+        /// </summary>
+        public double EngineRegenW(PartState p)
+        {
+            double limit = p.TempLimit;
+            double k = Math.Max(0, Math.Min(1, (p.temp - limit * 0.45) / (limit * 0.15)));
+            return p.def.thrustVac * p.thrustFrac * EngineHeatPerKn * 1.6 * k * (1 - 0.7 * p.damage);   // (damage breaks the cooling channels too)
+        }
+
+        public double CoolantLeft { get { double s = 0; foreach (var p in parts) s += p.coolant; return s; } }
+        public double CoolantCapacity { get { double s = 0; foreach (var p in parts) s += p.def.coolant; return s; } }
+
+        /// <summary>Puts coolant back into the tanks (a canister); returns the litres that fitted.</summary>
+        public double AddCoolant(double litres)
+        {
+            double put = 0;
+            foreach (var p in parts) { if (litres <= 0) break; double a = Math.Min(litres, p.def.coolant - p.coolant); if (a > 0) { p.coolant += a; litres -= a; put += a; } }
+            return put;
+        }
+
+        /// <summary>
+        /// Radiator panels shed engine heat (more the hotter the engine); an engine past 70% of its limit draws coolant;
+        /// one past 85% shuts itself down (no thrust) until it's below 60%.
+        /// </summary>
+        void CoolEngines(double dt)
+        {
+            if (!EngineHeat) return;
+            double radW = 0;
+            int engines = 0;
+            foreach (var p in parts)
+            {
+                if (p.def.kind == PartKind.Radiator) radW += p.def.coolRate * 1000.0 * (p.def.IsDeployable && !p.legsDeployed ? 0.2 : 1.0);   // (unfolded, or a fixed strip)
+                if (p.def.IsEngine && !p.def.IsSolid) engines++;
+            }
+            foreach (var p in parts)
+            {
+                if (!p.def.IsEngine) continue;
+                double limit = p.TempLimit;
+                if (radW > 0 && engines > 0 && p.temp > 300)
+                {
+                    // an engine's coolant loop runs far hotter than a drill's: radiators shed five times their rating from it
+                    double q = radW * 5 / engines * Math.Min(1, (p.temp - 300) / 600);
+                    p.temp = Math.Max(300, p.temp - q * dt / SkinCapacity(p));
+                }
+                if (p.temp > limit * CoolantFrom && CoolantLeft > 0)
+                {
+                    double want = (p.temp - limit * (CoolantFrom - 0.05)) * SkinCapacity(p);
+                    double litres = Math.Min(Math.Min(want / CoolantJoulesPerLitre, 3.0 * dt), CoolantLeft);
+                    foreach (var t in parts) { if (litres <= 0) break; double a = Math.Min(litres, t.coolant); if (a <= 0) continue; t.coolant -= a; litres -= a; p.temp -= a * CoolantJoulesPerLitre / SkinCapacity(p); }
+                }
+                if (!p.hot && p.temp > limit * HotAt) { p.hot = true; lastEvent = $"{p.def.name} overheated: it's shut itself down to cool. (Radiators and coolant keep engines cooler.)"; }
+                else if (p.hot && p.temp < limit * CoolAgainAt) { p.hot = false; lastEvent = $"{p.def.name} has cooled down and can fire again."; }
+            }
+        }
+
+        /// <summary>Damaged tanks leak (a wrecked one empties in about 20 minutes).</summary>
+        void Leak(double dt)
+        {
+            foreach (var p in parts)
+            {
+                if (p.damage < 0.25f) continue;
+                if (p.propellant > 0 && !p.def.IsSolid) p.propellant = Math.Max(0, p.propellant - p.def.propellant * 0.0008 * p.damage * dt);
+                if (p.mono > 0) p.mono = Math.Max(0, p.mono - p.def.mono * 0.0008 * p.damage * dt);
+                if (p.coolant > 0) p.coolant = Math.Max(0, p.coolant - p.def.coolant * 0.0008 * p.damage * dt);
+            }
+        }
+
+        /// <summary>Damages a part (lightning, a meteorite, a micrometeoroid): weaker, hotter, leaking, scorched. Legs break.</summary>
+        public void DamagePart(PartState p, float amount, string why)
+        {
+            if (p == null || amount <= 0) return;
+            p.damage = Mathf.Clamp01(p.damage + amount);
+            p.charred = Mathf.Max(p.charred, p.damage * 0.7f);
+            if (p.def.kind == PartKind.Leg && p.damage >= 0.99f) p.broken = true;
+            lastEvent = $"{p.def.name} damaged by {why} ({p.damage * 100:0}%).";
+        }
+
+        /// <summary>Fixes a part's damage (and a broken leg). True if there was anything to fix.</summary>
+        public bool FixPart(PartState p)
+        {
+            if (p == null || p.damage <= 0 && !p.broken) return false;
+            p.damage = 0;
+            if (p.broken) { p.broken = false; p.legsDeployed = gearDown; }
+            RecomputeMass();
+            return true;
         }
 
         // ---------------------------------------------------------------- rotation

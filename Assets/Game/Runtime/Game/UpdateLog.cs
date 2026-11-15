@@ -23,6 +23,12 @@ namespace Rocket
         /// <summary>Every update, newest first.</summary>
         public static readonly Update[] All =
         {
+            U(39, "Nov 15, 2026", "Out there",
+                "Random places to find on every world, different in every game: supply caches, camps, crashed probes, depots... ten within driving distance of the space centre",
+                "Things happen: lightning, dust devils, wind and heat waves where there's air; meteor showers and a strange shimmer on airless worlds; solar flares, micrometeoroids and blackouts in space",
+                "Meteor showers leave meteorite chunks to pick up and sell",
+                "Engines heat up as they run: past 85% they shut themselves down until they cool. Radiators cool engines now, and there's a coolant tank",
+                "Parts can be damaged (weaker engines, leaking tanks): fix them with a repair kit, or an engineer on foot"),
             U(38, "Nov 15, 2026", "The survival kit",
                 "Every Ardling has health, food and stamina: running uses stamina, on foot you get hungry, falls, heavy g and a burning cabin hurt",
                 "Knocked out? A revive kit in your backpack gets you up; otherwise a teammate with one has 90 seconds",

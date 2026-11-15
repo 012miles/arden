@@ -813,6 +813,34 @@ and look; nothing copied from the game the doc described):
 - Next: stage two (random outposts and wrecks along the way, random events, engine heat with coolant and radiators, repairs),
   then stage three (rogue drones, fighting back, traders, the mystery vending machine, daily and weekly quests).
 
+### Milestone 39: out there (2026-11-15)
+Stage two of the survival systems (captaincarl24: "add the rest of all the systems in the doc"), in Arden's own style:
+- **Random places** (Outposts.RandomSites, picked by each game's seed): 10 round the space centre (4 to 60 km out, on dry land:
+  rover trips) and 8 anywhere on every other world with ground (none on the sun or the gas giant). Supply caches, abandoned
+  camps, crashed probes, research huts, fuel depots, relay masts, survey rovers and cargo pods, each with a code name. They're
+  drawn like the outposts and searched the same way (a little fuel, food and science, and loot to pick up).
+- **Hazards** (Sim/Hazards.cs, Game/FlightHazards.cs): one every 3-8 minutes (half as often again on Easy), never while
+  warping, in a lesson or a replay, announced on screen with a banner. Where you are decides what can happen:
+  - thick air (Arden's ground): **thunderstorms** (lightning strikes nearby: a bolt, a flash, thunder; it hurts walkers within
+    10 m and damages ships it hits);
+  - any air: **dust devils** (a spinning column crossing close by, flinging loose things and Ardlings), **strong wind** (things
+    blow about, walking into it is tiring), **heat waves** (walkers get hungry fast, engines run 50% hotter, an orange tint);
+  - airless ground: **meteor showers** (15 meteors over 45 s: streaks, impacts, damage; a third leave a meteorite chunk to sell),
+    the **strange shimmer** (a glowing light that lifts loose things and Ardlings off the ground, then drops them);
+  - airless ground and space: **solar flares** (10 s warning, then radiation hurts anyone outside);
+  - space: **micrometeoroids** (pings that damage parts or hurt a spacewalker), **comms blackouts** (the signal drops for 30 s).
+- **Engine heat** (VesselSim.CoolEngines): running engines make waste heat (8 kW per kN; six times that when wrecked; 1.5x in a
+  heat wave), less what their own cooling carries off (fuel run round the nozzle: up to 1.6x the normal heat from 45 to 60% of
+  the limit, broken along with the engine when it's damaged). So a healthy engine settles near 55% of its limit, even in a heat
+  wave, and never overheats; a damaged one climbs past 85% and shuts itself down (no thrust) until it's below 60%, instead of
+  exploding. The existing radiators now cool engines too (five times their rating, unfolded; a fifth folded), and the new
+  **coolant tank** (120 L, Ore Mining tech) cools an engine past 70%; a **coolant canister** item tops it up.
+- **Part damage** (PartState.damage, saved): lightning, meteorites and micrometeoroids damage parts. A damaged engine pushes less
+  (40% when wrecked) and runs hotter, damaged tanks leak, damaged parts look scorched, wrecked legs break. A repair kit (anyone)
+  or an engineer on foot fixes them.
+- 4 new sim tests (places, hazards, engine heat, damage; the older tests run with engine heat off so their numbers stay put);
+  `-autotestHazards` (770-778).
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

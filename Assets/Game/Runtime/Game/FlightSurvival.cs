@@ -386,11 +386,9 @@ namespace Rocket
                 case "repairkit":
                 {
                     if (eva == null) { msg = "Repairs are done outside: go out (ENTER) and stand by the broken part."; keep = true; break; }
-                    var broken = eva.WorkInReach(U.vessels).FirstOrDefault(t => t.p.broken);
-                    if (broken.p == null) { msg = "Nothing broken within reach."; keep = true; break; }
-                    broken.p.broken = false;
-                    broken.p.legsDeployed = broken.v.gearDown;
-                    broken.v.RecomputeMass();
+                    var broken = eva.WorkInReach(U.vessels).Where(t => t.p.broken || t.p.damage > 0.01f).OrderByDescending(t => t.p.damage + (t.p.broken ? 1 : 0)).FirstOrDefault();
+                    if (broken.p == null) { msg = "Nothing broken or damaged within reach."; keep = true; break; }
+                    broken.v.FixPart(broken.p);
                     msg = $"{who} fixed the {broken.p.def.name} with the repair kit.";
                     break;
                 }
@@ -722,7 +720,7 @@ namespace Rocket
             {
                 case ItemKind.Food: return $"+{d.hunger:0} food" + (d.stamina > 0 ? $", +{d.stamina:0} stamina" : "");
                 case ItemKind.Medical: return d.id == "revive" ? "revives" : $"+{d.heal:0} health";
-                case ItemKind.Supply: return d.fuel > 0 ? $"{d.fuel * 1000:0} kg fuel" : d.mono > 0 ? $"{d.mono * 1000:0} kg thruster fuel" : d.ec > 0 ? $"{d.ec:0} EC" : d.supplies > 0 ? $"{d.supplies:0} crew-days" : "suit air";
+                case ItemKind.Supply: return d.fuel > 0 ? $"{d.fuel * 1000:0} kg fuel" : d.mono > 0 ? $"{d.mono * 1000:0} kg thruster fuel" : d.ec > 0 ? $"{d.ec:0} EC" : d.supplies > 0 ? $"{d.supplies:0} crew-days" : d.coolant > 0 ? $"{d.coolant:0} L coolant" : "suit air";
                 case ItemKind.Valuable: return $"worth {d.price}";
                 case ItemKind.Upgrade: return "backpack upgrade";
                 default: return d.kind.ToString().ToLowerInvariant();

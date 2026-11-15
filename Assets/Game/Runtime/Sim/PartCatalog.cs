@@ -30,6 +30,7 @@ namespace Rocket
         public bool stackTop = true, stackBottom = true, surfaceAttach = true, radial;
         public Vector3 radialSize;       // radial parts: (outward, height, width)
         public float dryMass, propellant, mono;
+        public float coolant;   // milestone 39: litres of coolant a tank holds (for engines running hot)
         public float thrustVac, ispVac, ispAsl, gimbalDeg;
         public float torque;             // reaction wheel, kN*m
         public float finArea;            // m^2
@@ -344,6 +345,10 @@ namespace Rocket
                 dryMass = 0.1f, mono = 0.4f, color = Hull, accent = Teal, description = "Stack tank of monopropellant for RCS." },
             new PartDef { id = "mono.r", name = "Radial Monoprop Tank", kind = PartKind.MonoTank, radial = true, radialSize = new Vector3(0.45f, 0.9f, 0.45f),
                 stackTop = false, stackBottom = false, dryMass = 0.04f, mono = 0.12f, color = Hull, accent = Teal, description = "Side-mounted monoprop tank." },
+            // milestone 39: keeping engines cool (the radiators cool engines too now)
+            new PartDef { id = "cool.s", name = "Coolant Tank", kind = PartKind.MonoTank, radial = true, radialSize = new Vector3(0.4f, 0.7f, 0.4f),
+                stackTop = false, stackBottom = false, dryMass = 0.05f, coolant = 120f, color = new Color(0.2f, 0.55f, 0.85f), accent = Mid,
+                description = "120 litres of coolant. An engine getting too hot draws on it before it has to shut down. Refill with a coolant canister." },
             new PartDef { id = "leg.s", name = "Landing Leg", kind = PartKind.Leg, radial = true, radialSize = new Vector3(0.25f, 1.1f, 0.22f),
                 stackTop = false, stackBottom = false, dryMass = 0.05f, legLength = 1.7f, crashTolerance = 12f, color = Mid, accent = Dark,
                 description = "G deploys the gear. Use 3 or 4 with symmetry near the bottom of a lander. Takes 12 m/s." },
@@ -501,10 +506,10 @@ namespace Rocket
                 description = "Refines ore into rocket fuel (0.8 t per t of ore) or monopropellant (0.6 t), 7.2 t of ore an hour, 6 EC/s. Makes 180 kW of heat: without radiators it slows down." },
             new PartDef { id = "rad.r", name = "Radiator Panel", kind = PartKind.Radiator, radial = true, radialSize = new Vector3(0.1f, 0.8f, 0.5f),
                 stackTop = false, stackBottom = false, dryMass = 0.05f, maxQ = 2f, coolRate = 120f, color = new Color(0.9f, 0.9f, 0.88f), accent = Mid,
-                description = "Unfolds (Y) to shed 120 kW from drills and converters (a fifth of that folded). Tears off in thick air." },
+                description = "Unfolds (Y) to shed 120 kW from drills, converters and engines (a fifth of that folded). Tears off in thick air." },
             new PartDef { id = "rad.s", name = "Radiator Strip", kind = PartKind.Radiator, radial = true, radialSize = new Vector3(0.06f, 1.2f, 0.3f),
                 stackTop = false, stackBottom = false, noDeploy = true, dryMass = 0.06f, coolRate = 40f, color = new Color(0.85f, 0.86f, 0.84f), accent = Dark,
-                description = "Fixed radiator: sheds 40 kW, always working, survives reentry and launch." },
+                description = "Fixed radiator: sheds 40 kW, always working, survives reentry and launch. Cools engines too." },
         };
 
         /// <summary>An astronaut out of the hatch: walks, jumps, flies a small jetpack. Not in the builder.</summary>

@@ -202,6 +202,7 @@ namespace Rocket
             fpHiddenView = null;
             LeaveInterior();
             ClearItemViews();   // milestone 38
+            ClearHazards();     // milestone 39
             for (int i = U.vessels.Count - 1; i >= 0; i--) if (U.vessels[i].destroyed) U.vessels.RemoveAt(i);
             ClearScene();
             active = null;
@@ -492,6 +493,7 @@ namespace Rocket
             EasyHelpers(active, Time.unscaledDeltaTime);   // milestone 35: Easy lends a hand
             TripTick(Time.unscaledDeltaTime);              // milestone 35: the Easy autopilot to a moon and down
             SurvivalTick();                                // milestone 38: health, hunger, stamina; things flying through the air
+            HazardsTick(Mathf.Min(Time.unscaledDeltaTime, 0.1f));   // milestone 39: storms, meteors, flares...
             if (replay != null)
             {
                 float rdt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
@@ -1140,7 +1142,7 @@ namespace Rocket
             if (commTimer > 0) return;
             commTimer = 0.5f;
             commLink = CommNet.Connect(active, U.vessels, root.bodies, ut);
-            active.connected = commLink.Connected;
+            active.connected = commLink.Connected && !HazardBlackout;   // (milestone 39: a comms blackout cuts it)
             active.signal = commLink.signal;
             bool probe = active.IsControllable && active.CrewCount == 0;
             if (probe && wasConnected && !active.connected) Show("Signal lost: the probe can't throttle up or stage until it's back in contact.", 4f);

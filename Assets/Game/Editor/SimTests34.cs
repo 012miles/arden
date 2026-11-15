@@ -57,7 +57,7 @@ namespace Rocket.EditorTools
             var u = CareerUniverse();
             var ship = u.Add(VesselSim.CreateLanded(VesselDesign.Stack("Lander", "pod.wren", "tank.s2", "eng.ember"), tal, (camp.dir + CelestialBody.EastAt(camp.dir) * (100.0 / tal.radius)).normalized, 0));
             ship.career = u.career;
-            Check(Outposts.Near(ship, 0, out double m) == camp && m < 150, $"found beside the ship ({m:0} m)");
+            Check(Outposts.Near(ship, 0, out double m)?.id == camp.id && m < 150, $"found beside the ship ({m:0} m)");   // (by id: a new game's seed rebuilds the list)
             var far = VesselSim.CreateLanded(VesselDesign.Stack("Far", "pod.wren"), tal, (camp.dir + CelestialBody.EastAt(camp.dir) * (2000.0 / tal.radius)).normalized, 0);
             Check(Outposts.Near(far, 0, out _) == null, "not from 2 km away");
             foreach (var p in ship.parts) p.propellant = 0;

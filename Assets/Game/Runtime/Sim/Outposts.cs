@@ -41,7 +41,75 @@ namespace Rocket
 
         static readonly Dictionary<string, List<Landmark>> cache = new Dictionary<string, List<Landmark>>();
 
-        public static Def Get(string id) => Defs.FirstOrDefault(d => d.id == id);
+        // ---- milestone 39: random places along the way, different in every game (the game's seed picks them)
+        static int gameSeed = 1;
+        static readonly Dictionary<string, Def> randomDefs = new Dictionary<string, Def>();
+
+        /// <summary>Which game's random places to use (its weather seed); a new seed forgets the old places.</summary>
+        public static int GameSeed
+        {
+            get => gameSeed;
+            set { if (value == gameSeed) return; gameSeed = value; lock (cache) { cache.Clear(); randomDefs.Clear(); } }
+        }
+
+        static readonly (string name, LandmarkKind kind, string blurb)[] SiteKinds =
+        {
+            ("Supply cache", LandmarkKind.Outpost, "Crates left for whoever came next. Some are still sealed."),
+            ("Abandoned camp", LandmarkKind.Outpost, "Tents, a stove and a note that just says \"back soon\"."),
+            ("Crashed probe", LandmarkKind.Wreck, "An old probe that didn't land so much as arrive."),
+            ("Research hut", LandmarkKind.Outpost, "Instruments still ticking away, and a fridge nobody emptied."),
+            ("Fuel depot", LandmarkKind.Outpost, "A tank farm, mostly empty. Mostly."),
+            ("Relay mast", LandmarkKind.Wreck, "A fallen relay mast with a toolbox chained to it."),
+            ("Survey rover", LandmarkKind.Wreck, "A rover that ran out of battery mid-survey."),
+            ("Cargo pod", LandmarkKind.Wreck, "A cargo pod that missed its drop zone by a long way."),
+        };
+
+        /// <summary>
+        /// The random places on a world: 10 round the space centre on the home world (4 to 60 km out, for rover trips),
+        /// 8 anywhere on other worlds with ground (none on the sun or the gas giant). Smaller finds than the big outposts:
+        /// a little fuel and food, some science, and things to pick up.
+        /// </summary>
+        public static List<Def> RandomSites(CelestialBody b)
+        {
+            var list = new List<Def>();
+            if (b == null || b.isStar || b.IsGasGiant) return list;
+            var rng = new System.Random(gameSeed * 7919 + Landmarks.StableHash(b.name));
+            bool home = b.IsHomeWorld;
+            int n = home ? 10 : 8;
+            for (int i = 0; i < n; i++)
+            {
+                var k = SiteKinds[rng.Next(SiteKinds.Length)];
+                Vector3d dir = default;
+                for (int tries = 0; tries < 12; tries++)
+                {
+                    if (home)
+                    {
+                        Vector3d site = LaunchSite.Direction, e = CelestialBody.EastAt(site), nn = CelestialBody.NorthAt(site);
+                        double a = rng.NextDouble() * Math.PI * 2, km = 4 + rng.NextDouble() * 56;
+                        dir = (site + (e * Math.Cos(a) + nn * Math.Sin(a)) * (km * 1000 / b.radius)).normalized;
+                    }
+                    else dir = CelestialBody.DirectionFromLatLon(rng.NextDouble() * 100 - 50, rng.NextDouble() * 360 - 180);
+                    if (!Terrain.IsWater(b, dir)) break;
+                }
+                double lat = Math.Asin(Math.Max(-1, Math.Min(1, dir.y))) * 180 / Math.PI, lon = Math.Atan2(-dir.z, dir.x) * 180 / Math.PI;
+                var d = new Def
+                {
+                    id = $"site.{b.name.ToLowerInvariant()}.{i}", name = $"{k.name} {(char)('A' + rng.Next(26))}-{1 + rng.Next(9)}", body = b.name, kind = k.kind,
+                    lat = lat, lon = lon, fuel = Math.Round(0.4 + rng.NextDouble() * 2.6, 1), mono = Math.Round(rng.NextDouble() * 0.15, 2),
+                    supplies = Math.Round(2 + rng.NextDouble() * 12), science = Math.Round(5 + rng.NextDouble() * 20), blurb = k.blurb,
+                };
+                list.Add(d);
+            }
+            return list;
+        }
+
+        public static Def Get(string id)
+        {
+            var d = Defs.FirstOrDefault(x => x.id == id);
+            if (d != null || id == null || !id.StartsWith("site.")) return d;
+            lock (cache) { if (randomDefs.TryGetValue(id, out d)) return d; }
+            return null;
+        }
 
         /// <summary>The outposts and wrecks on a world, as places (drawn like the landmarks).</summary>
         public static List<Landmark> On(CelestialBody b)
@@ -51,9 +119,10 @@ namespace Rocket
             {
                 if (cache.TryGetValue(b.name, out var list)) return list;
                 list = new List<Landmark>();
-                foreach (var d in Defs)
+                foreach (var d in Defs.Concat(RandomSites(b)))   // milestone 39: and the random places
                 {
                     if (d.body != b.name) continue;
+                    if (d.id.StartsWith("site.")) randomDefs[d.id] = d;
                     int hash = Landmarks.StableHash(d.id);
                     list.Add(new Landmark { id = d.id, name = d.name, body = d.body, kind = d.kind, dir = CelestialBody.DirectionFromLatLon(d.lat, d.lon), reach = Reach,
                         blurb = d.blurb, yaw = (hash & 0xff) * 1.4f, seed = (hash >> 8) & 0x7fff });

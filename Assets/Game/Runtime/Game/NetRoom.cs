@@ -68,6 +68,7 @@ namespace Rocket
         public List<Vitals> vitals = new List<Vitals>();
         public List<NetPack> packs = new List<NetPack>();
         public List<WorldItem> items = new List<WorldItem>();
+        public string hazard;   // milestone 39: what's going on out there right now (the host's game runs it)
         /// <summary>A room that builds and flies a rocket: a rocket room (1) or an expedition (2).</summary>
         public bool Rocket => activity == 1 || activity == 2;
         // ---- milestone 31: the room's best flight on each mission ("scenario|score|stars"), announced so other rooms can race it

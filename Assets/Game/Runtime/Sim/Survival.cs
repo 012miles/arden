@@ -89,7 +89,7 @@ namespace Rocket
         public string id, name, about;
         public ItemKind kind;
         public float hunger, heal, stamina;   // food and medicine
-        public double fuel, mono, ec, supplies, air;   // tonnes / EC / crew-days / suit hours it adds
+        public double fuel, mono, ec, supplies, air, coolant;   // tonnes / EC / crew-days / suit hours / litres it adds
         public int price;                     // in the store (funds); sells for half (valuables: their worth)
         public int rarity;                    // 0 common, 1 uncommon, 2 rare, 3 very rare (how often they turn up)
         public Color color = Color.white;
@@ -148,6 +148,7 @@ namespace Rocket
             new ItemDef { id = "monocan", name = "Thruster fuel can", kind = ItemKind.Supply, mono = 0.04, price = 90, rarity = 1, color = C(0.95f, 0.75f, 0.1f), shape = "can", about = "40 kg of thruster (RCS) fuel." },
             new ItemDef { id = "battery", name = "Battery pack", kind = ItemKind.Supply, ec = 600, price = 100, rarity = 1, color = C(0.2f, 0.5f, 0.9f), shape = "box", about = "600 EC of electricity for a ship." },
             new ItemDef { id = "supplycrate", name = "Supply crate", kind = ItemKind.Supply, supplies = 3, price = 140, rarity = 0, color = C(0.55f, 0.6f, 0.4f), shape = "box", about = "Three crew-days of food, water and air for a ship." },
+            new ItemDef { id = "coolantcan", name = "Coolant canister", kind = ItemKind.Supply, coolant = 40, price = 110, rarity = 1, color = C(0.2f, 0.55f, 0.85f), shape = "can", about = "40 litres of engine coolant, for a ship with a coolant tank." },
             new ItemDef { id = "airtank", name = "Air tank", kind = ItemKind.Supply, air = 6, price = 80, rarity = 0, color = C(0.2f, 0.65f, 0.3f), shape = "tube", about = "Refills your suit's air." },
             // tools
             new ItemDef { id = "repairkit", name = "Repair kit", kind = ItemKind.Tool, price = 180, rarity = 1, color = C(0.9f, 0.55f, 0.1f), shape = "kit", about = "Fixes a broken part within reach. Anyone can use it, not just engineers." },
@@ -229,6 +230,7 @@ namespace Rocket
                     if (d.mono > 0 && mono < d.mono - 1e-4) bits.Add($"{(d.mono - mono) * 1000:0} kg of thruster fuel");
                     if (d.ec > 0) { double before = ship.EcStored; ship.AddCharge(d.ec); if (ship.EcStored > before + 0.5) bits.Add($"{ship.EcStored - before:0} EC"); }
                     if (d.supplies > 0 && ship.SuppliesCapacity > 0) { double a = ship.AddSupplies(d.supplies); if (a > 0.01) bits.Add($"{a:0.0} crew-days of supplies"); }
+                    if (d.coolant > 0) { double a = ship.AddCoolant(d.coolant); if (a > 0.5) bits.Add($"{a:0} L of coolant"); }   // milestone 39
                     if (bits.Count == 0) return null;
                     ship.RecomputeMass();
                     return $"Into {ship.name}: {string.Join(", ", bits)}.";

@@ -66,6 +66,7 @@ namespace Rocket
                 // milestone 34: in the cabin, just its prompts (and the team, and the pause menu)
                 DrawInteriorHud(Ui.W, Ui.H);
                 DrawSurvivalHud(Ui.W, Ui.H);   // milestone 38
+                DrawHazardHud(Ui.W, Ui.H);     // milestone 39
                 if (Coop.Active) DrawCoopFlight(Ui.W, Ui.H);
                 if (paused && !showHowTo && !showBadges) DrawEndPanel("Paused", "");
                 return;
@@ -86,6 +87,7 @@ namespace Rocket
             DrawInteriorHud(W, H);   // milestone 34: the cabin's prompts
             DrawTripPanel(W, H);     // milestone 35: the Easy autopilot
             DrawSurvivalHud(W, H);   // milestone 38: health, food, stamina, what F does, the backpack
+            DrawHazardHud(W, H);     // milestone 39: what's going on out there
             var v = active;
             var body = v.body;
             Orbit orbit = trajectory.Count > 0 ? trajectory[0].orbit : null;
@@ -532,9 +534,10 @@ namespace Rocket
             cy += CableRows(r, cy, true);
             foreach (var (vv, p) in jobs)
             {
-                string label = p.broken ? $"Fix the {p.def.name} on {vv.name}{(m.role == CrewRole.Engineer ? "" : " (engineer)")}" : $"Repack the {p.def.name} on {vv.name}";
-                GUI.enabled = !p.broken || m.role == CrewRole.Engineer;
-                if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), label, Ui.ButtonSmall)) { if (p.broken) RepairPart(vv, p); else RepackChute(vv, p); }
+                bool fix = p.broken || p.damage > 0.01f;   // (milestone 39: damaged parts too)
+                string label = fix ? $"Fix the {p.def.name}{(p.damage > 0.01f ? $" ({p.damage * 100:0}%)" : "")}{(m.role == CrewRole.Engineer ? "" : " (engineer)")}" : $"Repack the {p.def.name} on {vv.name}";
+                GUI.enabled = !fix || m.role == CrewRole.Engineer;
+                if (Ui.Press(new Rect(r.x + 12, cy, 276, 26), label, Ui.ButtonSmall)) { if (fix) RepairPart(vv, p); else RepackChute(vv, p); }
                 GUI.enabled = true;
                 cy += 30;
             }

@@ -25,6 +25,7 @@ namespace Rocket.EditorTools
             failures = 0;
             Weather.On = false;      // milestone 27: the weather tests turn it on themselves
             VesselSim.VaryToughness = false;   // milestone 35: parts exactly at their ratings, so results repeat
+            VesselSim.EngineHeat = false;      // milestone 39: engines making heat changes older numbers (its own tests switch it on)
             // -only3b runs just the spaceplane tests (quick iteration).
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only3b") >= 0) { RunMilestone3b(); Finish(); return; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only4") >= 0) { RunMilestone4a(); RunMilestone4b(); Finish(); return; }
@@ -58,6 +59,7 @@ namespace Rocket.EditorTools
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only34") >= 0) { RunMilestone34(); Finish(); return; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only35") >= 0) { RunMilestone35(); Finish(); return; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only38") >= 0) { RunMilestone38(); Finish(); return; }
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only39") >= 0) { RunMilestone39(); Finish(); return; }
             Run("Orbit: state at epoch round-trips (ellipse + hyperbola)", StateAtEpoch);
             Run("Orbit: one full period returns to the start", OrbitPeriodRoundTrip);
             Run("Orbit: circular orbit reports Ap = Pe", CircularApPe);
@@ -113,6 +115,7 @@ namespace Rocket.EditorTools
             RunMilestone34();
             RunMilestone35();
             RunMilestone38();
+            RunMilestone39();
             if (Environment.GetCommandLineArgs().Length > 0 && Array.IndexOf(Environment.GetCommandLineArgs(), "-heatSweep") >= 0) HeatSweep();
             Finish();
         }

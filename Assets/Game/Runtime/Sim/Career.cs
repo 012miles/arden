@@ -60,7 +60,7 @@ namespace Rocket
                 parts = new[] { "relay.s" } },
             new TechNode { id = "mining", name = "Ore Mining", tier = 6, cost = 200, requires = new[] { "electrics", "landing" },
                 description = "Survey scanners to map ore from orbit, drills, ore tanks and a radiator strip.",
-                parts = new[] { "scan.orbit", "drill.s", "ore.r", "ore.s", "rad.s" } },
+                parts = new[] { "scan.orbit", "drill.s", "ore.r", "ore.s", "rad.s", "cool.s" } },   // (milestone 39: the coolant tank)
             new TechNode { id = "refining", name = "Ore Refining", tier = 7, cost = 380, requires = new[] { "mining" },
                 description = "Turn ore into fuel where you land: the converter, radiator panels, big solar arrays and heavy drills.",
                 parts = new[] { "isru.s", "rad.r", "solar.l", "drill.l", "ore.l" } },
@@ -111,7 +111,7 @@ namespace Rocket
             { "elevon", 400 }, { "tail.fin", 500 }, { "gear.s", 400 }, { "port.sm", 800 }, { "port.std", 1400 }, { "hab.s", 4000 },
             { "solar.s", 750 }, { "antenna.s", 450 }, { "battery.r", 150 }, { "battery.s", 550 }, { "relay.s", 1800 }, { "sci.therm", 300 }, { "sci.baro", 450 }, { "sci.bio", 900 }, { "sci.ground", 1300 },
             { "solar.l", 2800 }, { "scan.orbit", 2500 }, { "drill.s", 2200 }, { "drill.l", 6000 }, { "ore.r", 300 }, { "ore.s", 800 }, { "ore.l", 3000 },
-            { "isru.s", 7000 }, { "rad.r", 900 }, { "rad.s", 500 }, { "probe.vireo", 1600 },
+            { "isru.s", 7000 }, { "rad.r", 900 }, { "rad.s", 500 }, { "cool.s", 400 }, { "probe.vireo", 1600 },
             { "wheel.s", 600 }, { "wheel.l", 1500 }, { "frame.r", 900 }, { "dish.d", 6000 },
             { "tank.s3", 500 }, { "tank.l2", 700 }, { "tank.l16", 4600 }, { "eng.swift", 1500 }, { "eng.condor", 6500 },
             { "srb.flint", 250 }, { "srb.blaze", 2400 }, { "nose.l", 300 }, { "adapt.sl", 400 }, { "fin.l", 220 },

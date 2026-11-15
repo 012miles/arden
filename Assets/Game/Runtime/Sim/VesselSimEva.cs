@@ -78,6 +78,15 @@ namespace Rocket
             SyncLanded(ut + dt);
         }
 
+        /// <summary>Milestone 39: thrown off the ground (a dust devil, the shimmer): off their feet with this push.</summary>
+        public void Fling(Vector3d dv)
+        {
+            landed = false;
+            hasLaunched = true;
+            rails = null;
+            vel += dv;
+        }
+
         /// <summary>Which way is out of a crewed part's hatch (vessel frame): the side that's most level with the ground when landed.</summary>
         Vector3 HatchDir(PartState p)
         {
@@ -232,7 +241,7 @@ namespace Rocket
                 if (v == this || v.destroyed || v.body != body || v.IsEva) continue;
                 foreach (var p in v.parts)
                 {
-                    bool job = p.broken || (p.def.kind == PartKind.Parachute && (p.chuteDeployed || p.chuteFailed));
+                    bool job = p.broken || p.damage > 0.01f || (p.def.kind == PartKind.Parachute && (p.chuteDeployed || p.chuteFailed));   // (milestone 39: damaged parts too)
                     if (job && ReachTo(v, p) <= WorkRange + (landed && v.landed ? 0 : Math.Max(p.def.Height, 0.5) * 0.5)) list.Add((v, p));
                 }
             }
@@ -243,13 +252,12 @@ namespace Rocket
         public string Repair(VesselSim v, PartState p)
         {
             if (!IsEva) return "Only an astronaut on EVA can make repairs.";
-            if (!p.broken) return $"The {p.def.name} isn't broken.";
+            if (!p.broken && p.damage <= 0.01f) return $"The {p.def.name} isn't broken.";
             var m = CrewInfo(EvaName);
-            if (m.role != CrewRole.Engineer) return $"Only an engineer can fix the {p.def.name}: {EvaName} is a {Crew.RoleName(m.role)}.";
-            p.broken = false;
-            p.legsDeployed = v.gearDown; // back to wherever the gear switch is
-            v.RecomputeMass();
-            return $"{EvaName} fixed the {p.def.name}." + (v.gearDown ? " It's coming back down." : " Deploy it with G.");
+            if (m.role != CrewRole.Engineer) return $"Only an engineer can fix the {p.def.name}: {EvaName} is a {Crew.RoleName(m.role)}. (Anyone can with a repair kit.)";
+            bool leg = p.broken;
+            v.FixPart(p);   // milestone 39: damage as well as broken legs
+            return $"{EvaName} fixed the {p.def.name}." + (leg ? (v.gearDown ? " It's coming back down." : " Deploy it with G.") : "");
         }
 
         /// <summary>Anyone on EVA can repack a used parachute; it opens again on the vessel's next stage.</summary>

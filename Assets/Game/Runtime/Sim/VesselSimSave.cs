@@ -29,6 +29,9 @@ namespace Rocket
         public float charred;
         public int convMode;
         public bool used, broken;
+        public float damage;      // milestone 39: part damage, coolant left, an overheated engine
+        public double coolant;
+        public bool hot, coolantKept;
     }
 
     /// <summary>A vessel's saved state: parts, staging, orbit (or landing spot) and switches.</summary>
@@ -88,6 +91,7 @@ namespace Rocket
                     chuteOpen = p.chuteOpen, legDeploy = p.legDeploy, towerTime = p.towerTime, spool = p.spool,
                     crew = new List<string>(p.crew), dockedTo = p.dockedTo, dockedName = p.dockedName, dockedDebris = p.dockedDebris,
                     science = new List<ScienceData>(p.science), charge = p.charge, ore = p.ore, supplies = p.supplies, charred = p.charred, convMode = p.convMode, used = p.used, broken = p.broken,
+                    damage = p.damage, coolant = p.coolant, hot = p.hot, coolantKept = true,
                 });
             return s;
         }
@@ -129,6 +133,9 @@ namespace Rocket
                 np.convMode = def.convertRate > 0 ? Math.Max(0, Math.Min(2, ps.convMode)) : 0;
                 np.used = ps.used;
                 np.broken = ps.broken;
+                np.damage = Mathf.Clamp01(ps.damage);   // milestone 39
+                np.coolant = ps.coolantKept ? Math.Max(0, Math.Min(ps.coolant, def.coolant)) : def.coolant;
+                np.hot = ps.hot;
                 if (s.saveVersion < 2) { np.dockedTo = -1; for (int k = 0; k < def.crew; k++) np.crew.Add(CrewNames.Next()); }
             }
             v.RebuildTopology();
