@@ -24,7 +24,7 @@ namespace Rocket
             {
                 dashTimer = 0.5f;
                 dashKey = key;
-                dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(st.exScenario), st.exDifficulty, st.players.Count);
+                dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(st.exScenario), st.exDifficulty, st.players.Count, !st.campaign);
             }
             return dash;
         }
@@ -69,7 +69,8 @@ namespace Rocket
                 Ui.Text(new Rect(x + 148, y, w - 148, 20), value, clip);
                 y += 20;
             }
-            Row("Budget", $"{x6.cost:N0} of {x6.budget:N0}", x6.budget > 0 ? (float)(x6.cost / x6.budget) : 0, x6.cost > x6.budget, x6.cost > x6.budget * 0.9);
+            if (x6.budget > 0) Row("Budget", $"{x6.cost:N0} of {x6.budget:N0}", (float)(x6.cost / x6.budget), x6.cost > x6.budget, x6.cost > x6.budget * 0.9);
+            else Row("Budget", $"Sandbox: none (it costs {x6.cost:N0})", 0, false, false);   // milestone 43
             Row("Mass", $"{x6.mass:0.0} t, push {x6.twr:0.0}x", Mathf.Clamp01((float)x6.twr / 2f), x6.twr > 0 && x6.twr < 1.05, x6.twr < 1.25);
             Row("Speed", $"{x6.dv:N0} of ~{sc.dvNeed:N0} m/s", Mathf.Clamp01((float)(x6.dv / sc.dvNeed)), false, x6.dv < sc.dvNeed * 0.85);
             Row("Time", double.IsInfinity(x6.days) ? $"supplies: no limit (trip ~{sc.tripDays:0} d)" : $"supplies {x6.days:0.#} d, trip ~{sc.tripDays:0} d", double.IsInfinity(x6.days) ? 1 : Mathf.Clamp01((float)(x6.days / sc.tripDays)), false, !double.IsInfinity(x6.days) && x6.days < sc.tripDays);

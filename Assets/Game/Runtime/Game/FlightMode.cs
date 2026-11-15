@@ -216,6 +216,7 @@ namespace Rocket
 
         void ClearScene()
         {
+            ClearWalkers();   // milestone 43
             foreach (var lr in cableLines.Values) if (lr != null) UnityEngine.Object.Destroy(lr.gameObject);
             cableLines.Clear();
             if (carryLine != null) { UnityEngine.Object.Destroy(carryLine.gameObject); carryLine = null; }
@@ -520,6 +521,7 @@ namespace Rocket
             if (rollout != null) AdvanceRollout(Mathf.Min(Time.unscaledDeltaTime, 0.1f));
             else if (!remote && ((!paused && !photoMode) || Coop.Active))           // (in a rocket room the flight goes on for everyone)
             {
+                HostDriveWalkers();   // milestone 43: every player's Ardling gets their keys (and the ship the pilot's)
                 DriveWarpToTarget(Mathf.Min(Time.unscaledDeltaTime, 0.1f));
                 Simulate(Mathf.Min(Time.unscaledDeltaTime, 0.1f));
                 if (active != null && active.hasLaunched) recorder.Sample(active, ut, root.bodies);     // milestone 28: for the replay
@@ -606,7 +608,7 @@ namespace Rocket
                 if (In.Down(K.Tab) && !mapView && !v.IsEva) EnterInterior();   // milestone 34: into the cabin (milestone 41: says why when it can't)
                 if (v.IsEva) HandleEvaKeys(v);
                 else HandleVesselKeys(v);
-                if (!(Coop.Active && remote)) HandleGetOut(v);   // milestone 34: ENTER gets out after a landing
+                HandleGetOut(v);   // milestone 34: ENTER gets out after a landing (milestone 43: in a room too)
             }
             if (In.Down(K.T)) ToggleSas();
 
@@ -739,8 +741,15 @@ namespace Rocket
         public VesselSim GoEva(PartState p)
         {
             if (active == null || p == null || p.crew.Count == 0) return null;
-            if (Coop.Active && remote) { Show("Spacewalks are done on the host's game in a rocket room.", 3f); return null; }
+            if (Coop.Active && remote) { Coop.Current.room.Send(new NetMsg { t = "cmd", a = "eva" }); return null; }   // milestone 43: the host puts this player's own Ardling out
             string who = p.crew[0];
+            if (Coop.Active)
+            {
+                // (milestone 43: in a room the host climbs out as their own Ardling, from whichever seat is theirs)
+                string me = Coop.Current.room.Me?.name;
+                var mine = me != null ? active.parts.FirstOrDefault(q => q.crew.Contains(me)) : null;
+                if (mine != null) { p = mine; who = me; }
+            }
             var eva = active.GoEva(who, ut, out string why);
             if (eva == null) { Show(why, 3f); return null; }
             var parent = active;
@@ -764,6 +773,7 @@ namespace Rocket
         {
             var eva = active;
             if (eva == null || !eva.IsEva) return false;
+            if (Coop.Active && remote) { Coop.Current.room.Send(new NetMsg { t = "cmd", a = "board" }); return true; }   // milestone 43: the host puts this player back in
             VesselSim best = null;
             double bd = double.MaxValue;
             foreach (var u in U.vessels)
@@ -1523,6 +1533,7 @@ namespace Rocket
             var cam = root.farCam;
             if (mapView)
             {
+                HideCabinCamera();   // milestone 43: the cabin's own camera drew the room over the map (opened from the cabin: only the map's buttons showed)
                 root.nearCam.enabled = false;
                 cam.cullingMask = (1 << GameRoot.LayerFar) | (1 << GameRoot.LayerMap);
                 Vector3 targetPos = (mapFocus.AbsolutePosition(renderUt) - originAbs).ToFloat();

@@ -109,25 +109,10 @@ namespace Rocket
             {
                 var d = In.MouseDelta;
                 iyaw += d.x * 0.12f;
-                ipitch = Mathf.Clamp(ipitch + d.y * 0.12f, -80f, 80f);
+                ipitch = Mathf.Clamp(ipitch + d.y * 0.12f, -88f, 88f);
             }
-            var fwd = Quaternion.Euler(0, iyaw, 0) * Vector3.forward;
-            var right = Quaternion.Euler(0, iyaw, 0) * Vector3.right;
-            Vector3 move = fwd * ((In.Held(K.W) ? 1 : 0) - (In.Held(K.S) ? 1 : 0)) + right * ((In.Held(K.D) ? 1 : 0) - (In.Held(K.A) ? 1 : 0));
-            if (move.sqrMagnitude > 1) move.Normalize();
-            ipos += move * (In.Held(K.LeftCtrl) ? 2.6f : 1.5f) * dt;
-            // the walls
-            if (roomRound)
-            {
-                var flat = new Vector2(ipos.x, ipos.z);
-                float lim = roomR - 0.4f;
-                if (flat.magnitude > lim) { flat = flat.normalized * lim; ipos.x = flat.x; ipos.z = flat.y; }
-            }
-            else
-            {
-                ipos.x = Mathf.Clamp(ipos.x, -roomW / 2 + 0.4f, roomW / 2 - 0.4f);
-                ipos.z = Mathf.Clamp(ipos.z, -roomL / 2 + 0.4f, roomL / 2 - 0.4f);
-            }
+            // milestone 43: walking, thrown about or floating, with the walls and the furniture solid (FlightCabinPhysics)
+            CabinStep(dt);
             // milestone 35: look at something and press E (or click, or scroll the throttle)
             if (UseCabin() && !inside) return;
             ipSend -= dt;
@@ -182,6 +167,13 @@ namespace Rocket
             UpdateCabinFolk();
         }
 
+        /// <summary>The cabin's camera off (the map, photo mode): it's an overlay that would draw the room over everything.</summary>
+        void HideCabinCamera()
+        {
+            if (icam != null && icam.enabled) icam.enabled = false;
+            SetWorldAo(true);
+        }
+
         void BuildInteriorCamera(Camera world)
         {
             var g = new GameObject("Cabin camera");
@@ -208,6 +200,8 @@ namespace Rocket
             var st = new GUIStyle(Ui.BigCenter) { fontSize = 20 };
             if (lookedAt != null) Ui.Shadowed(new Rect(W / 2 - 300, H / 2 + 18, 600, 26), lookedAt.name.ToUpperInvariant(), new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold });
             if (hint != null) Ui.Shadowed(new Rect(W / 2 - 400, H / 2 + 42, 800, 30), hint, st);
+            string moveHint = CabinMoveHint();   // milestone 43: heavy, thrown about, floating, holding on
+            if (moveHint != null) Ui.Shadowed(new Rect(W / 2 - 500, H - 66, 1000, 24), moveHint, new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold });
             Ui.Shadowed(new Rect(W / 2 - 500, H - 40, 1000, 22), $"Inside the {insidePart?.def.name}   ·   look at things: E or click uses them   ·   scroll on the throttle   ·   W/S/A/D walk   ·   {In.Name(K.Tab)}: leave the cabin", new GUIStyle(Ui.Small) { alignment = TextAnchor.MiddleCenter });
             // the dot in the middle, for looking at things (bigger and yellow when it's on something)
             if (lookedAt != null) Ui.Line(new Rect(W / 2 - 4, H / 2 - 4, 8, 8), new Color(1f, 0.85f, 0.3f, 0.95f));
@@ -229,7 +223,7 @@ namespace Rocket
         {
             if (!Coop.Active || insidePart == null && on) return;
             var c = Coop.Current;
-            string a = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}|{1:0.##}|{2:0.##}|{3:0}", insidePart?.index ?? -1, ipos.x, ipos.z, iyaw);
+            string a = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}|{1:0.##}|{2:0.##}|{3:0}|{4:0.##}", insidePart?.index ?? -1, ipos.x, ipos.z, iyaw, ipos.y);   // (milestone 43: and how high, floating)
             c.room.Send(new NetMsg { t = "ip", a = a, on = on });
         }
 
@@ -247,16 +241,18 @@ namespace Rocket
                     var (a, on, t) = kv.Value;
                     if (!on || Time.unscaledTime - t > 2f || kv.Key == c.room.MyId) continue;
                     var f = a.Split('|');
-                    if (f.Length != 4 || !int.TryParse(f[0], out int part) || part != insidePart.index) continue;
+                    if (f.Length < 4 || !int.TryParse(f[0], out int part) || part != insidePart.index) continue;
                     var pl = c.room.State.Player(kv.Key);
                     if (pl == null) continue;
                     float.TryParse(f[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x);
                     float.TryParse(f[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float z);
                     float.TryParse(f[3], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float yaw);
+                    float py = 0;
+                    if (f.Length > 4) float.TryParse(f[4], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out py);
                     string key = "walk:" + pl.name;
                     want.Add(key);
                     var go = Folk(key, MyArdling.LookOf(pl.look ?? pl.name));
-                    go.transform.localPosition = Vector3.Lerp(go.transform.localPosition, new Vector3(x, 0, z), 0.3f);
+                    go.transform.localPosition = Vector3.Lerp(go.transform.localPosition, new Vector3(x, py, z), 0.3f);
                     go.transform.localRotation = Quaternion.Slerp(go.transform.localRotation, Quaternion.Euler(0, yaw, 0), 0.3f);
                     AnimateFolk(key, go, pl.name);   // milestone 35
                 }

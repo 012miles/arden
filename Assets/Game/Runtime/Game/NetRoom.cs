@@ -55,6 +55,7 @@ namespace Rocket
         // ---- milestone 30: a rocket room (build and fly together)
         public int activity;                     // 0 mission design, 1 rocket
         public bool campaign;                    // a campaign (career, missions unlock) or a sandbox
+        public bool pvp;                         // milestone 43: players' weapons hurt each other (the host switches it)
         public int unlocked = 99;                // mission design campaign: how many missions are open
         public string careerJson;                // rocket campaign: the host's career (funds, parts, contracts), for everyone's builder
         public string designJson, goal = "space", summary;
@@ -635,6 +636,7 @@ namespace Rocket
                 case "in": if (State.Rocket && Role((MRole)Coop.Pilot)) OnHostCommand?.Invoke(who, m); return;
                 // ---- expeditions (milestone 33): poses, actions and the pilot's controls go to the expedition on the host
                 case "cmd": if (State.Rocket) OnHostCommand?.Invoke(who, m); return;
+                case "wk": if (State.Rocket) OnHostCommand?.Invoke(who, m); return;   // milestone 43: a player's walking keys
                 case "ip": if (State.Rocket) { OnPose?.Invoke(who, m.a, m.on); BroadcastRaw(new NetMsg { t = "ipr", n = who, a = m.a, on = m.on }); } return;
                 case "cs": if (State.Rocket && !string.IsNullOrEmpty(m.a) && m.a.Length < 80) { OnCabin?.Invoke(who, m.a); BroadcastRaw(new NetMsg { t = "csr", n = who, a = m.a }); } return;
                 case "answer":

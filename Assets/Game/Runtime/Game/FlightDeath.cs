@@ -14,6 +14,8 @@ namespace Rocket
     public partial class FlightMode
     {
         VesselSim deathFor, statsFor;
+        int deathId = int.MinValue, statsId = int.MinValue;   // milestone 43: by the ship's number (a room renews the ship object twice a second)
+        static int IdOf(VesselSim v) => v.id != 0 ? v.id : v.GetHashCode();
         float deathAt;
         string deathWhy, deathTitle;
         List<string> deathCrew = new List<string>();
@@ -24,10 +26,11 @@ namespace Rocket
         {
             var v = active;
             if (v == null) return;
-            if (statsFor != v) { statsFor = v; flightMaxAlt = 0; flightMaxSpeed = 0; }
+            if (statsId != IdOf(v)) { statsId = IdOf(v); flightMaxAlt = 0; flightMaxSpeed = 0; }
+            statsFor = v;
             if (!v.destroyed)
             {
-                if (deathFor != null && deathFor != v) deathFor = null;   // flying something else now
+                if (deathFor != null && deathId != IdOf(v)) { deathFor = null; deathId = int.MinValue; }   // flying something else now
                 if (v.hasLaunched || v.IsEva)
                 {
                     flightMaxAlt = System.Math.Max(flightMaxAlt, v.Altitude);
@@ -35,9 +38,10 @@ namespace Rocket
                 }
                 return;
             }
-            if (deathFor == v) return;
+            if (deathId == IdOf(v)) { deathFor = v; return; }   // (the same ship: the screen carries on, it doesn't start again)
             // just lost
             deathFor = v;
+            deathId = IdOf(v);
             deathAt = Time.unscaledTime;
             deathWhy = string.IsNullOrEmpty(v.destroyReason) ? "The ship was destroyed." : v.destroyReason;
             deathCrew = v.parts.SelectMany(p => p.crew).Distinct().ToList();
@@ -58,7 +62,7 @@ namespace Rocket
         }
 
         /// <summary>For tours: whether the death screen's up, and its title.</summary>
-        public string DeathScreenTitle => active != null && active.destroyed && deathFor == active ? deathTitle : null;
+        public string DeathScreenTitle => active != null && active.destroyed && deathId == IdOf(active) ? deathTitle : null;
 
         /// <summary>A tip that fits how it went wrong.</summary>
         public static string DeathTip(string why)
@@ -78,7 +82,7 @@ namespace Rocket
         /// <summary>The death screen: a red fade, what happened, then the ways on underneath.</summary>
         void DrawDeathScreen(float W, float H)
         {
-            if (deathFor != active) { DrawEndPanel("Vessel destroyed", active.destroyReason); return; }
+            if (deathId != IdOf(active)) { DrawEndPanel("Vessel destroyed", active.destroyReason); return; }
             float t = Time.unscaledTime - deathAt;
             float a = Mathf.Clamp01(t / 1.4f);
             var was = GUI.color;

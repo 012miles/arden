@@ -75,7 +75,7 @@ namespace Rocket
         string CarriedBy(string who)
         {
             if (string.IsNullOrEmpty(who)) return null;
-            if (Coop.Active) return RoomPack(who)?.carried;
+            if (Coop.Active) { string c = RoomPack(who)?.carried; return string.IsNullOrEmpty(c) ? null : c; }   // (milestone 43: a room sends "" for nothing: everyone looked like they were carrying something, and couldn't attack)
             return carried.TryGetValue(who, out var id) ? id : null;
         }
 
@@ -152,6 +152,7 @@ namespace Rocket
                             if (v.gForce > gSafe) HurtArdling(vit, (float)(v.gForce - gSafe) * Survival.GDamage * (float)dtGame, v, "the g-force");
                             if (p.HeatFraction > 0.92f) HurtArdling(vit, Survival.HeatDamage * (float)dtGame * (easy ? 0.5f : 1f), v, "the heat");
                         }
+                        if (vit.Down && PvpBackUp(name, vit)) continue;   // milestone 43: a PvP knock-out gets back up
                         if (vit.Down && Survival.TooLate(vit, now)) LoseArdling(name, v, p);
                     }
                 }
@@ -365,6 +366,7 @@ namespace Rocket
                     return;
                 }
                 case "use": UseFromPack(who, pack, n, eva); return;
+                case "attackp": { var f = (arg ?? "").Split('|'); DoAttackPlayer(who, f[0], f.Length > 1 ? f[1] : null); return; }   // milestone 43: PvP
                 case "attack": { var f = (arg ?? "").Split('|'); int.TryParse(f[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int au); DoAttack(who, au, f.Length > 1 ? f[1] : null); return; }   // milestone 40 (42: with a weapon)
                 case "buy": case "sell": DoTrade(who, op, arg); return;
                 case "revive":
@@ -652,6 +654,7 @@ namespace Rocket
             var vit = VitalsFor(me);
             bool show = active.IsEva || inside;
             float boxY = inside ? H - 120 : H - 278;   // (on foot: above the throttle and fuel panel)
+            if (Coop.Active && !inside && !Coop.Collapsed) boxY = H - 400;   // (milestone 43: in a room, above the team's chat too)
             if (vit != null && show)
             {
                 var r = new Rect(12, boxY, 250, 92);

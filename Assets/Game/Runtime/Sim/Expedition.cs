@@ -101,9 +101,10 @@ namespace Rocket
         // ---------------------------------------------------------------- the six resources
 
         /// <summary>Works out a design's dashboard for an expedition: what it costs, carries, makes and lasts, and what stops it.</summary>
-        public static ExDashboard Evaluate(VesselDesign d, ExScenario s, int difficulty, int players)
+        /// <remarks>Milestone 43 (captaincarl24: "sandbox for multiplayer has a budget?? fix that"): a sandbox room has no budget (0).</remarks>
+        public static ExDashboard Evaluate(VesselDesign d, ExScenario s, int difficulty, int players, bool sandbox = false)
         {
-            var x = new ExDashboard { budget = Budget(s, difficulty), players = players, tripDays = s.tripDays };
+            var x = new ExDashboard { budget = sandbox ? 0 : Budget(s, difficulty), players = players, tripDays = s.tripDays };
             if (d == null || d.nodes.Count == 0) { x.blockers.Add("Build a rocket first"); return x; }
             var defs = d.Defs();
             if (defs.Contains(null)) { x.blockers.Add("The rocket has a part this game doesn't know"); return x; }
@@ -123,7 +124,7 @@ namespace Rocket
             x.twr = stages.Count > 0 ? stages.First(r => r.hasEngines || r == stages.Last()).twrAsl : 0;
             x.days = Supplies.DaysFor(d, Math.Max(1, players));
             // what stops a launch
-            if (x.cost > x.budget) x.blockers.Add($"Over budget: it costs {x.cost:N0}, the budget is {x.budget:N0}");
+            if (x.budget > 0 && x.cost > x.budget) x.blockers.Add($"Over budget: it costs {x.cost:N0}, the budget is {x.budget:N0}");
             if (x.seats < players) x.blockers.Add($"Everyone rides along: {players} players need {players} seats (it has {x.seats})");
             // what's risky
             if (x.dv < s.dvNeed * 0.85) x.warnings.Add($"Speed budget {x.dv:N0} m/s: the trip needs about {s.dvNeed:N0} (outposts can top you up)");
@@ -183,10 +184,10 @@ namespace Rocket
                 if (ok) r.good.Add(g.text);
                 else r.change.Add(Hint(g, s, p));
             }
-            double money = p.budget > 0 ? Math.Max(0, Math.Min(1, 1 - p.cost / p.budget)) : 0;
+            double money = p.budget > 0 ? Math.Max(0, Math.Min(1, 1 - p.cost / p.budget)) : 1;   // (sandbox: no budget to keep to)
             int moneyPts = (int)Math.Round(100 * money * Math.Min(1, goalPts / 400.0));   // saving money only counts if you got somewhere
-            r.lines.Add($"Money left over ({money * 100:0}% of the budget): {moneyPts}");
-            if (money > 0.25 && goalPts >= 400) r.good.Add($"Came in well under budget ({p.cost:N0} of {p.budget:N0})");
+            r.lines.Add(p.budget > 0 ? $"Money left over ({money * 100:0}% of the budget): {moneyPts}" : $"Sandbox (no budget): {moneyPts}");
+            if (p.budget > 0 && money > 0.25 && goalPts >= 400) r.good.Add($"Came in well under budget ({p.cost:N0} of {p.budget:N0})");
             int crewPts = p.crew > 0 && p.lost == 0 && p.home ? 100 : p.crew > 0 && p.lost == 0 ? 50 : 0;
             r.lines.Add(p.lost > 0 ? $"Ardlings lost: {p.lost}: 0" : $"Everyone alive{(p.home ? " and home" : "")}: {crewPts}");
             if (p.lost > 0) r.change.Add($"{p.lost} Ardling{(p.lost == 1 ? " was" : "s were")} lost. Take more supplies, a heat shield and parachutes, and land slowly.");

@@ -33,6 +33,25 @@ namespace Rocket
             ("Ochre probe (Wayfarer)", VesselDesign.Wayfarer()),
             ("Wanderer tug (Wrangler)", VesselDesign.Wrangler()),
             ("Brume probe (Long Haul)", VesselDesign.LongHaul()),
+            // milestone 43 (captaincarl24: "add more presets for multiplayer like add like 10 more"): ships for a whole team, a
+            // capsule and a four-seat habitat (five seats, room for everyone in a room of four)
+            ("Team: Hopper (5 seats)", TeamHopper()),
+            ("Team: Splashdown (5 seats)", TeamSplashdown()),
+            ("Team: Twin Booster (5 seats)", TeamTwinBooster()),
+            ("Team: Orbiter (5 seats)", TeamOrbiter()),
+            ("Team: Quad Booster (5 seats)", TeamQuadBooster()),
+            ("Team: Station (5 seats)", TeamStation()),
+            ("Team: Big Lift (5 seats)", TeamBigLift()),
+            ("Team: Tal Lander (5 seats, there and back)", TeamTalLander()),
+            ("Team: Ochre Expedition (5 seats)", TeamOchre()),
+            ("Team: Brume Voyager (5 seats)", TeamBrume()),
+        };
+
+        /// <summary>The ten team ships new in milestone 43 (for tests).</summary>
+        public static readonly string[] TeamOnes =
+        {
+            "Team: Hopper (5 seats)", "Team: Splashdown (5 seats)", "Team: Twin Booster (5 seats)", "Team: Orbiter (5 seats)", "Team: Quad Booster (5 seats)",
+            "Team: Station (5 seats)", "Team: Big Lift (5 seats)", "Team: Tal Lander (5 seats, there and back)", "Team: Ochre Expedition (5 seats)", "Team: Brume Voyager (5 seats)",
         };
 
         /// <summary>The ten presets new in milestone 32 (for tests).</summary>
@@ -48,6 +67,98 @@ namespace Rocket
             for (int i = 0; i < d.nodes.Count; i++)
                 if (d.nodes[i].id == id && (best < 0 || (lowest ? d.nodes[i].pos.y < d.nodes[best].pos.y : d.nodes[i].pos.y > d.nodes[best].pos.y))) best = i;
             return best;
+        }
+
+        // ---------------------------------------------------------------- milestone 43: team ships
+
+        static VesselDesign Done(VesselDesign d) { DesignOps.ApplyDefaultGroups(d); return d; }
+
+        static void Boosters(VesselDesign d, int onTank, float frac, int count, string srb)
+        {
+            var decs = DesignOps.AttachSurfaceAt(d, onTank, frac, count == 4 ? 45f : 0f, "dec.r", count, false);
+            int srbSym = DesignOps.NextSym(d), noseSym = srbSym + 1;
+            foreach (int dec in decs)
+            {
+                int b = DesignOps.AttachToOuterFace(d, dec, srb);
+                d.nodes[b].sym = srbSym;
+                d.nodes[DesignOps.AttachStack(d, b, true, "nose.s")].sym = noseSym;
+            }
+        }
+
+        static void Power(VesselDesign d)
+        {
+            int battery = Find(d, "battery.s");
+            if (battery < 0) return;
+            DesignOps.AttachSurfaceAt(d, battery, 0.5f, 0f, "solar.s", 2, false);
+            DesignOps.AttachSurfaceAt(d, battery, 0.5f, 90f, "antenna.s", 1, false);
+        }
+
+        /// <summary>A short hop for the whole team: up a few kilometres and down on the parachute.</summary>
+        public static VesselDesign TeamHopper() => Done(VesselDesign.Stack("Team Hopper", "chute.s", "pod.wren", "hab.s", "dec.s", "tank.s4", "tank.s4", "fins.s", "eng.kestrel"));
+
+        /// <summary>A bigger hop with a heat shield, out over the sea and back down for a splashdown.</summary>
+        public static VesselDesign TeamSplashdown() => Done(VesselDesign.Stack("Team Splashdown", "chute.s", "pod.wren", "hab.s", "shield.s", "dec.s", "tank.s4", "tank.s4", "tank.s4", "fins.s", "eng.kestrel"));
+
+        /// <summary>The team on the starter core with two small solid boosters.</summary>
+        public static VesselDesign TeamTwinBooster()
+        {
+            var d = VesselDesign.Stack("Team Twin Booster", "chute.s", "pod.wren", "hab.s", "dec.s", "tank.s2", "eng.ember", "dec.s", "tank.s4", "tank.s3", "fins.s", "eng.kestrel");
+            Boosters(d, Find(d, "tank.s3"), 0.5f, 2, "srb.flint");
+            return Done(d);
+        }
+
+        /// <summary>Two stages to orbit for five, a heat shield to come home on.</summary>
+        public static VesselDesign TeamOrbiter() => Done(VesselDesign.Stack("Team Orbiter", "chute.s", "pod.wren", "hab.s", "shield.s", "dec.s", "tank.s4", "tank.s4", "eng.swift",
+            "adapt.ls", "dec.l", "tank.l16", "fins.l", "eng.heron"));
+
+        /// <summary>A 2.6 m core with four solid boosters: lots of push off the pad with a full crew.</summary>
+        public static VesselDesign TeamQuadBooster()
+        {
+            var d = VesselDesign.Stack("Team Quad Booster", "chute.s", "pod.wren", "hab.s", "shield.s", "dec.s", "tank.s4", "eng.ember", "adapt.ls",
+                "dec.l", "tank.l8", "tank.l8", "fins.l", "eng.heron");
+            Boosters(d, Find(d, "tank.l8", lowest: true), 0.4f, 4, "srb.cinder");
+            return Done(d);
+        }
+
+        /// <summary>A crewed station for five: a docking port, power, and its own engine.</summary>
+        public static VesselDesign TeamStation()
+        {
+            var d = VesselDesign.Stack("Team Station", "port.std", "pod.wren", "hab.s", "battery.s", "tank.s4", "eng.ember", "adapt.ls", "dec.l", "tank.l16", "fins.l", "eng.heron");
+            Power(d);
+            return Done(d);
+        }
+
+        /// <summary>The team on the big parts: a Condor upper stage on an FT-16L and an FT-8L.</summary>
+        public static VesselDesign TeamBigLift() => Done(VesselDesign.Stack("Team Big Lift", "chute.s", "pod.wren", "hab.s", "shield.s", "adapt.ls", "tank.l8", "eng.condor",
+            "dec.l", "tank.l16", "tank.l8", "fins.l", "eng.heron"));
+
+        /// <summary>Five to Tal and back: a lander with legs on a big transfer stage and a Heron.</summary>
+        public static VesselDesign TeamTalLander()
+        {
+            var d = VesselDesign.Stack("Team Tal Lander", "chute.s", "pod.wren", "hab.s", "shield.s", "tank.s4", "eng.swift",
+                "dec.s", "tank.s4", "tank.s4", "eng.swift", "adapt.ls", "dec.l", "tank.l16", "tank.l16", "fins.l", "eng.heron");
+            DesignOps.AttachSurfaceAt(d, Find(d, "tank.s4"), 0.95f, 45f, "leg.s", 4, false);
+            return Done(d);
+        }
+
+        /// <summary>A long trip for five to the red planet: power for the months on the way, legs to land.</summary>
+        public static VesselDesign TeamOchre()
+        {
+            var d = VesselDesign.Stack("Team Ochre Expedition", "chute.s", "pod.wren", "hab.s", "shield.s", "battery.s", "tank.s4", "eng.swift",
+                "dec.s", "tank.s4", "tank.s4", "eng.swift", "adapt.ls", "dec.l", "tank.l16", "tank.l16", "fins.l", "eng.heron");
+            DesignOps.AttachSurfaceAt(d, Find(d, "tank.s4"), 0.95f, 45f, "leg.s", 4, false);
+            Power(d);
+            return Done(d);
+        }
+
+        /// <summary>Five out to the giant's moons: a Condor stage with power, on a Heron with heavy solid boosters.</summary>
+        public static VesselDesign TeamBrume()
+        {
+            var d = VesselDesign.Stack("Team Brume Voyager", "chute.s", "pod.wren", "hab.s", "shield.s", "battery.s", "adapt.ls", "tank.l8", "eng.condor",
+                "dec.l", "tank.l16", "tank.l16", "fins.l", "eng.heron");
+            Power(d);
+            Boosters(d, Find(d, "tank.l16", lowest: true), 0.45f, 4, "srb.blaze");
+            return Done(d);
         }
 
         /// <summary>A capsule on one small solid booster: up a few kilometres and down on the parachute. Starting parts only.</summary>

@@ -169,7 +169,14 @@ namespace Rocket
             var target = AimedDrone(v, out var w);
             attackCool = w.every;
             struckAt[me ?? ""] = Time.time;   // (milestone 42: the swing or the recoil)
-            if (target == null) { if (w.id != "kick") FireAtNothing(v, w); return; }   // (milestone 42: a shot at nothing still flies)
+            if (target == null)
+            {
+                // milestone 43: PvP on in a room: another player's Ardling in reach
+                var foe = AimedPlayer(v, w);
+                if (foe != null) { ItemOp(me, "attackp", foe + "|" + w.id); return; }
+                if (w.id != "kick") FireAtNothing(v, w);
+                return;
+            }
             ItemOp(me, "attack", target.uid.ToString(CultureInfo.InvariantCulture) + "|" + w.id);
         }
 
@@ -358,6 +365,8 @@ namespace Rocket
             if (active.IsEva && active.landed && CarriedBy(MyArdlingName) == null)
             {
                 var t = AimedDrone(active, out var w);
+                string foe = t == null ? AimedPlayer(active, HeldWeapon(MyArdlingName)) : null;   // milestone 43: PvP
+                if (foe != null) Ui.Shadowed(new Rect(W / 2 - 300, H - 334, 600, 24), $"Click: {HeldWeapon(MyArdlingName).verb} {foe} (PvP)", new GUIStyle(Ui.BigCenter) { fontSize = 17 });
                 if (t != null) Ui.Shadowed(new Rect(W / 2 - 300, H - 334, 600, 24), w.id == "kick" ? $"Click: kick the {t.Def.name.ToLowerInvariant()} (a weapon from the store hits harder)" : $"Click: {w.verb} the {t.Def.name.ToLowerInvariant()} ({w.name})", new GUIStyle(Ui.BigCenter) { fontSize = 17 });
             }
             DrawBossBar(W);   // milestone 42

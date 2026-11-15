@@ -23,6 +23,14 @@ namespace Rocket
         /// <summary>Every update, newest first (milestone 41, captaincarl24: just the first version and the latest updates).</summary>
         public static readonly Update[] All =
         {
+            U(43, "Nov 15, 2026", "Everyone on foot, PvP and real cabin physics",
+                "Multiplayer: every player climbs out and spacewalks as their own Ardling (ENTER to get out, B at a hatch to get back in)",
+                "The ship stays the ship: while the host's out walking, everyone's jobs still work on the ship (they used to steer the host's Ardling)",
+                "Co-op boss fights with everyone on foot, and PvP (the host switches it on in the pause menu; knocked out, you're back up in 8 seconds)",
+                "The cabin feels the ship: pressed to the floor under thrust, thrown to the ceiling upside down, weightless in space",
+                "Zero gravity: drift, grab walls, furniture or the yellow handrails and push off the way you look; the furniture's solid now",
+                "10 team ships (five seats each) for multiplayer",
+                "Fixes: the map from inside the cabin, the death screen repeating, no budget in sandbox rooms, a blank \"Holding\" line that blocked attacks in rooms"),
             U(42, "Nov 15, 2026", "Shiftlings, the Hollow and weapons",
                 "Shiftlings: something in the old wrecks copies Ardlings. They walk about in ordinary suits (in a room, sometimes in a teammate's look) and turn when you get close",
                 "Lurkers: Shiftlings gone feral, fast on all fours",

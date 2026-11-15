@@ -923,8 +923,26 @@ weapons", "make the main menu screen animated like theres rockets taking off, mo
   everyone (it only ever started by itself once, which was the "tutorial isn't playing").
 - Smoke.Dust (slams, falls). 4 new sim tests; `-autotestMutants` (800-810). Rooms: only the host walks outside (next: everyone).
 
+### Milestone 43: everyone on foot, PvP and real cabin physics (2026-11-15)
+- **Walkers in rooms** (Game/FlightWalkers.cs): the room's ship (CoopShip on the host, shipLocal on players) stays the ship
+  whoever's walking: frames, copies, goals and every job's commands go to it (commands run with the ship swapped in while
+  the host's on EVA; the pilot's input goes to the ship). A player's ENTER/EVA sends cmd "eva": the host puts that player's
+  own Ardling out of their seat (SeatPlayers names the crew). Their game sends their walking keys ("wk", 20 a second); the
+  host drives their Ardling with the flight and sends every walker (FlightFrame.walk, body-fixed place and turn) with each
+  frame, plus full copies ("wsnap") when who's out changes; the player's game makes and moves them, and follows its own.
+  B sends cmd "board". Checked with two copies of the game (`-autotestWalkHost` / `-autotestWalkJoin`, walk2.ps1).
+- **Co-op bosses** come with it (drones target every Ardling on the host). **PvP** (RoomState.pvp, the host's pause menu):
+  a held weapon aimed at another player's Ardling ("attackp"), checked on the host; knocked out in PvP: back up in 8 s.
+- **Cabin physics** (Game/FlightCabinPhysics.cs; VesselSim.feltLocal, worked out every Step and sent in frames): walking
+  (slower under g, pinned past 3 g, staggering with the sideways pull), falling when the pull isn't toward the floor,
+  weightless below 0.1 g (drift; near a wall, the floor, the furniture or a yellow handrail you hold on and push off the
+  way you look); solid desk, consoles, seats, locker, bunks, bike and table. Planes and rovers keep their floor.
+- **10 team presets** (capsule + four-seat habitat). **Fixes**: the cabin's camera drew the room over the map; the death
+  screen restarted with each of the host's ship copies (now by the ship's number); sandbox rooms have no budget
+  (Expedition.Evaluate sandbox); a room's empty "carried" ("") counted as carrying (blank "Holding", no attacks).
+- 3 new sim tests.
+
 ## Next
-- Milestone 43: every player on foot in a room (their own Ardling, input to the host, positions back), co-op boss fights, PvP.
 - Ideas welcome. (Controller support: not wanted.)
 
 ## Deliberate differences

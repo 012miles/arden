@@ -142,6 +142,7 @@ namespace Rocket
             if (hab) BuildHabExtras(h);
             BuildCabinKit(hab, h, front);   // milestone 36: the overhead panel, gauges, glass, vents, seats, clutter, floating things
             BuildMoreProps(hab, h);         // milestone 42: snacks, a drink maker, a desk toy, a guitar, a photo, a poster, a mirror, a toolbox, a game
+            BuildCabinCollision(hab, front);   // milestone 43: solid furniture, handrails for weightlessness
             ResetCabinLight();
             // in a room: how the others left this cabin (the blinds, the locker, the lights, the plant, the chess)
             if (Coop.Active && insidePart != null)

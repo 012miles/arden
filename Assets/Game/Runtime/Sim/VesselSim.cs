@@ -714,7 +714,7 @@ namespace Rocket
 
         // ---------------------------------------------------------------- stepping
 
-        public void Step(double dt, double ut)
+        void StepCore(double dt, double ut)   // (milestone 43: Step, in VesselSimSettle.cs, wraps this to work out what the crew feel)
         {
             if (destroyed) return;
             RecomputeMass();
@@ -1975,6 +1975,7 @@ namespace Rocket
 
         public RailsEvent RailsAdvance(double dt, double ut, out double advanced)
         {
+            feltLocal = landed ? Quaternion.Inverse(rot) * (-body.Gravity(pos)).ToFloat() : Vector3.zero;   // (milestone 43: coasting is weightless)
             advanced = dt;
             if (landed) { SyncLanded(ut + dt); return RailsEvent.None; }
             if (rails == null) rails = Orbit.FromState(pos, vel, body.mu, ut);

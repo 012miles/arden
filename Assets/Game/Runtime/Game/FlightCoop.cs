@@ -65,30 +65,35 @@ namespace Rocket
                     catch { }
                 }
                 else if (m.t == "cmd") RunCoopCommand(c, who, m);
+                else if (m.t == "wk") HostWalkInput(who, m);   // milestone 43
                 // a command can end the flight (mission control's "end"): stop here, the ship's being taken apart
                 if (!root.inFlight || active?.parts == null) return;
             }
             if (active?.parts == null) return;
-            // the flight, to everyone
+            // the flight, to everyone (milestone 43: the room's ship, even while the host's out walking; and every walker)
+            var ship = CoopShip;
+            if (ship?.parts == null) return;
             coopSendT -= dt; coopSnapT -= dt;
-            long sig = FlightRecording.SignatureOf(active);
+            long sig = FlightRecording.SignatureOf(ship);
             if (sig != coopSig || coopSnapT <= 0)
             {
                 coopSig = sig; coopSnapT = 0.5f; coopSnap++;
                 string snap = null;
-                try { snap = JsonUtility.ToJson(active.ToSave()); } catch (Exception e) { Debug.LogWarning("Couldn't send the flight: " + e.Message); }
+                try { snap = JsonUtility.ToJson(ship.ToSave()); } catch (Exception e) { Debug.LogWarning("Couldn't send the flight: " + e.Message); }
                 if (snap != null) c.room.BroadcastRaw(new NetMsg { t = "snap", n = coopSnap, json = snap });
             }
-            if (coopSendT <= 0) { coopSendT = 0.05f; c.room.BroadcastRaw(new NetMsg { t = "fs", json = JsonUtility.ToJson(FrameNow()) }); }
+            var walkers = WalkersNow();
+            HostSendWalkerSaves(c, walkers, dt);
+            if (coopSendT <= 0) { coopSendT = 0.05f; var fr = FrameNow(); fr.walk = walkers; c.room.BroadcastRaw(new NetMsg { t = "fs", json = JsonUtility.ToJson(fr) }); }
             // the goal
-            if (active.hasLaunched) c.maxAltitude = Math.Max(c.maxAltitude, active.Altitude);
+            if (ship.hasLaunched) c.maxAltitude = Math.Max(c.maxAltitude, ship.Altitude);
             ExpeditionTick(dt);   // milestone 34
             coopGoalT -= dt;
             if (coopGoalT <= 0)
             {
                 coopGoalT = 1f;
                 var st = c.room.State;
-                if (!c.Expedition && !st.goalDone && st.goal != "free" && Coop.GoalMet(st.goal, active, c.maxAltitude, ut))
+                if (!c.Expedition && !st.goalDone && st.goal != "free" && Coop.GoalMet(st.goal, ship, c.maxAltitude, ut))
                 {
                     st.goalDone = true;
                     st.summary = $"Goal done: {Coop.Goal(st.goal).name}!";
@@ -101,7 +106,7 @@ namespace Rocket
 
         FlightFrame FrameNow()
         {
-            var v = active;
+            var v = CoopShip ?? active;   // (milestone 43: the room's ship)
             var f = new FlightFrame
             {
                 ut = ut, px = v.pos.x, py = v.pos.y, pz = v.pos.z, vx = v.vel.x, vy = v.vel.y, vz = v.vel.z,
@@ -110,6 +115,7 @@ namespace Rocket
                 body = root.bodies.IndexOf(v.body), vessel = v.id, snap = coopSnap, warp = warp, rails = railsWarp,
                 target = target != null ? target.name : null,
                 roll = rollout != null ? rollout.t + 1f : 0f, rollPad = rollout != null ? rollout.pad : 0,   // milestone 41
+                gx = v.feltLocal.x, gy = v.feltLocal.y, gz = v.feltLocal.z,                                  // milestone 43
             };
             if (node != null) { f.hasNode = true; f.nodeUt = node.ut; f.nodePro = (float)node.prograde; f.nodeNor = (float)node.normal; f.nodeRad = (float)node.radial; }
             return f;
@@ -124,13 +130,21 @@ namespace Rocket
                 : name == "run" || name == "send" ? CAct.Science
                 : CAct.Navigate;
             bool endByHost = name == "end";
-            bool anyone = name == "scav" && c.Expedition || name == "item";   // in an expedition anyone can search an outpost; anyone uses their own things
+            bool anyone = name == "scav" && c.Expedition || name == "item" || name == "eva" || name == "board";   // in an expedition anyone can search an outpost; anyone uses their own things, climbs out and back in
             if (!c.SenderCan(who, act) && !endByHost && !anyone) return;
             var p = c.room.State.Player(who);
+            var shipNow = CoopShip;
+            var wasActive = active;
+            bool onShip = shipNow != null && shipNow != active && name != "item" && name != "eva" && name != "board";
             Internal(() =>
             {
+                if (onShip) active = shipNow;   // milestone 43: the host's out walking: the job's done on the ship
+                try
+                {
                 switch (name)
                 {
+                    case "eva": HostGoEva(p?.name); break;      // milestone 43: a player climbs out
+                    case "board": HostBoard(p?.name); break;    // and back in
                     case "stage": if (!TryCountdown()) Stage(); break;
                     case "abort": DoAbort(); break;
                     case "group": FireGroup(m.n); break;
@@ -180,6 +194,8 @@ namespace Rocket
                         if (who == c.room.MyId || (p != null && p.Has((MRole)Coop.Control))) CoopEndFlight();
                         break;
                 }
+                }
+                finally { if (onShip && active == shipNow) active = wasActive; }
             });
         }
 
@@ -220,7 +236,9 @@ namespace Rocket
             design = null;
             remote = true;
             rolloutSkippedHere = false;
+            ClearWalkers();   // milestone 43
             active = VesselSim.FromSave(save, root.bodies, ut);
+            shipLocal = active;
             U.Add(active);
             StartFlight();
             camYaw = 180f;
@@ -234,33 +252,38 @@ namespace Rocket
             var c = Coop.Current;
             if (c == null) return;
             // a new copy of the ship: staging, chutes, fuel used
+            if (shipLocal == null) shipLocal = active;
             if (c.snapId != c.snapUsed && c.snapJson != null)
             {
                 c.snapUsed = c.snapId;
                 try { ApplySnap(JsonUtility.FromJson<VesselSave>(c.snapJson)); } catch { }
             }
+            if (c.walkSnapJson != null) { ClientWalkerSaves(c.walkSnapJson); c.walkSnapJson = null; }   // milestone 43
+            var sh = shipLocal;
             if (c.Sample(out var f, out var pos, out var vel, out var rot, out double sut))
             {
                 ut = sut; prevUt = ut;
                 var b = root.bodies[Mathf.Clamp(f.body, 0, root.bodies.Count - 1)];
-                if (active.body != b) active.body = b;
-                active.pos = active.prevPos = pos;
-                active.vel = vel;
-                active.rot = active.prevRot = rot;
-                active.angVel = new Vector3(f.wx, f.wy, f.wz);
-                if (!c.CanDo(CAct.Steer)) active.throttle = f.throttle;
-                active.sas = (SasMode)f.sas;
-                active.rcsOn = f.rcs;
-                active.landed = f.landed;
+                if (sh.body != b) sh.body = b;
+                sh.pos = sh.prevPos = pos;
+                sh.vel = vel;
+                sh.rot = sh.prevRot = rot;
+                sh.angVel = new Vector3(f.wx, f.wy, f.wz);
+                if (!c.CanDo(CAct.Steer)) sh.throttle = f.throttle;
+                sh.sas = (SasMode)f.sas;
+                sh.rcsOn = f.rcs;
+                sh.landed = f.landed;
+                ClientWalkers(f.walk);   // milestone 43: every player's Ardling (this player's own is what they control)
                 warp = f.warp; railsWarp = f.rails;
                 target = string.IsNullOrEmpty(f.target) ? null : root.bodies.FirstOrDefault(x => x.name == f.target);
-                FollowHostRollout(f);   // milestone 41: everyone sees the roll-out to the pad, not just the host
-                if (f.destroyed && !active.destroyed)
+                if (active == sh) FollowHostRollout(f);   // milestone 41: everyone sees the roll-out to the pad, not just the host
+                if (f.gx != 0 || f.gy != 0 || f.gz != 0) sh.feltLocal = new Vector3(f.gx, f.gy, f.gz);   // milestone 43: the cabin feels what the host's ship does
+                if (f.destroyed && !sh.destroyed)
                 {
-                    active.destroyed = true;
-                    active.destroyReason = "The rocket was destroyed.";
-                    SpawnBoom(active.body, active.pos, Mathf.Clamp(active.Length * 2.5f, 8f, 40f));
-                    Shatter(active, Mathf.Clamp((float)active.SurfaceRelVelocity.magnitude / 40f, 0.6f, 2f));   // milestone 35
+                    sh.destroyed = true;
+                    sh.destroyReason = "The rocket was destroyed.";
+                    SpawnBoom(sh.body, sh.pos, Mathf.Clamp(sh.Length * 2.5f, 8f, 40f));
+                    Shatter(sh, Mathf.Clamp((float)sh.SurfaceRelVelocity.magnitude / 40f, 0.6f, 2f));   // milestone 35
                 }
                 // the route: the host's maneuver node, unless mission control (this player) is changing it right now
                 if (Time.unscaledTime > nodeEditUntil)
@@ -276,9 +299,10 @@ namespace Rocket
             }
             while (c.sayings.Count > 0) Show(c.sayings.Dequeue(), 3f);
             // how it looks here: flames, smoke, legs, chutes, reentry (the host's game runs the real thing)
-            active.VisualStep(dt);
-            // this player's steering, to the host
-            if (c.CanDo(CAct.Steer))
+            shipLocal?.VisualStep(dt);
+            ClientSendWalk(dt);   // milestone 43: out walking: this player's keys, to the host
+            // this player's steering, to the host (not while they're out walking)
+            if (c.CanDo(CAct.Steer) && active == shipLocal)
             {
                 coopInT -= dt;
                 if (coopInT <= 0)
@@ -326,17 +350,19 @@ namespace Rocket
         /// <summary>A new copy of the ship from the host: the same model if its parts haven't changed, a new one if they have.</summary>
         void ApplySnap(VesselSave save)
         {
+            var old = shipLocal ?? active;
             var v = VesselSim.FromSave(save, root.bodies, ut);
-            v.pos = v.prevPos = active.pos; v.rot = v.prevRot = active.rot; v.vel = active.vel; v.throttle = active.throttle;
-            bool same = v.id == active.id && v.parts.Count == active.parts.Count && v.parts.Select(p => p.index).SequenceEqual(active.parts.Select(p => p.index));
-            views.TryGetValue(active, out var oldView);
-            views.Remove(active);
-            U.Remove(active);
+            v.pos = v.prevPos = old.pos; v.rot = v.prevRot = old.rot; v.vel = old.vel; v.throttle = old.throttle; v.feltLocal = old.feltLocal;
+            bool same = v.id == old.id && v.parts.Count == old.parts.Count && v.parts.Select(p => p.index).SequenceEqual(old.parts.Select(p => p.index));
+            views.TryGetValue(old, out var oldView);
+            views.Remove(old);
+            U.Remove(old);
             if (same && oldView != null) views[v] = oldView;
             else { oldView?.Destroy(); views[v] = VesselView.Create(v); }
-            if (active.destroyed) { v.destroyed = true; views[v].SetVisible(false); }
+            if (old.destroyed) { v.destroyed = true; views[v].SetVisible(false); }
             U.Add(v);
-            active = v;
+            if (active == old) active = v;   // (milestone 43: while this player's out walking, they stay on their Ardling)
+            shipLocal = v;
         }
 
         // ---------------------------------------------------------------- the panels
@@ -385,7 +411,7 @@ namespace Rocket
         void DrawCoopPause(float W, float H, float atY = -1)
         {
             var c = Coop.Current;
-            float ph = active.destroyed ? 230 : 236;
+            float ph = active.destroyed ? 266 : 272;   // (milestone 43: + PvP)
             var r = new Rect(W / 2 - 190, atY >= 0 ? Mathf.Min(atY, H - 10 - ph) : H / 2 - 130, 380, ph);
             Ui.Box(r); Ui.Box(r);
             Ui.Text(new Rect(r.x, r.y + 12, r.width, 30), active.destroyed ? "The rocket was lost" : "Paused (the flight goes on)", Ui.BigCenter);
@@ -402,6 +428,13 @@ namespace Rocket
             float hw = (r.width - 88) / 2;
             if (Ui.Press(new Rect(r.x + 40, y, hw, 30), $"Hide UI ({In.Name(K.F1)})", Ui.Button)) { paused = false; Ui.ToggleHidden(); return; }
             if (Ui.Press(new Rect(r.x + 48 + hw, y, hw, 30), "Definitions", Ui.Button)) Glossary.Open = true;
+            // milestone 43: PvP (the host decides)
+            y += 36;
+            var st = c.room.State;
+            GUI.enabled = c.IsHost;
+            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), st.pvp ? "PvP: ON (weapons hurt players)" : (c.IsHost ? "PvP: off (switch on)" : "PvP: off (the host decides)"), st.pvp ? Ui.ButtonStopSmall : Ui.Button))
+            { st.pvp = !st.pvp; c.room.Touch(); CoopSay(st.pvp ? "PvP is on: players' weapons hurt each other." : "PvP is off."); }
+            GUI.enabled = true;
         }
     }
 }

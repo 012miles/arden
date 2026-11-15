@@ -19,6 +19,8 @@ namespace Rocket
         public bool rcs, landed, destroyed, hasNode, rails;
         public string target;
         public float roll;    // milestone 41: the host's roll-out to the pad, its time + 1 (0: not rolling out)
+        public float gx, gy, gz;   // milestone 43: what the crew feel (the ship's frame, m/s²), for everyone's cabin
+        public List<WalkerState> walk;   // milestone 43: every player's Ardling out of the ship
         public int rollPad;
     }
 
@@ -143,6 +145,7 @@ namespace Rocket
         public readonly List<(float at, FlightFrame f)> frames = new List<(float, FlightFrame)>();
         public string snapJson;
         public int snapId = -1, snapUsed = -1;
+        public string walkSnapJson;   // milestone 43
         public readonly Queue<string> sayings = new Queue<string>();
         public bool boom;
 
@@ -160,6 +163,7 @@ namespace Rocket
                     catch { }
                     break;
                 case "snap": snapJson = m.json; snapId = m.n; break;
+                case "wsnap": walkSnapJson = m.json; break;   // milestone 43: copies of the walkers
                 case "say": if (!string.IsNullOrEmpty(m.a)) { sayings.Enqueue(m.a); while (sayings.Count > 6) sayings.Dequeue(); } break;
                 case "boom": boom = true; break;
                 case "ipr": if (m.n != room.MyId) poses[m.n] = (m.a, m.on, Time.unscaledTime); break;
@@ -275,7 +279,7 @@ namespace Rocket
                     if (d == null || d.nodes.Count == 0) continue;
                     var st = room.State;
                     string problem = Campaign ? root.universe.career.LaunchProblem(d, st.runway) : null;
-                    if (problem == null && Expedition) { var dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(st.exScenario), st.exDifficulty, st.players.Count); if (!dash.CanLaunch) problem = dash.blockers[0]; }
+                    if (problem == null && Expedition) { var dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(st.exScenario), st.exDifficulty, st.players.Count, !st.campaign); if (!dash.CanLaunch) problem = dash.blockers[0]; }
                     if (problem != null) { room.Chat($"Can't launch yet: {problem}"); continue; }
                     st.coopPhase = 1; st.flights++; st.goalDone = false; st.summary = null;
                     maxAltitude = 0;
@@ -283,7 +287,7 @@ namespace Rocket
                     {
                         // a fresh expedition: the budget, the crew, nothing done yet
                         var sc = Rocket.Expedition.Scenario(st.exScenario);
-                        st.ex = new ExProgress { budget = Rocket.Expedition.Budget(sc, st.exDifficulty), cost = Prices.Of(d), crew = st.players.Count,
+                        st.ex = new ExProgress { budget = st.campaign ? Rocket.Expedition.Budget(sc, st.exDifficulty) : 0, cost = Prices.Of(d), crew = st.players.Count,
                             dvHad = Staging.AnalyzeDesign(d, 9.81).Sum(r => r.dvVac) };
                         root.universe.career.scavenged.Clear();
                     }
@@ -369,7 +373,7 @@ namespace Rocket
         public string LaunchProblem(VesselDesign d)
         {
             if (!Expedition) return null;
-            var dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(room.State.exScenario), room.State.exDifficulty, room.State.players.Count);
+            var dash = Rocket.Expedition.Evaluate(d, Rocket.Expedition.Scenario(room.State.exScenario), room.State.exDifficulty, room.State.players.Count, !room.State.campaign);
             return dash.CanLaunch ? null : dash.blockers[0];
         }
 

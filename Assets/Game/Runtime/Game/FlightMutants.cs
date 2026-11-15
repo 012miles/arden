@@ -244,6 +244,65 @@ namespace Rocket
             WeaponFx(w, v.body, here + up * 0.8, here + up * 0.8 + fwd.normalized * w.reach);
         }
 
+        // ---------------------------------------------------------------- PvP (milestone 43)
+
+        readonly HashSet<string> pvpDowned = new HashSet<string>();
+        public const float PvpBackUpAfter = 8f;
+        static bool PvpOn => Coop.Active && Coop.Current.room.State.pvp;
+
+        /// <summary>Another player's Ardling this walker is aiming at, within the weapon's reach (PvP rooms only).</summary>
+        string AimedPlayer(VesselSim v, WeaponDef w)
+        {
+            if (!PvpOn || v == null || !v.IsEva) return null;
+            string me = MyArdlingName;
+            Vector3d here = FixedPos(v), up = here.normalized;
+            Vector3d fwd = FirstPersonView ? v.body.InertialToFixed(Vector3d.FromFloat(root.farCam.transform.forward), ut) : FixedFacing(v);
+            fwd = (fwd - up * Vector3d.Dot(fwd, up)).normalized;
+            double cosMax = Math.Cos(w.cone * Math.PI / 180), bestD = double.MaxValue;
+            string best = null;
+            foreach (var o in U.vessels)
+            {
+                if (o == v || o.destroyed || !o.IsEva || o.EvaName == null || o.EvaName == me || o.body != v.body) continue;
+                if (VitalsFor(o.EvaName)?.Down ?? false) continue;
+                Vector3d to = FixedPos(o) - here;
+                double dist = to.magnitude;
+                if (dist > w.reach || dist < 1e-3) continue;
+                Vector3d flat = (to - up * Vector3d.Dot(to, up)).normalized;
+                if (Vector3d.Dot(flat, fwd) < cosMax && dist > 1.2) continue;
+                if (dist < bestD) { bestD = dist; best = o.EvaName; }
+            }
+            return best;
+        }
+
+        /// <summary>The host carries out one player hitting another (PvP on, in reach, with a weapon they carry).</summary>
+        void DoAttackPlayer(string who, string target, string weapon)
+        {
+            if (!PvpOn || who == null || target == null || who == target) return;
+            var a = EvaOf(who); var t = EvaOf(target);
+            if (a == null || t == null || a.body != t.body) return;
+            var w = Weapons.Held(PackOf(who, out _), weapon);
+            if ((FixedPos(t) - FixedPos(a)).magnitude > w.reach + 2) return;
+            var tv = U.career.VitalsOf(target);
+            if (tv == null || tv.Down) return;
+            Vector3d up = FixedPos(a).normalized;
+            WeaponFx(w, a.body, FixedPos(a) + up * 0.8, FixedPos(t) + up * 0.7);
+            if (w.drain > 0) tv.stamina = Mathf.Max(0, tv.stamina - w.drain);
+            HurtArdling(tv, w.damage * (Words.Easy ? 0.5f : 1f), t, $"{who}'s {w.name.ToLowerInvariant()}");
+            if (tv.Down) { pvpDowned.Add(target); Show($"{who} knocked out {target}! Back up in {PvpBackUpAfter:0} seconds.", 3f, true); }
+        }
+
+        /// <summary>Knocked out in a PvP fight: back up after a few seconds (not lost). True if that's what happened.</summary>
+        bool PvpBackUp(string name, Vitals vit)
+        {
+            if (!pvpDowned.Contains(name) || vit == null || !vit.Down) return false;
+            if (ut - vit.downedAt < PvpBackUpAfter) return true;   // (still down: not lost either)
+            vit.downedAt = -1;
+            vit.health = 40f;
+            pvpDowned.Remove(name);
+            TellPlayer(name, $"{name} gets back up (health 40).", 3f);
+            return true;
+        }
+
         // ---------------------------------------------------------------- for tours
 
         public void TestSpawn(DroneKind k, float metres, string look = null)

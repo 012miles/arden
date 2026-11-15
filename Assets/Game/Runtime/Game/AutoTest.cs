@@ -124,6 +124,16 @@ namespace Rocket
                 yield break;
             }
 
+            foreach (var (flag, tour) in new (string, Func<IEnumerator>)[] { ("-autotestWalkHost", WalkHostTour), ("-autotestWalkJoin", WalkJoinTour) })   // milestone 43
+                if (Array.IndexOf(Environment.GetCommandLineArgs(), flag) >= 0)
+                {
+                    yield return tour();
+                    File.WriteAllText(Path.Combine(outDir, "autotest_log.txt"), log.ToString());
+                    yield return new WaitForSecondsRealtime(0.5f);
+                    Application.Quit();
+                    yield break;
+                }
+
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-autotestCoopJoin") >= 0)
             {
                 yield return CoopJoinTour();
