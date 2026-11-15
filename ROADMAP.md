@@ -785,6 +785,34 @@ captaincarl24: "make the interior more detailed and more realistic, add some tex
   out with distance so nothing shimmers. Rails, floor plates and window frames use the photographed brushed metal.
 - The crew and the plushie are lit by the lamps too.
 
+### Milestone 38: the survival kit (2026-11-15)
+captaincarl24: "add the rest of all the systems in the doc". Stage one of three, in Arden's own style (our own items, numbers
+and look; nothing copied from the game the doc described):
+- **Health, hunger and stamina** for every Ardling (Sim/Survival.cs, kept in the career). On foot the stomach empties in about
+  18 game hours; aboard a ship with supplies the crew eat and it fills. Running (CTRL) uses stamina, which comes back resting
+  (slower when hungry); run dry and you walk until it's back to 30. Landing faster than 5.5 m/s hurts, so does more than 8 g
+  (12 on Easy) and a cabin hotter than 92% of its limit; an empty stomach slowly does too; fed Ardlings heal (four times
+  faster resting in a habitat). Fresh on the pad, everyone's well.
+- **Knocked out** at no health: a revive kit in the Ardling's own backpack is used by itself; otherwise a teammate with one has
+  90 seconds (F beside them on foot, or Use aboard the same ship), or they're lost.
+- **Crouch** (Z): half speed, a lower view.
+- **Things on the worlds** (Universe.items, saved): searching an outpost or wreck scatters 2-5 things round you, picked by
+  rarity (common 60, uncommon 28, rare 10, very rare 2). They show with a glowing ring. On foot F picks up the nearest within
+  2.5 m (or puts down what you hold), R throws it (it flies and bounces in the world's frame), I puts it in the backpack.
+- **29 items of our own**: ten foods (each fills a different amount; some give energy), bandage, med kit, revive kit; fuel
+  canister (250 kg), thruster fuel can, battery pack, supply crate, air tank; repair kit (anyone can fix a broken part with
+  it), scanner (what's lying about within 3 km, for a minute), torch, spare flag; five valuables to sell; backpack straps (6)
+  and the big backpack (8).
+- **The backpack** (I, and 1-8 to use): 4 places, kept between flights. Fuel, thruster fuel, batteries and supplies go into the
+  ship in reach (or the one you're in).
+- **The supply store** at the space centre (a new building): buy (into the backpack, or the locker when it's full), sell (valuables
+  for their worth, the rest at half), move things between backpack and locker (12, 24 once extended). Free in a sandbox.
+- **Rooms**: the host keeps everyone's numbers, backpacks and what they hold, and the things lying about, and sends them round;
+  players' F/R/I/1-8 go to the host as commands.
+- 8 new sim tests (vitals, hunger over time, stamina, falls, backpack, items, loot, saves); `-autotestSurvival` (760-768).
+- Next: stage two (random outposts and wrecks along the way, random events, engine heat with coolant and radiators, repairs),
+  then stage three (rogue drones, fighting back, traders, the mystery vending machine, daily and weekly quests).
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

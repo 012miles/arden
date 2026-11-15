@@ -23,7 +23,7 @@ namespace Rocket
         public bool FirstPersonView => firstPerson && active != null && active.IsEva && !active.destroyed && !mapView && !photoMode && replay == null;
 
         /// <summary>The mouse is steering the view (first person, nothing in the way, ALT not held).</summary>
-        bool MouseLooking => (FirstPersonView || (inside && !mapView)) && !paused && !Glossary.Open && !In.Held(K.LeftAlt) && Application.isFocused;
+        bool MouseLooking => (FirstPersonView || (inside && !mapView)) && !paused && !Glossary.Open && !packOpen && !In.Held(K.LeftAlt) && Application.isFocused;
 
         /// <summary>Walking extras, after HandleEvaKeys has read W/S/A/D: the camera key, running, strafing, the mouse.</summary>
         void HandleWalkInput(VesselSim v)
@@ -39,9 +39,15 @@ namespace Rocket
             v.evaRun = false;
             if (v.landed)
             {
-                v.evaRun = In.Held(K.LeftCtrl);
                 if (firstPerson && walkOverride == null) { v.evaStrafe = v.inputYaw; v.inputYaw = 0; }
             }
+            // milestone 38: running uses stamina (and not crouched); standing still or walking brings it back
+            bool moving = Mathf.Abs(v.inputPitch) > 0.01f || Mathf.Abs(v.evaStrafe) > 0.01f;
+            bool wantRun = v.landed && In.Held(K.LeftCtrl) && moving && !v.evaCrouch;
+            var vit = VitalsFor(MyArdlingName);
+            if (vit == null) v.evaRun = wantRun;
+            else if (SurvivalHere) v.evaRun = Survival.Stamina(vit, paused ? 0 : Mathf.Min(Time.unscaledDeltaTime, 0.1f), wantRun);
+            else v.evaRun = wantRun && !vit.tired;
             if (MouseLooking)
             {
                 var d = In.MouseDelta;
@@ -88,7 +94,7 @@ namespace Rocket
                 return;
             }
             Vector3 up = renderRot * Vector3.up, fwd = renderRot * Vector3.forward, right = renderRot * Vector3.right;
-            cam.transform.position = up * EyeHeight + fwd * 0.12f;
+            cam.transform.position = up * (active.evaCrouch ? 0.27f : EyeHeight) + fwd * 0.12f;   // (milestone 38: lower when crouched)
             cam.transform.rotation = Quaternion.LookRotation(Quaternion.AngleAxis(-fpPitch, right) * fwd, up);
             // your own suit would fill the view: hide it while looking out of it
             if (views.TryGetValue(active, out var view) && view != fpHiddenView)

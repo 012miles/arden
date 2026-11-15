@@ -851,7 +851,7 @@ namespace Rocket
             if (lookedAt == null) return false;
             if (lookedAt.scroll != null && Mathf.Abs(In.Scroll) > 0.01f) lookedAt.scroll(In.Scroll);
             // (a click only while the mouse is looking round: with ALT held it's for the panels)
-            if (In.Down(K.E) || In.LeftDown && !In.Held(K.LeftAlt) && !In.Typing) { lookedAt.use?.Invoke(); KitSound(lookedAt.sound ?? "ui_click"); return true; }
+            if (In.Down(K.E) || In.LeftDown && !In.Held(K.LeftAlt) && !In.Typing && !packOpen) { lookedAt.use?.Invoke(); KitSound(lookedAt.sound ?? "ui_click"); return true; }
             return false;
         }
 

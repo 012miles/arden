@@ -122,7 +122,7 @@ namespace Rocket
                 : name == "run" || name == "send" ? CAct.Science
                 : CAct.Navigate;
             bool endByHost = name == "end";
-            bool anyone = name == "scav" && c.Expedition;   // in an expedition anyone can search an outpost
+            bool anyone = name == "scav" && c.Expedition || name == "item";   // in an expedition anyone can search an outpost; anyone uses their own things
             if (!c.SenderCan(who, act) && !endByHost && !anyone) return;
             var p = c.room.State.Player(who);
             Internal(() =>
@@ -134,6 +134,7 @@ namespace Rocket
                     case "group": FireGroup(m.n); break;
                     case "rcs": ToggleRcs(); break;
                     case "scav": DoScavenge(); break;
+                    case "item": RunItemCommand(who, m); break;   // milestone 38
                     case "sastoggle": ToggleSas(); break;
                     case "sas": SetSas((SasMode)m.n); break;
                     case "autopilot": if (autopilotOn) StopAutopilot(); else EnableAutopilot(); break;

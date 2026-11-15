@@ -201,6 +201,7 @@ namespace Rocket
             firstPerson = false;
             fpHiddenView = null;
             LeaveInterior();
+            ClearItemViews();   // milestone 38
             for (int i = U.vessels.Count - 1; i >= 0; i--) if (U.vessels[i].destroyed) U.vessels.RemoveAt(i);
             ClearScene();
             active = null;
@@ -490,6 +491,7 @@ namespace Rocket
             UpdateCursor();   // milestone 34: the pointer's locked while looking round in first person
             EasyHelpers(active, Time.unscaledDeltaTime);   // milestone 35: Easy lends a hand
             TripTick(Time.unscaledDeltaTime);              // milestone 35: the Easy autopilot to a moon and down
+            SurvivalTick();                                // milestone 38: health, hunger, stamina; things flying through the air
             if (replay != null)
             {
                 float rdt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
@@ -558,6 +560,7 @@ namespace Rocket
             UpdateMusic();
             UpdateBooms(Time.unscaledDeltaTime);
             UpdateChunks(Time.unscaledDeltaTime);   // milestone 35: the pieces of a crash
+            UpdateItemViews();   // milestone 38: things lying about
             reportTimer -= Time.unscaledDeltaTime;
             if (reportTimer <= 0)
             {
@@ -602,7 +605,7 @@ namespace Rocket
             if (In.Down(K.Slash) && !CoopBlock(CAct.Navigate, "warp", 0)) { SetWarpOne(); warpTargetUt = null; }
             if (In.Down(K.M)) mapView = !mapView;
             if (In.Down(K.O)) ToggleOreMap();
-            if (In.Down(K.F)) { thermalView = !thermalView; Show(thermalView ? "Thermal view on" : "Thermal view off"); }
+            if (In.Down(K.F) && !active.IsEva) { thermalView = !thermalView; Show(thermalView ? "Thermal view on" : "Thermal view off"); }   // (on foot F picks things up)
             if (In.Down(K.Delete) && node != null) { DeleteNode(); Show("Maneuver deleted"); }
             if (In.Down(K.Tab) && mapView) CycleMapFocus();
             bool canSwitch = !Coop.Active || (!remote && Coop.Current.CanDo(CAct.Steer));
@@ -653,6 +656,7 @@ namespace Rocket
             }
             if (v.inputTranslate != Vector3.zero && railsWarp) SetWarpOne();
             HandleWalkInput(v);   // milestone 34: camera view, running, sideways steps, the mouse
+            if (HandleSurvivalKeys(v)) return;   // milestone 38: F/R/Z/I/1-8 (and nothing at all while knocked out)
             if (In.Down(K.B)) BoardNearest();
             if (In.Down(K.G)) PlantFlag();
         }

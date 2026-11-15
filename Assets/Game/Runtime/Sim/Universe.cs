@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace Rocket
@@ -18,6 +19,8 @@ namespace Rocket
         public int wanderersSeen;
         public List<BaseLink> links = new List<BaseLink>();
         public int weatherSeed;   // milestone 34: each game has its own weather
+        public List<WorldItem> items = new List<WorldItem>();   // milestone 38: things lying about on the worlds
+        public int nextItemUid = 1;
     }
 
     [Serializable]
@@ -42,6 +45,17 @@ namespace Rocket
         public readonly OreSurvey survey = new OreSurvey();
         /// <summary>Ground cables between landed modules (milestone 22): see Bases.</summary>
         public readonly List<BaseLink> links = new List<BaseLink>();
+        /// <summary>Milestone 38: things lying on (or flying over) the worlds: loot, and whatever's been dropped or thrown.</summary>
+        public readonly List<WorldItem> items = new List<WorldItem>();
+        public int nextItemUid = 1;
+
+        public WorldItem AddItem(string id, CelestialBody b, Vector3d fixedPos, float yaw = 0)
+        {
+            var w = new WorldItem { uid = nextItemUid++, id = id, body = b.name, yaw = yaw };
+            w.Pos = fixedPos;
+            items.Add(w);
+            return w;
+        }
         /// <summary>When the next wanderer may arrive, and how many have come so far (for their names).</summary>
         public double nextWandererUt;
         public int wanderersSeen;
@@ -82,6 +96,8 @@ namespace Rocket
             var s = new UniverseSave { ut = ut, nextId = nextId, career = career.ToSave(), survey = survey.ToSave(), nextWandererUt = nextWandererUt, wanderersSeen = wanderersSeen, weatherSeed = weatherSeed };
             foreach (var v in vessels) if (!v.destroyed) s.vessels.Add(v.ToSave());
             foreach (var l in links) s.links.Add(new BaseLink { a = l.a, b = l.b });
+            s.items = items.ToList();
+            s.nextItemUid = nextItemUid;
             return JsonUtility.ToJson(s);
         }
 
@@ -99,6 +115,10 @@ namespace Rocket
             WeatherSeed = s != null && s.weatherSeed != 0 ? s.weatherSeed : NewWeatherSeed();   // older saves get weather of their own too
             links.Clear();
             if (s?.links != null) foreach (var l in s.links) links.Add(new BaseLink { a = l.a, b = l.b });
+            items.Clear();
+            if (s?.items != null) items.AddRange(s.items.Where(w => w != null && Items.Get(w.id) != null));
+            nextItemUid = Math.Max(1, s?.nextItemUid ?? 1);
+            foreach (var w in items) nextItemUid = Math.Max(nextItemUid, w.uid + 1);
             if (s?.vessels == null) return;
             foreach (var vs in s.vessels)
             {

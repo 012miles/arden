@@ -63,6 +63,11 @@ namespace Rocket
         public int exDifficulty = 1, exRuns, weatherSeed;
         public ExProgress ex = new ExProgress();
         public string exReport;
+        // ---- milestone 38: survival in a room (the host keeps everyone's and sends it round): each Ardling's health,
+        // hunger and stamina, each player's backpack and what they're holding, and the things lying about
+        public List<Vitals> vitals = new List<Vitals>();
+        public List<NetPack> packs = new List<NetPack>();
+        public List<WorldItem> items = new List<WorldItem>();
         /// <summary>A room that builds and flies a rocket: a rocket room (1) or an expedition (2).</summary>
         public bool Rocket => activity == 1 || activity == 2;
         // ---- milestone 31: the room's best flight on each mission ("scenario|score|stars"), announced so other rooms can race it

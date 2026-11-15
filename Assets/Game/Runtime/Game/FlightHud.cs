@@ -65,6 +65,7 @@ namespace Rocket
             {
                 // milestone 34: in the cabin, just its prompts (and the team, and the pause menu)
                 DrawInteriorHud(Ui.W, Ui.H);
+                DrawSurvivalHud(Ui.W, Ui.H);   // milestone 38
                 if (Coop.Active) DrawCoopFlight(Ui.W, Ui.H);
                 if (paused && !showHowTo && !showBadges) DrawEndPanel("Paused", "");
                 return;
@@ -84,6 +85,7 @@ namespace Rocket
             { if (!TryCountdown()) Stage(); }
             DrawInteriorHud(W, H);   // milestone 34: the cabin's prompts
             DrawTripPanel(W, H);     // milestone 35: the Easy autopilot
+            DrawSurvivalHud(W, H);   // milestone 38: health, food, stamina, what F does, the backpack
             var v = active;
             var body = v.body;
             Orbit orbit = trajectory.Count > 0 ? trajectory[0].orbit : null;

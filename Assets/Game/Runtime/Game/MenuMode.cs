@@ -95,6 +95,7 @@ namespace Rocket
                 new Place { name = "Headquarters", does = "Facilities and upgrades", e = -181, n = 263, h = 30, go = Builder(() => h.ShowCenter(true)) },
                 new Place { name = "Astronaut complex", does = "Your crew", e = 150, n = 320, h = 22, go = Builder(() => h.ShowCrew(true)) },
                 new Place { name = "Visitor centre", does = "Badges you've earned", e = 655, n = 1218, h = 40, go = Builder(() => h.ShowBadges(true)) },
+                new Place { name = "Supply store", does = "Food, kit, your locker; sell finds", e = -48, n = 307, h = 14, go = () => StorePanel.Open = true },   // milestone 38
             };
             for (int i = 0; i < LaunchSite.Pads.Length; i++)
             {
@@ -121,7 +122,7 @@ namespace Rocket
             if (Mathf.Abs(sc) > 0.01f) centreDist = Mathf.Clamp(centreDist * (sc > 0 ? 1f / 1.12f : 1.12f), 500f, 3200f);
             double a = centreYaw * Mathf.Deg2Rad, cx = -150, cn = 420;
             shot = new double[] { cx + System.Math.Sin(a) * centreDist, cn + System.Math.Cos(a) * centreDist, centreDist * 0.48, cx, cn, 0 };
-            if (In.EscapeDown) { root.EnterHangar(); }
+            if (In.EscapeDown && !StorePanel.Open) { root.EnterHangar(); }
         }
 
         void DrawCentre(float W, float H)

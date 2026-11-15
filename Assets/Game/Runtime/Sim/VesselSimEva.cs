@@ -19,6 +19,7 @@ namespace Rocket
         /// </summary>
         public float evaStrafe, evaLookYaw;
         public bool evaRun;
+        public bool evaCrouch;   // milestone 38: crouched (Z): half speed
 
         public bool IsEva => parts.Count == 1 && parts[0].def.kind == PartKind.Eva;
         /// <summary>Milestone 35 (captaincarl24: "why do Ardlings have infinite flags, give them a limit of like 3"): flags per trip outside.</summary>
@@ -67,7 +68,7 @@ namespace Rocket
                 fwd = (fwd - up * Vector3d.Dot(fwd, up)).normalized;
                 right = (right - up * Vector3d.Dot(right, up)).normalized;
                 bool swim = Terrain.IsWater(body, up);
-                double speed = swim ? EvaSwimSpeed * (evaRun ? 1.6 : 1.0) : EvaWalkSpeed * (evaRun ? EvaRunFactor : 1.0);   // (milestone 35: slower swimming)
+                double speed = swim ? EvaSwimSpeed * (evaRun ? 1.6 : 1.0) : EvaWalkSpeed * (evaRun ? EvaRunFactor : 1.0) * (evaCrouch ? Survival.CrouchSpeed : 1.0);   // (milestone 35: slower swimming)
                 double stand = landedFixedPos.magnitude - (body.radius + LaunchSite.SurfaceHeight(body, up));
                 Vector3d nu = (landedFixedPos + (fwd * move.y + right * move.x) * (speed * dt)).normalized;
                 landedFixedPos = nu * (body.radius + LaunchSite.SurfaceHeight(body, nu) + stand);

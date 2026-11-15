@@ -23,6 +23,12 @@ namespace Rocket
         /// <summary>Every update, newest first.</summary>
         public static readonly Update[] All =
         {
+            U(38, "Nov 15, 2026", "The survival kit",
+                "Every Ardling has health, food and stamina: running uses stamina, on foot you get hungry, falls, heavy g and a burning cabin hurt",
+                "Knocked out? A revive kit in your backpack gets you up; otherwise a teammate with one has 90 seconds",
+                "Things lie about on the worlds: search an outpost or wreck and loot scatters round you. F picks up, R throws, Z crouches",
+                "Your backpack (I, then 1-8 to use): food, medicine, fuel canisters and batteries for a ship in reach, repair kits, a scanner, a torch",
+                "It keeps what's in it between flights; the supply store at the space centre sells kit, buys your finds and keeps a locker"),
             U(37, "Nov 14, 2026", "Realistic cabins",
                 "Real lamps light the cabin: light pools under them, corners go darker, and the sun no longer shines through the walls",
                 "Sunlight falls through the windows onto the floor and moves as the ship turns; close a blind and it's gone",

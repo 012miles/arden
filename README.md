@@ -14,6 +14,8 @@ Developed by captaincarl24
   everything (E): STAGE, ABORT, switches, circuit breakers, a keypad computer, needle gauges and an attitude ball, the radio,
   blinds, lights, the snack locker and more. In space the loose things float; in reentry the windows glow and the cabin shakes.
   Real lamps, sunlight falling through the windows and textured cloth, rubber, paint and metal make it look real.
+- **Survive**: every Ardling has health, food and stamina. Search outposts for loot, pick things up (F), throw them (R), keep
+  them in your backpack (I) between flights, and buy kit or sell finds at the space centre's supply store.
 - **Make it yours**: paint your rocket in 16 colours and stick on decals (built-in ones or your own pictures), save your own presets, and
   dress your Ardling (suit colour, visor note, hat) for multiplayer.
 - **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole
@@ -70,6 +72,10 @@ land within 300 m of an outpost or wreck (⌂ on the map) to **Scavenge** it; **
 | C | First or third person (on foot) |
 | G | Plant a flag |
 | B | Climb back in |
+| F | Pick up / put down (or revive a knocked-out teammate) |
+| R | Throw what you're holding |
+| Z | Crouch |
+| I | Backpack (1-8 use what's in it) |
 | TAB | Go inside the cabin (look at something and press E to use it: the seats fly, the hatch goes out) |
 | Alt | Free the mouse pointer in first person |
 

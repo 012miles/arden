@@ -422,6 +422,11 @@ namespace Rocket
         public List<string> scavenged = new List<string>();   // milestone 34: outposts and wrecks searched
         public bool creditsSeen;               // milestone 35: the credits rolled after the story
         public int presetSlots;                // milestone 34: slots open for your own presets (older saves: 0, read as 1)
+        // milestone 38: survival (older saves: survivalVersion 0, given the starting kit)
+        public int survivalVersion;
+        public List<Vitals> vitals = new List<Vitals>();
+        public List<string> backpack = new List<string>(), locker = new List<string>();
+        public int backpackSize, lockerSize;
     }
 
     /// <summary>
@@ -485,6 +490,7 @@ namespace Rocket
             presetSlots = 1;
             creditsSeen = false;
             scavenged.Clear();
+            ResetSurvival();   // milestone 38
             unlocked.Clear();
             unlocked.Add("start");
             subjects.Clear();
@@ -1035,8 +1041,10 @@ namespace Rocket
 
         // ---------------------------------------------------------------- save
 
-        public CareerSave ToSave() => new CareerSave
+        public CareerSave ToSave()
         {
+            var save = new CareerSave
+            {
             version = 2, mode = mode, chosen = chosen, funds = funds, science = science, reputation = reputation,
             unlocked = unlocked.ToList(), subjects = subjects.Values.ToList(), contracts = contracts.ToList(),
             records = records, nextContractId = nextContractId, seed = seed,
@@ -1045,11 +1053,14 @@ namespace Rocket
             landmarksSpotted = spotted.ToList(), landmarksVisited = visited.ToList(),
             storyStep = storyStep, storyStarted = storyStarted, storyBriefed = storyBriefed,
             presetSlots = presetSlots, scavenged = scavenged.ToList(), creditsSeen = creditsSeen,
-        };
+            };
+            SaveSurvival(save);   // milestone 38
+            return save;
+        }
 
         public void Load(CareerSave s)
         {
-            if (s == null || s.version == 0) { mode = GameMode.Sandbox; chosen = false; return; } // saved before careers existed
+            if (s == null || s.version == 0) { mode = GameMode.Sandbox; chosen = false; ResetSurvival(); return; } // saved before careers existed
             mode = s.mode; chosen = s.chosen; funds = s.funds; science = s.science; reputation = s.reputation;
             presetSlots = Math.Max(1, s.presetSlots);
             creditsSeen = s.creditsSeen;
@@ -1070,6 +1081,7 @@ namespace Rocket
             storyNews.Clear();
             badgeNews.Clear();
             LoadCenter(s);
+            LoadSurvival(s);   // milestone 38
         }
     }
 }

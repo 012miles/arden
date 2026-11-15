@@ -129,9 +129,11 @@ namespace Rocket
                 ship = U.vessels.Where(v => !v.destroyed && !v.IsEva && !v.IsFlag && v.body == active.body && v.landed && v.parts.Count > 0)
                     .OrderBy(v => (v.pos - here).magnitude).FirstOrDefault(v => (v.pos - here).magnitude < 600) ?? active;
             }
+            bool fresh = !U.career.scavenged.Contains(l.id);
             string got = Outposts.Scavenge(l, ship, U.career);
             Show(got, 7f, true);
             audio?.Clunk(0.35f);
+            if (fresh && U.career.scavenged.Contains(l.id)) DropLoot(active.IsEva ? active : ship, l.id);   // milestone 38: things to pick up
         }
 
         // ---------------------------------------------------------------- the end

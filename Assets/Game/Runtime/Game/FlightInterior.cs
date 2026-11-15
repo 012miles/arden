@@ -93,7 +93,9 @@ namespace Rocket
             if (!inside) return;
             if (mapView) return;    // (the map screen: M comes back)
             if (In.Down(K.Tab)) { LeaveInterior(); return; }
-            if (!In.Held(K.LeftAlt) && Application.isFocused)
+            if (In.Down(K.I)) TogglePack();   // milestone 38: eat, heal, refuel from the backpack
+            UsePackKeys(MyArdlingName);
+            if (!In.Held(K.LeftAlt) && !packOpen && Application.isFocused)
             {
                 var d = In.MouseDelta;
                 iyaw += d.x * 0.12f;
