@@ -108,8 +108,9 @@ namespace Rocket
             if (!In.Held(K.LeftAlt) && !packOpen && Application.isFocused)
             {
                 var d = In.MouseDelta;
-                iyaw += d.x * 0.12f;
-                ipitch = Mathf.Clamp(ipitch + d.y * 0.12f, -88f, 88f);
+                float turn = iflip > 0.5f ? -0.12f : 0.12f;   // (milestone 44: standing on the roof, the view's turned over)
+                iyaw += d.x * turn;
+                ipitch = Mathf.Clamp(ipitch + d.y * turn, -88f, 88f);
             }
             // milestone 43: walking, thrown about or floating, with the walls and the furniture solid (FlightCabinPhysics)
             CabinStep(dt);
@@ -157,13 +158,13 @@ namespace Rocket
             SetWorldAo(false);   // milestone 35
             if (icam == null) BuildInteriorCamera(world);
             icam.enabled = true;
-            var look = Quaternion.Euler(-ipitch, iyaw, 0);
-            icam.transform.position = room.transform.position + ipos + Vector3.up * Eye;
+            var look = Quaternion.Euler(-ipitch, iyaw, 0) * Quaternion.Euler(0, 0, 180f * iflip);   // (milestone 44: turned over on the roof)
+            icam.transform.position = room.transform.position + EyeAt;
             icam.transform.rotation = look;
             icam.fieldOfView = world.fieldOfView;
             Vector3 at = renderRot * (insidePart.Center - active.com);
-            world.transform.position = at + renderRot * Vector3.up * 0.3f;
-            world.transform.rotation = renderRot * look;
+            world.transform.position = at + CabinToWorld * Vector3.up * 0.3f;   // (milestone 44: a plane's cabin runs along it)
+            world.transform.rotation = CabinToWorld * look;
             UpdateCabinFolk();
         }
 
@@ -298,14 +299,20 @@ namespace Rocket
             var b = new MeshBuilder();
             var glow = new MeshBuilder();
             bool hab = p.def.kind == PartKind.Habitat || p.def.crew >= 3;
-            if (hab) BuildHab(b, glow, p.def.crew); else BuildCapsule(b, glow, p.def.crew);
+            // milestone 44: a plane's cabins are built along it (FlightCockpit): a cockpit, or a passenger cabin
+            planeRoom = BuiltAsPlane(active);
+            airlinerRoom = planeRoom && p.def.kind == PartKind.Habitat;
+            cabinRot = planeRoom ? Quaternion.LookRotation(Vector3.up, Vector3.forward) : Quaternion.identity;
+            iflip = 0; onCeiling = false;
+            if (planeRoom) { if (airlinerRoom) BuildAirliner(b, glow, p.def.crew); else BuildCockpit(b, glow, p.def.crew); }
+            else if (hab) BuildHab(b, glow, p.def.crew); else BuildCapsule(b, glow, p.def.crew);
             room = new GameObject("Cabin " + p.def.name) { layer = InteriorLayer };
             room.transform.position = new Vector3(0, -30000f, 0);   // far from anything (and on its own layer)
             // milestone 37: lit by its own lamps (not the sun through the walls), corners darkening like a real room
             cabinMat.SetFloat("_SunScale", 0f);
             cabinMat.SetFloat("_CabinAO", 1f);
             cabinMat.SetVector("_RoomOrigin", room.transform.position);
-            cabinMat.SetVector("_RoomSize", hab ? new Vector4(roomW / 2, 2.1f, 1, roomL / 2) : new Vector4(roomR * Mathf.Cos(Mathf.PI / 12f), 2.1f, 0, 0));
+            cabinMat.SetVector("_RoomSize", !roomRound ? new Vector4(roomW / 2, 2.1f, 1, roomL / 2) : new Vector4(roomR * Mathf.Cos(Mathf.PI / 12f), 2.1f, 0, 0));
             var mesh = new GameObject("Walls") { layer = InteriorLayer };
             mesh.transform.SetParent(room.transform, false);
             mesh.AddComponent<MeshFilter>().sharedMesh = b.ToMesh("Cabin");

@@ -942,6 +942,13 @@ weapons", "make the main menu screen animated like theres rockets taking off, mo
   (Expedition.Evaluate sandbox); a room's empty "carried" ("") counted as carrying (blank "Holding", no attacks).
 - 3 new sim tests.
 
+
+### Milestone 44: NASA's Mission Review and real plane cockpits (2026-11-15)
+captaincarl24: "incorporate the nasa datasets into the game ... use the datasets for the main game" (the Space Apps Resources tab has guides, papers and tools rather than data files, so each became part of the builder), "for the plane cockpit make a new model for it ... when your cockpit is upside down your on the roof unless the g forces are holding you down".
+- **Mission Review** (Sim/MissionReview.cs; the builder's Review button): the rocket on the stand checked like a NASA mission. The four mission segments (launch, space, ground, user) from "Design and Develop Science Missions"; the Mission Design Lab's disciplines (propulsion, power, thermal, attitude control, communications, end of mission); JPL's Concept Maturity Levels 1-4; real NASA missions like the design (after the telescope learning game). Every red line says what to add.
+- **Plane cockpits** (Game/FlightCockpit.cs): a plane's cabins are built along it (nose ahead, belly as the floor) and the felt pull is turned into that frame (cabinRot), replacing the old "always level" rule. Upside down you stand on the roof (CabinMove.Roof, the view rolls over, mouse look flips); a loop's g holds you on the floor; standing on its tail lays you on your back. The cockpit: raked windscreen with frame and glass (and reentry glow), side windows, arched roof, seats facing the nose (rows for bigger crews), rudder pedals, thrust levers. Passenger cabins: 2+2 seat rows, small windows with shades, overhead bins.
+- 2 new tests (-only44); tour -autotest44 (840-843).
+- Next (milestone 45): 10 plane presets (shuttle-like, airliners, supersonic) with bigger plane parts, a better parachute, a return-home autopilot from Tal.
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

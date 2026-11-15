@@ -87,7 +87,7 @@ namespace Rocket
                 cabinLamps.Add((l, intensity, c));
             }
             Color warm = new Color(1f, 0.92f, 0.8f);
-            if (hab) foreach (float z in new[] { -roomL / 2 + 1.5f, -roomL / 2 + 4f, -roomL / 2 + 6.5f }) AddLamp("Ceiling lamp", new Vector3(0, h - 0.15f, z), warm, 2.6f, 4.5f);
+            if (hab) foreach (float z in new[] { -roomL / 2 + 1.5f, -roomL / 2 + 4f, -roomL / 2 + 6.5f }) if (z < roomL / 2 - 0.3f) AddLamp("Ceiling lamp", new Vector3(0, h - 0.15f, z), warm, 2.6f, 4.5f);
             else AddLamp("Ceiling lamp", new Vector3(0, h - 0.2f, -0.1f), warm, 3.0f, 5f);
             AddLamp("Flood lamp", new Vector3(0, h - 0.35f, front - 0.95f), new Color(1f, 0.96f, 0.9f), 1.3f, 2.8f);
             AddLamp("Screen glow", new Vector3(0, 0.78f, front - 0.5f), new Color(0.45f, 0.75f, 1f), 0.4f, 1.3f);
@@ -144,7 +144,7 @@ namespace Rocket
         {
             var sun = root.sun;
             float sunI = sun != null && sun.enabled && sun.gameObject.activeInHierarchy ? sun.intensity * Mathf.Max(sun.color.r, Mathf.Max(sun.color.g, sun.color.b)) : 0;
-            Vector3 s = sun != null ? Quaternion.Inverse(renderRot) * sun.transform.forward : Vector3.down;   // the way the light travels, in the cabin
+            Vector3 s = sun != null ? Quaternion.Inverse(CabinToWorld) * sun.transform.forward : Vector3.down;   // the way the light travels, in the cabin
             var verts = new Vector3[4];
             var cols = new Color[4];
             foreach (var sp in sunPatches)
@@ -648,7 +648,7 @@ namespace Rocket
         void BuildWindowsGlass(bool hab, float h)
         {
             var list = Windows(h).ToList();
-            if (hab) list.Add((new Vector3(0, 0, roomL / 2), Vector3.back, roomW * 0.76f, 0.6f, 1.55f));
+            if (hab && !planeRoom) list.Add((new Vector3(0, 0, roomL / 2), Vector3.back, roomW * 0.76f, 0.6f, 1.55f));
             foreach (var (c, n, w, sill, head) in list)
             {
                 var q = Quaternion.LookRotation(-n, Vector3.up);
@@ -986,7 +986,7 @@ namespace Rocket
                 Prop pr = null;
                 pr = AddProp("float" + i, name, start, () => $"E: give the {name.ToLowerInvariant()} a push", () =>
                 {
-                    Vector3 eye = ipos + Vector3.up * Eye;
+                    Vector3 eye = EyeAt;
                     f.vel += (f.t.localPosition - eye).normalized * 1.1f + Vector3.up * 0.4f;
                     f.spin += UnityEngine.Random.insideUnitSphere * 200f;
                 }, 0.08f);

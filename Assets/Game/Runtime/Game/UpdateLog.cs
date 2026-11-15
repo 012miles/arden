@@ -23,6 +23,11 @@ namespace Rocket
         /// <summary>Every update, newest first (milestone 41, captaincarl24: just the first version and the latest updates).</summary>
         public static readonly Update[] All =
         {
+            U(44, "Nov 15, 2026", "NASA's Mission Review and real plane cockpits",
+                "Mission Review in the builder (the Review button): your rocket checked the way NASA checks a mission, from the NASA Space Apps challenge's resources",
+                "The four mission segments (launch, space, ground, user), the Mission Design Lab's disciplines, JPL's design maturity levels 1-4, and the real NASA missions your design is like",
+                "Planes get their own cockpit: a raked windscreen, side windows, seats facing the nose, rudder pedals and thrust levers; passenger cabins have rows of seats and bins",
+                "A plane's cabin runs along the plane: upside down you're on the roof unless the g-force holds you down, and a shuttle on the pad lays you on your back"),
             U(43, "Nov 15, 2026", "Everyone on foot, PvP and real cabin physics",
                 "Multiplayer: every player climbs out and spacewalks as their own Ardling (ENTER to get out, B at a hatch to get back in)",
                 "The ship stays the ship: while the host's out walking, everyone's jobs still work on the ship (they used to steer the host's Ardling)",

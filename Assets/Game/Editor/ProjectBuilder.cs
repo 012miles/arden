@@ -38,7 +38,7 @@ namespace Rocket.EditorTools
             CreateScene();
             PlayerSettings.productName = SaveSlots.ProductName;
             PlayerSettings.companyName = "captaincarl24";
-            PlayerSettings.bundleVersion = "0.43";   // the milestone number: 1.0 at release
+            PlayerSettings.bundleVersion = "0.44";   // the milestone number: 1.0 at release
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
             PlayerSettings.defaultIsNativeResolution = false;
             PlayerSettings.defaultScreenWidth = 1600;

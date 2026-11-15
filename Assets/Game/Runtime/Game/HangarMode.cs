@@ -2026,8 +2026,11 @@ namespace Rocket
                 x += 104;
             }
             PresetsRect = new Rect(x, 50, 96, 30);
-            if (Ui.Press(PresetsRect, "Presets", showPresets ? Ui.ButtonSel : Ui.Button)) { showPresets = !showPresets; painting = false; showFile = false; showMore = false; }
+            if (Ui.Press(PresetsRect, "Presets", showPresets ? Ui.ButtonSel : Ui.Button)) { showPresets = !showPresets; showReview = false; painting = false; showFile = false; showMore = false; }
             x += 100;
+            // milestone 44: NASA's way of checking a design (Sim/MissionReview)
+            if (Ui.Press(new Rect(x, 50, 84, 30), "Review", showReview ? Ui.ButtonSel : Ui.Button)) { showReview = !showReview; showPresets = false; painting = false; showFile = false; showMore = false; }
+            x += 88;
             // milestone 34: paint and decals
             if (Ui.Press(new Rect(x, 50, 70, 30), "Paint", painting ? Ui.ButtonSel : Ui.Button)) { painting = !painting; showPresets = false; showMore = false; if (painting) { DropHeldQuietly(); userDecals = null; } }
             x += 74;
@@ -2122,7 +2125,8 @@ namespace Rocket
             if (showFile) DrawFileMenu(new Rect(Mathf.Min(fileX - 60, W - 210), 44, 200, (coop ? 5 : 7) * 34 + 12));
             if (showLoad) DrawLoad(new Rect(Mathf.Min(fileX - 120, W - 270), 44, 260, 300));
             if (showVessels) DrawVessels(new Rect(Mathf.Clamp(fileX - 320, 10, W - 440), 92, 430, 420));
-            if (showPresets) DrawPresets(new Rect(midL + 8, 96, Mathf.Max(380, midR - midL - 16), H - 96 - 40));   // milestone 34: its own window, ready-made and your own
+            if (showPresets) DrawPresets(new Rect(midL + 8, 96, Mathf.Max(380, midR - midL - 16), H - 96 - 40));
+            else if (showReview) DrawReview(new Rect(midL + 8, 96, Mathf.Max(380, midR - midL - 16), H - 96 - 40));   // milestone 44   // milestone 34: its own window, ready-made and your own
             if (showCrew) DrawCrew(crewX);
             if (showMore && moreX > 0)
             {
@@ -2285,6 +2289,58 @@ namespace Rocket
         /// The Presets window (milestone 34: its own menu). Ready-made rockets, and up to 12 slots for your own: save the
         /// rocket you're building into a slot and load it any time. The first slot is free; a campaign buys more with funds.
         /// </summary>
+        // ---------------------------------------------------------------- milestone 44: the Mission Review (NASA Space Apps resources)
+
+        bool showReview;
+        Vector2 reviewScroll;
+        float reviewHeight = 900;
+        MissionReview.Result reviewCache;
+        string reviewSig;
+        public void TestShowReview(bool on) { showReview = on; showPresets = false; }
+        public MissionReview.Result TestReview => MissionReview.Review(design);
+
+        void DrawReview(Rect r)
+        {
+            Ui.Box(r); Ui.Box(r);
+            string sig = design.nodes.Count + ":" + string.Join(",", design.nodes.Select(n => n.id));
+            if (reviewCache == null || sig != reviewSig) { reviewSig = sig; reviewCache = MissionReview.Review(design); }
+            var rv = reviewCache;
+            Ui.Text(new Rect(r.x + 14, r.y + 10, r.width - 70, 26), "Mission Review", Ui.Title);
+            if (Ui.Press(new Rect(r.xMax - 40, r.y + 10, 28, 26), "×", Ui.ButtonSmall) || (In.EscapeDown && !In.Typing)) { showReview = false; return; }
+            var view = new Rect(r.x + 8, r.y + 46, r.width - 16, r.height - 54);
+            float cw = view.width - 24;
+            var wrap = new GUIStyle(Ui.Small) { wordWrap = true, richText = true };
+            reviewScroll = GUI.BeginScrollView(view, reviewScroll, new Rect(0, 0, cw, Mathf.Max(view.height, reviewHeight)));
+            float y = 0;
+            void Put(float x, string t)
+            {
+                float hh = Mathf.Max(22, wrap.CalcHeight(new GUIContent(t), cw - x));
+                Ui.Text(new Rect(x, y, cw - x, hh), t, wrap);
+                y += hh + 4;
+            }
+            Put(6, "<color=#8a929c>NASA checks a mission design like this before building it. Every line here comes from a resource of the NASA Space Apps \"Space Mission Design Game\" challenge.</color>");
+            y += 4;
+            Put(6, $"<b>Design maturity: {rv.cmlName}</b>   <color=#8a929c>(JPL's Concept Maturity Levels)</color>");
+            for (int k = 0; k < 4; k++) Ui.Line(new Rect(6 + k * 46, y, 42, 10), k < rv.cml ? new Color(0.45f, 0.85f, 1f) : new Color(1, 1, 1, 0.1f));
+            y += 16;
+            Put(6, Words.Say(rv.cmlNext));
+            y += 8;
+            void Lines(string title, string from, System.Collections.Generic.List<MissionReview.Line> ls)
+            {
+                Put(6, $"<b>{title}</b>   <color=#8a929c>{from}</color>");
+                foreach (var l in ls) Put(14, $"<color={(l.ok ? "#7dff8a" : "#ff7a6b")}>{(l.ok ? "✓" : "×")} {l.area}</color>   {Words.Say(l.text)}");
+                y += 8;
+            }
+            Lines("The four mission segments", "from NASA's \"Design and Develop Science Missions\"", rv.segments);
+            Lines("Discipline by discipline", "from NASA's Mission Design Lab", rv.disciplines);
+            Put(6, "<b>Real missions like this</b>   <color=#8a929c>from the telescope learning game</color>");
+            foreach (var m in rv.realMissions) Put(14, "• " + m);
+            y += 8;
+            Put(6, $"<color=#8a929c>Speed budget {rv.dv:N0} m/s · lift-off push {rv.twr:0.00}x its weight. Fix the red lines to climb the maturity levels, then fly it to prove it.</color>");
+            reviewHeight = y + 10;
+            GUI.EndScrollView();
+        }
+
         void DrawPresets(Rect r)
         {
             Ui.Box(r); Ui.Box(r);

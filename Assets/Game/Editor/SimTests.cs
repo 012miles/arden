@@ -64,6 +64,7 @@ namespace Rocket.EditorTools
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only41") >= 0) { RunMilestone41(); Finish(); return; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only42") >= 0) { RunMilestone42(); Finish(); return; }
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only43") >= 0) { RunMilestone43(); Finish(); return; }
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-only44") >= 0) { RunMilestone44(); Finish(); return; }
             Run("Orbit: state at epoch round-trips (ellipse + hyperbola)", StateAtEpoch);
             Run("Orbit: one full period returns to the start", OrbitPeriodRoundTrip);
             Run("Orbit: circular orbit reports Ap = Pe", CircularApPe);
@@ -124,6 +125,7 @@ namespace Rocket.EditorTools
             RunMilestone41();
             RunMilestone42();
             RunMilestone43();
+            RunMilestone44();
             if (Environment.GetCommandLineArgs().Length > 0 && Array.IndexOf(Environment.GetCommandLineArgs(), "-heatSweep") >= 0) HeatSweep();
             Finish();
         }

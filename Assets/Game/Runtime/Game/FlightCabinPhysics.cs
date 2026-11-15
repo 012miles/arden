@@ -16,7 +16,7 @@ namespace Rocket
     /// </summary>
     public partial class FlightMode
     {
-        enum CabinMove { Walk, Pinned, Falling, Floating, Holding }
+        enum CabinMove { Walk, Pinned, Falling, Floating, Holding, Roof }
         CabinMove cabinMove;
         Vector3 ivel;
         float cabinG;   // how hard the pull is (in g)
@@ -32,7 +32,7 @@ namespace Rocket
         void BuildCabinCollision(bool hab, float front)
         {
             obstacles.Clear(); handholds.Clear(); ivel = Vector3.zero;
-            float width = hab ? 2.0f : 1.6f;
+            float width = hab ? Mathf.Min(2.0f, roomW - 0.4f) : 1.6f;
             obstacles.Add((new Vector3(0, 0, front - 0.42f), new Vector3(width / 2f, 0, 0.3f), 0.9f));                    // the desk (and its screens)
             float side = hab ? roomW / 2 - 0.35f : 0.98f, consoleZ = hab ? roomL / 2 - 0.95f : roomR - 1.9f;
             foreach (int s in new[] { -1, 1 }) obstacles.Add((new Vector3(s * side, 0, consoleZ), new Vector3(0.14f, 0, 0.23f), 0.62f));   // the side consoles
@@ -42,7 +42,7 @@ namespace Rocket
             if (roomRound) { float a = 225f * Mathf.Deg2Rad, r = roomR * Mathf.Cos(Mathf.PI / 12f) - 0.25f; lk = new Vector3(Mathf.Sin(a) * r, 0, Mathf.Cos(a) * r); }
             else lk = new Vector3(hw - 0.55f, 0, -hl + 0.25f);
             obstacles.Add((lk, new Vector3(0.34f, 0, 0.34f), 1.9f));                                                      // the locker
-            if (hab)
+            if (hab && !planeRoom)
             {
                 obstacles.Add((new Vector3(-hw + 0.4f, 0, -hl + 1.3f), new Vector3(0.4f, 0, 0.78f), 1.3f));                // the bunks
                 obstacles.Add((new Vector3(hw - 0.4f, 0, -hl + 1.3f), new Vector3(0.4f, 0, 0.78f), 1.3f));
@@ -51,7 +51,20 @@ namespace Rocket
             }
             // yellow handrails to hold on to when weightless: round the walls at chest height, and across the ceiling
             Color rail = new Color(0.95f, 0.78f, 0.15f);
-            if (roomRound)
+            if (planeRoom)
+            {
+                // milestone 44: a plane's: rails on the back half of the walls (the front has windows) and down the roof; the
+                // passenger cabin's bins are handholds too
+                foreach (int s in new[] { -1, 1 })
+                    for (int k = 0; k < (airlinerRoom ? 3 : 2); k++)
+                    {
+                        Vector3 at = airlinerRoom ? new Vector3(s * (hw - 0.66f), 1.58f, -hl + 1.2f + k * (roomL - 2.4f) / 2f) : new Vector3(s * (hw - 0.08f), 1.15f, -hl + 0.45f + k * 0.6f);
+                        if (!airlinerRoom) Piece("Handrail", at, Quaternion.LookRotation(new Vector3(s, 0, 0), Vector3.up), b => { b.Mat = MeshBuilder.MatGloss; b.AddBox(Vector3.zero, new Vector3(0.5f, 0.035f, 0.035f), rail, Quaternion.identity); });
+                        handholds.Add(at);
+                    }
+                for (int k = 0; k < 2; k++) { Vector3 at = new Vector3(0, RoomH - 0.1f, -hl + 0.8f + k * (roomL - 1.6f) * 0.5f); Piece("Ceiling rail", at, Quaternion.identity, b => { b.Mat = MeshBuilder.MatGloss; b.AddBox(Vector3.zero, new Vector3(0.9f, 0.035f, 0.035f), rail, Quaternion.identity); }); handholds.Add(at); }
+            }
+            else if (roomRound)
             {
                 foreach (float deg in new[] { 60f, 120f, 165f, 195f, 240f, 300f })
                 {
@@ -82,19 +95,19 @@ namespace Rocket
         }
 
         /// <summary>Which way you're pulled in the cabin (m/s², cabin frame), and whether this cabin keeps its floor (planes, rovers).</summary>
-        Vector3 CabinPull(out bool levelOnly)
+        Vector3 CabinPull()
         {
-            levelOnly = active != null && active.parts.Exists(p => p.def.kind == PartKind.Gear || p.def.kind == PartKind.Wheel || p.def.kind == PartKind.Wing);
             if (active == null) return new Vector3(0, -9.81f, 0);
-            Vector3 g = -active.feltLocal;
-            if (levelOnly) g = new Vector3(0, -g.magnitude, 0);   // (built level: the pull only presses you down, or lets go)
-            return g;
+            // milestone 44: turned into the cabin's frame (a plane's runs along it), so planes feel it all too: upside down
+            // you're on the roof, unless the g-force of a loop holds you on the floor (it used to keep planes level always)
+            return Quaternion.Inverse(cabinRot) * -active.feltLocal;
         }
 
         /// <summary>One frame of moving about the cabin: walking, being thrown about, or floating and pushing off.</summary>
         void CabinStep(float dt)
         {
-            Vector3 g = CabinPull(out _);
+            Vector3 g = CabinPull();
+            float roofY = RoomH - BodyH - 0.05f;
             float gm = g.magnitude;
             cabinG = gm / 9.81f;
             var look = Quaternion.Euler(-ipitch, iyaw, 0);
@@ -103,7 +116,22 @@ namespace Rocket
             bool fast = In.Held(K.LeftCtrl);
             bool weightless = gm < 1.0f;
             bool floorDown = gm > 1e-3f && Vector3.Dot(g / gm, Vector3.down) > 0.8f;
-            if (!weightless && floorDown && ipos.y <= 0.03f && ivel.y <= 0.6f)
+            bool roofDown = gm > 1e-3f && Vector3.Dot(g / gm, Vector3.up) > 0.8f;
+            if (!weightless && roofDown && ipos.y >= roofY - 0.03f && ivel.y >= -0.6f)
+            {
+                // milestone 44 (captaincarl24: "when your cockpit is upside down your on the roof"): you stand on the roof
+                float speed = (fast ? 2.2f : 1.2f) / Mathf.Max(1f, Mathf.Sqrt(cabinG));
+                if (cabinG > 3f) speed = 0f;
+                Vector3 move = fwdFlat * wIn + rightFlat * dIn;
+                if (move.sqrMagnitude > 1) move.Normalize();
+                Vector3 want = move * speed + Vector3.ProjectOnPlane(g, Vector3.up) * 0.25f;
+                ivel = Vector3.Lerp(new Vector3(ivel.x, 0, ivel.z), want, Mathf.Clamp01(dt * 10f));
+                ipos += ivel * dt;
+                ipos.y = roofY;
+                onCeiling = true;
+                cabinMove = CabinMove.Roof;
+            }
+            else if (!weightless && floorDown && ipos.y <= 0.03f && ivel.y <= 0.6f)
             {
                 // walking: heavier under thrust; the sideways part of the pull (leaning, speeding up) makes you stagger that way
                 float speed = (fast ? 2.6f : 1.5f) / Mathf.Max(1f, Mathf.Sqrt(cabinG));
@@ -115,6 +143,7 @@ namespace Rocket
                 ivel = Vector3.Lerp(new Vector3(ivel.x, 0, ivel.z), want, Mathf.Clamp01(dt * 10f));
                 ipos += ivel * dt;
                 ipos.y = 0f;
+                onCeiling = false;
                 cabinMove = speed <= 0 ? CabinMove.Pinned : CabinMove.Walk;
             }
             else if (!weightless)
@@ -141,6 +170,7 @@ namespace Rocket
                 cabinMove = holding ? CabinMove.Holding : CabinMove.Floating;
             }
             CollideCabin();
+            iflip = Mathf.MoveTowards(iflip, onCeiling ? 1f : 0f, dt * 2.5f);   // milestone 44: the view turns over onto the roof, and back
         }
 
         /// <summary>The floor, the ceiling, the walls and the furniture: you stop at them (and bounce a little when thrown).</summary>
@@ -203,6 +233,7 @@ namespace Rocket
             switch (cabinMove)
             {
                 case CabinMove.Pinned: return $"Pressed to the floor: {cabinG:0.0} g";
+                case CabinMove.Roof: return cabinG > 3f ? $"Upside down and pinned to the roof: {cabinG:0.0} g" : "Upside down: you're on the roof. Pull up (or roll back over) and the g-force puts you back on the floor";
                 case CabinMove.Falling: return cabinG > 0.2f ? "Thrown about: the ship's pulling you that way" : "Falling";
                 case CabinMove.Floating: return "Weightless and drifting: get near a wall or a yellow handrail to grab on";
                 case CabinMove.Holding: return "Holding on: W/A/S/D push off the way you look, SPACE pushes harder";

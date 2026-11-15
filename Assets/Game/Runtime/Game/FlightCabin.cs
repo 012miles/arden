@@ -132,16 +132,19 @@ namespace Rocket
         {
             props.Clear(); screens.Clear(); lamps.Clear(); folkWalk.Clear(); windowBlinds.Clear();
             lookedAt = null; plantGrow = 0; chessMoves = 0; cabinLightMode = 0; abortArmedUntil = 0;
+            bool habOnly = hab && !planeRoom;
+            hab = hab || planeRoom;   // milestone 44: a plane's cockpit and passenger cabin are long boxes, laid out like a habitat
             float front = hab ? roomL / 2 : roomR - 0.12f;
             float side = hab ? roomW / 2 - 0.35f : 0.98f;
             float consoleZ = hab ? roomL / 2 - 0.95f : roomR - 1.9f;
-            BuildDashboard(front, hab ? 2.0f : 1.6f);
+            BuildDashboard(front, hab ? Mathf.Min(2.0f, roomW - 0.4f) : 1.6f);
             BuildConsoles(side, consoleZ);
             BuildSeatsAndHatch(hab, h);
             BuildCabinLife(hab, h, front);
-            if (hab) BuildHabExtras(h);
+            if (habOnly) BuildHabExtras(h);
             BuildCabinKit(hab, h, front);   // milestone 36: the overhead panel, gauges, glass, vents, seats, clutter, floating things
             BuildMoreProps(hab, h);         // milestone 42: snacks, a drink maker, a desk toy, a guitar, a photo, a poster, a mirror, a toolbox, a game
+            if (planeRoom) { BuildPlaneExtras(h); KeepPlanePropsInside(); }   // milestone 44: the windscreen, thrust levers, bins
             BuildCabinCollision(hab, front);   // milestone 43: solid furniture, handrails for weightlessness
             ResetCabinLight();
             // in a room: how the others left this cabin (the blinds, the locker, the lights, the plant, the chess)
@@ -585,6 +588,7 @@ namespace Rocket
 
         IEnumerable<(Vector3 c, Vector3 n, float w, float sill, float head)> Windows(float h)
         {
+            if (planeRoom) { foreach (var w in PlaneWindows()) yield return w; yield break; }   // milestone 44
             if (roomRound)
             {
                 const int sides = 12;
@@ -831,7 +835,7 @@ namespace Rocket
         /// <summary>What the dot in the middle is on (the nearest thing along your look, within reach).</summary>
         Prop LookTarget()
         {
-            Vector3 eye = ipos + Vector3.up * Eye, dir = Quaternion.Euler(-ipitch, iyaw, 0) * Vector3.forward;
+            Vector3 eye = EyeAt, dir = Quaternion.Euler(-ipitch, iyaw, 0) * Vector3.forward;
             Prop best = null;
             float bestT = float.MaxValue;
             foreach (var p in props)
@@ -985,9 +989,9 @@ namespace Rocket
         {
             var p = FindProp(id);
             if (p == null) return "none";
-            Vector3 d = p.at - (ipos + Vector3.up * Eye), flat = new Vector3(d.x, 0, d.z);
+            Vector3 d = p.at - EyeAt, flat = new Vector3(d.x, 0, d.z);
             if (flat.magnitude > back) ipos += flat.normalized * (flat.magnitude - back);
-            d = p.at - (ipos + Vector3.up * Eye);
+            d = p.at - EyeAt;
             iyaw = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
             ipitch = Mathf.Atan2(d.y, new Vector2(d.x, d.z).magnitude) * Mathf.Rad2Deg;
             lookedAt = LookTarget();
