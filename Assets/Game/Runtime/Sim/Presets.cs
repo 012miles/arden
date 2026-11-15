@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace Rocket
@@ -7,7 +8,7 @@ namespace Rocket
     /// The builder's ready-made designs (Presets menu). Milestone 32 adds ten more, from a tiny solid-fuel hop to a
     /// four-booster heavy lifter, several using the new parts.
     /// </summary>
-    public static class Presets
+    public static partial class Presets
     {
         public static List<(string label, VesselDesign design)> All() => new List<(string, VesselDesign)>
         {
@@ -45,7 +46,7 @@ namespace Rocket
             ("Team: Tal Lander (5 seats, there and back)", TeamTalLander()),
             ("Team: Ochre Expedition (5 seats)", TeamOchre()),
             ("Team: Brume Voyager (5 seats)", TeamBrume()),
-        };
+        }.Concat(Planes()).ToList();   // milestone 46: ten planes (PresetsPlanes)
 
         /// <summary>The ten team ships new in milestone 43 (for tests).</summary>
         public static readonly string[] TeamOnes =

@@ -23,6 +23,11 @@ namespace Rocket
         /// <summary>Every update, newest first (milestone 41, captaincarl24: just the first version and the latest updates).</summary>
         public static readonly Update[] All =
         {
+            U(46, "Nov 15, 2026", "Ten new planes and the autopilot home",
+                "10 plane presets: twin airliner (737 / A320 style), jumbo jet (747 style), wide-body twin (A350 / 787 style), regional jet, cargo lifter, supersonic airliner (Concorde style), quiet supersonic jet (X-59 style), rocket plane (X-15 style), business jet and a space shuttle",
+                "New parts for big planes: airliner, needle-nose and orbiter cockpits, passenger cabins, the Breeze turbofan, the Mistral afterburner jet, swept and ogee delta wings, a tall tail fin, big elevons and heavy landing gear (research: Airliners, Supersonic Flight)",
+                "The space shuttle launches from the pad on its boosters and lands on the runway; every other plane takes off inside the runway",
+                "Easy autopilot: Fly home from Tal or Vesk, landed or in orbit: it climbs off, plans the burn home, and drops you into the air for the parachutes"),
             U(45, "Nov 15, 2026", "A real parachute",
                 "Parachutes look like parachutes: 16 orange and white panels billowing between their seams, a vent at the top and a scalloped edge",
                 "Suspension lines run from every seam down to a strap above the capsule, so the canopy hangs from the ship instead of floating over it",

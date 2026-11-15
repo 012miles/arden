@@ -36,8 +36,9 @@ namespace Rocket
                 if (f.trip == FlightMode.TripPhase.Off) break;
                 yield return new WaitForSecondsRealtime(0.5f);
             }
+            yield return new WaitForSecondsRealtime(3f);   // (milestone 46: landings settle onto their legs for a moment first)
             var lv = f.active;
-            bool landed = lv != null && !lv.destroyed && lv.landed && lv.body == tal;
+            bool landed = lv != null && !lv.destroyed && (lv.landed || lv.settling) && lv.body == tal;
             Log(landed ? $"TRIP PASS: landed on Tal after {Time.unscaledTime - start:0} s, {lv.parts.Sum(p => p.propellant):0.0} t of fuel left" : $"TRIP FAIL: ended in {last} on {lv?.body.name}, landed={lv?.landed}, status \"{f.tripStatus}\"");
             yield return new WaitForSecondsRealtime(1f);
             yield return Shot("729_trip_end");

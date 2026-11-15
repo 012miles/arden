@@ -510,7 +510,7 @@ namespace Rocket
             return s;
         }
 
-        bool EngineHasFuel(PartState p) => p.def.IsSolid ? p.propellant > 1e-9 : SectionLiquid(p.section) > 1e-9;
+        public bool EngineHasFuel(PartState p) => p.def.IsSolid ? p.propellant > 1e-9 : SectionLiquid(p.section) > 1e-9;
 
         /// <summary>
         /// Milestone 34: how a ship this device doesn't fly should look (a rocket room player's copy of the host's flight,

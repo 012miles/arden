@@ -149,7 +149,7 @@ namespace Rocket
             undo.Clear();
             redo.Clear();
             hall = default;
-            runwayLaunch = design.IsPlane;
+            runwayLaunch = design.IsPlane && !design.LaunchesUpright;
             try { launchPad = Mathf.Clamp(PlayerPrefs.GetInt("launchPad", 0), 0, LaunchSite.Pads.Length - 1); } catch { launchPad = 0; }
             SetView(design.IsPlane);
             // Between flights: fail overdue contracts, top up the offers, and show what happened.
@@ -2647,7 +2647,7 @@ namespace Rocket
             DropHeldQuietly();
             design = preset.Clone();
             selected = -1;
-            runwayLaunch = design.IsPlane || design.IsRover; // rovers get the runway to drive on
+            runwayLaunch = design.IsPlane && !design.LaunchesUpright || design.IsRover; // (milestone 46: a shuttle goes from the pad) rovers get the runway to drive on
             SetView(design.IsPlane);
             showPresets = false;
             presetConfirm = null;
@@ -3204,7 +3204,7 @@ namespace Rocket
                 if (Ui.Press(new Rect(r.x + 10, y, r.width - 20, 26), name, Ui.Button))
                 {
                     var d = DesignStore.Load(name);
-                    if (d != null) { PushUndo(); DropHeldQuietly(); design = d; selected = -1; runwayLaunch = design.IsPlane; SetView(design.IsPlane); }
+                    if (d != null) { PushUndo(); DropHeldQuietly(); design = d; selected = -1; runwayLaunch = design.IsPlane && !design.LaunchesUpright; SetView(design.IsPlane && !design.LaunchesUpright); }
                     showLoad = false;
                 }
                 y += 30;

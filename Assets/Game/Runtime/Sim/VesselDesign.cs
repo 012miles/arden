@@ -322,6 +322,8 @@ namespace Rocket
         }
 
         public bool IsPlane => nodes.Exists(n => PartCatalog.Get(n.id)?.kind == PartKind.Gear);
+        /// <summary>Milestone 46: a spaceplane strapped to boosters (a shuttle): it has wheels, but it goes up from the pad.</summary>
+        public bool LaunchesUpright => IsPlane && nodes.Exists(n => { var k = PartCatalog.Get(n.id)?.kind; return k == PartKind.Solid || k == PartKind.RadialDecoupler; });
         public bool IsRover => !IsPlane && nodes.Exists(n => PartCatalog.Get(n.id)?.kind == PartKind.Wheel);
 
         /// <summary>Career starter (tier-0 parts only): one stage, a thermometer, and a capsule that comes down on its parachute.</summary>

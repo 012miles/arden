@@ -97,7 +97,10 @@ namespace Rocket
             Orbit orbit = trajectory.Count > 0 ? trajectory[0].orbit : null;
 
             // milestone 42: the tutorial's flight steps bring the screen in a piece at a time (hidden: drawn far off screen)
-            bool hideTel = !Tutorial.FlightShows(Tutorial.Show.Telemetry), hideTop = !Tutorial.FlightShows(Tutorial.Show.TopBar);
+            bool hideTel = !Tutorial.FlightShows(Tutorial.Show.Telemetry), hideTop = !Tutorial.FlightShows(Tutorial.Show.TopBar)
+                // milestone 46 (the bug test: the pause menu ran over the clock on shorter screens): the clock row steps aside
+                // while the pause menu needs the room (it's 596 tall and keeps clear of the navball)
+                || paused && !Coop.Active && !v.destroyed && Ui.H < 930;
             bool hideCtl = !Tutorial.FlightShows(Tutorial.Show.Controls), hideNav = !Tutorial.FlightShows(Tutorial.Show.Navball);
             if (hideTel) GUI.BeginGroup(new Rect(-20000, -20000, W, H));
             // ---- Telemetry (milestone 24: the basics, the rest under "More", in the player's words)
@@ -143,7 +146,8 @@ namespace Rocket
             double hdg = Math.Atan2(Vector3d.Dot(horiz, CelestialBody.EastAt(up)), Vector3d.Dot(horiz, CelestialBody.NorthAt(up))) * 180 / Math.PI;
             if (hdg < 0) hdg += 360;
             Row(Words.T("Pitch / heading", "Pitch / heading", ""), horiz.magnitude < 0.02 ? $"{pitchDeg:0} deg / --" : $"{pitchDeg:0} deg / {hdg:000} deg", true);
-            string status = v.destroyed ? $"<color=#ff7060>{Words.T("Destroyed", "Destroyed", "Broken")}</color>" : v.landed && !v.IsEva && v.InWater ? (v.submerged > 0.97f ? "<color=#ff9a60>Sinking</color>" : "Floating") : v.landed ? Words.T("Landed", "Landed", "On the ground") :
+            string status = v.destroyed ? $"<color=#ff7060>{Words.T("Destroyed", "Destroyed", "Broken")}</color>" : v.landed && !v.IsEva && v.InWater ? (v.submerged > 0.97f ? "<color=#ff9a60>Sinking</color>" : "Floating") : v.landed || v.settling && !v.IsEva ? Words.T("Landed", "Landed", "On the ground") :   // (milestone 46: settling onto its legs is landed, not "falling back")
+               
                 v.WheelsDown && v.RadarAltitude(ut) < 0.3 ? (v.brakesOn ? Words.T("Rolling (brakes on)", "Rolling (brakes on)", "Parked") : "Rolling") :
                 body.HasAtmosphere && alt < body.atmosphereHeight ? "Flying" :
                 orbit != null && orbit.IsElliptic && orbit.Periapsis - body.radius > body.SafeAltitude && orbit.Apoapsis < body.SoiRadius ? Words.T("In orbit", "In orbit", "Going round!") :

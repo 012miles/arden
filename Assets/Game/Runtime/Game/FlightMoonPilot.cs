@@ -14,7 +14,7 @@ namespace Rocket
     /// </summary>
     public partial class FlightMode
     {
-        public enum TripPhase { Off, Launch, Plan, Transfer, Coast, Capture, Deorbit, Fall, Brake, Done }
+        public enum TripPhase { Off, Launch, Plan, Transfer, Coast, Capture, Deorbit, Fall, Brake, Done, Ascend, Circularize, ReturnPlan, ReturnBurn, ReturnCoast }   // (milestone 46: the way home, FlightReturnPilot)
         public TripPhase trip = TripPhase.Off;
         CelestialBody tripTarget;
         bool tripLand, braking;
@@ -65,7 +65,17 @@ namespace Rocket
             switch (trip)
             {
                 case TripPhase.Launch:
-                    if (!v.hasLaunched) { if (!TryCountdown()) Stage(); return; }
+                    if (!v.hasLaunched)
+                    {
+                        // milestone 46 (the bug test found the Tal Lander in the sea): light the first stage once, then wait for
+                        // liftoff. It used to stage every frame until the rocket counted as launched, and since landings settle
+                        // (milestone 41) a rocket sits on the pad a moment after lighting up: it dropped its booster on the pad
+                        // and flew on the second stage alone (and cut the countdown short).
+                        if (countdown >= 0f) { tripStatus = "Counting down"; return; }
+                        if (v.nextStage == 0) { if (!TryCountdown()) Stage(); }
+                        tripStatus = "Lifting off";
+                        return;
+                    }
                     if (!autopilotOn && v.Altitude < v.body.atmosphereHeight) { EnableAutopilot(); return; }
                     if (!autopilotOn) { trip = tripTarget == v.body ? TripPhase.Deorbit : TripPhase.Plan; }
                     tripStatus = "Climbing to orbit";
@@ -137,6 +147,9 @@ namespace Rocket
                 case TripPhase.Brake:
                     if (v.landed || v.settling) { v.throttle = 0; v.steerDirection = null; trip = TripPhase.Done; Show($"Landed on {v.body.name}! Press ENTER to climb out.", 5f); return; }
                     LandingBurn(v);
+                    return;
+                case TripPhase.Ascend: case TripPhase.Circularize: case TripPhase.ReturnPlan: case TripPhase.ReturnBurn: case TripPhase.ReturnCoast:
+                    ReturnTick(v);   // milestone 46: flying home
                     return;
                 case TripPhase.Done:
                     trip = TripPhase.Off;
@@ -247,13 +260,15 @@ namespace Rocket
                 if (Ui.Press(new Rect(r.xMax - 96, r.y + 7, 88, 26), "Stop (X)", Ui.ButtonStopSmall)) StopTrip("Autopilot off. You have control.");
                 return;
             }
-            if (active.landed && active.hasLaunched && active.body != Home) return;
             var home = Home;
+            bool canGoHome = active.body != home && active.body.parent == home && active.hasLaunched;   // milestone 46: "Fly home" from a moon
+            if (active.landed && active.hasLaunched && active.body != Home && !canGoHome) return;
             var moons = root.bodies.Where(b => b.parent == (active.body.parent == home ? home : active.body) && !b.isStar && b.parent != null && b != active.body).ToList();
             if (active.body != home) moons.Clear();
             bool canLand = !active.landed && active.hasLaunched && active.body != null && (!active.body.HasAtmosphere || active.body == home)
                 && Orbit.FromState(active.pos, active.vel, active.body.mu, ut).IsElliptic;
-            if (moons.Count == 0 && !canLand) return;
+            if (active.landed || active.settling) canLand = false;   // (settling onto its legs: it has landed)
+            if (moons.Count == 0 && !canLand && !canGoHome) return;
             Ui.Box(r);
             Ui.Text(new Rect(r.x + 12, r.y + 10, 90, 22), "<color=#9fc6e8>Autopilot</color>", Ui.Small);
             float x = r.x + 92;
@@ -263,6 +278,8 @@ namespace Rocket
                 x += 124;
             }
             if (canLand && Ui.Press(new Rect(x, r.y + 7, 118, 26), active.body.HasAtmosphere ? "Come home" : "Land", Ui.ButtonGoSmall)) StartLanding();
+            if (canLand) x += 124;
+            if (canGoHome && Ui.Press(new Rect(x, r.y + 7, 118, 26), $"Fly home", Ui.ButtonGoSmall)) StartReturn();
         }
     }
 }
