@@ -737,6 +737,37 @@ Ardling animations, a slightly smaller helmet and a better sticky note face."
   swimming and the new look (700-713); `-autotestTrip` flies a Tal Lander from the pad to Tal and down on the Easy autopilot (720-729);
   `-autotestCabin` uses everything in a capsule (and launches from its STAGE button), then a habitat, and goes out of the hatch (730-747).
 
+### Milestone 36: a cabin you could live in (2026-11-14)
+captaincarl24: "more detailed bro, search online to see how other popular games did it and do it". The research, and what came of it:
+- **A kit of props, used everywhere** (cockpit builders for the genre's interiors work from prop packs; big space games mix the
+  same parts per ship): FlightCabinKit.cs makes toggle switches (some under hinged guards), circuit breakers (a white collar
+  shows when pulled), rotary knobs with tick marks, backlit push buttons, indicator lights and needle gauges, and puts them in
+  panels. Every one can be pressed, with its own sound (clink, thud, click).
+- **The overhead panel**: 16 circuit breakers, and the real ones work (FANS stops the streamers and the hum, PANEL LTS darkens
+  the labels, FLOOD the flood light, RADIO kills the radio, NAV freezes the attitude ball and the keypad, CO2 SCRUB sets off the
+  alarm; the rest answer back: the heater, the coffee, the toaster...); FLOOD, PANEL, VOLUME and TEMP knobs (scroll to turn);
+  guarded O2 PURGE and WATER DUMP, FAN BOOST; LAMP TEST lights every lamp in the ship; a cabin temperature readout; and a
+  keypad computer (programs 1-5 show height, speed, fuel, the high point and the mission clock; 0, 7, 42 and 1234 do other
+  things). Its cables run to the walls, zip-tied.
+- **The numbers on real instruments** (flight games that keep everything in the cockpit rather than on a floating HUD): an
+  instrument strip on the desk with needle gauges for fuel, power, climb and g (red ends), and an attitude ball, the game's own
+  navball, turning with the ship. MASTER ALARM flashes and beeps for new trouble (low fuel, heat, no signal, food, power, CO2)
+  until pressed; CAUTION stays lit while any of it lasts.
+- **Light in layers** (flight sims split panel backlight, flood and dome light): bright/dim/night modes, the FLOOD knob on top,
+  the PANEL knob for the backlit labels.
+- **Shake the cockpit, not the camera** (the advice from VR cockpit games: a shaking view makes people sick): thrust, thick air
+  and reentry rattle the loose things, sway the cables and wiggle the needles, the lights flicker; the view stays still.
+  Reentry glows orange in the windows.
+- **Lived in** (photos of the ISS and Apollo cabins: cloth bags, Velcro, bungees, cables, labels everywhere): stowage bags with
+  straps and tags, a Velcro strip with a tablet (its checklist ticks itself), a camera and a torch, bungee cords holding a food
+  pouch and a drink bag, a photo from home, a mission patch with the crew's name, quilted wall pads, placards, sticky notes
+  (Ardlings would), glass with a glint and bolts in every window, vent streamers fluttering in the air flow, the fans' hum.
+  Seats got bolsters, armrests, foot rests and a hand controller; habitats a food warmer.
+- **Weightlessness**: a pen, a pouch, a note, a sock and a bolt float about in space, drifting on the fans' breeze and bouncing
+  off the walls (push them!); with weight (thrust, landing) they fall and settle on the floor.
+- The world's own ambient occlusion stays off inside; the cabin's fill light was lowered to match. `-autotestCabin` now also
+  tests the overhead panel, the gauges and the clutter, floats things in orbit and glows in reentry (750-757).
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

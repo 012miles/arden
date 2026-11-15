@@ -37,6 +37,7 @@ namespace Rocket
             public float state, shown, vel;    // what it's set to, what's showing (animated toward it), a swing speed
             public Transform moving;
             public Action<Prop, float> animate;
+            public string sound;               // milestone 36: what it sounds like (clink, thud, a click...)
         }
 
         readonly List<Prop> props = new List<Prop>();
@@ -87,7 +88,7 @@ namespace Rocket
             tm.alignment = anchor == TextAnchor.UpperLeft || anchor == TextAnchor.MiddleLeft ? TextAlignment.Left : TextAlignment.Center;
             tm.color = col;
             tm.text = text;
-            go.GetComponent<MeshRenderer>().sharedMaterial = cabinFont.material;
+            go.GetComponent<MeshRenderer>().sharedMaterial = CabinTextMaterial();
             return tm;
         }
 
@@ -97,6 +98,26 @@ namespace Rocket
             var lit = Piece("Lamp", at + rot * new Vector3(0, 0, -0.008f), rot, b => b.AddBox(Vector3.zero, new Vector3(size, size, 0.01f), col * 1.6f, Quaternion.identity), true);
             lamps.Add((lit, on));
             return lit;
+        }
+
+        static Material cabinTextMat;
+
+        /// <summary>
+        /// Milestone 36: the cabin's text material. The font's own (Unity's text shader) takes its depth test from the
+        /// interface and drew labels through walls; Rocket/Text always tests depth. It follows the font's texture when the
+        /// font adds letters.
+        /// </summary>
+        Material CabinTextMaterial()
+        {
+            if (cabinTextMat == null)
+            {
+                var sh = Resources.Load<Shader>("Shaders/RocketText");
+                if (sh == null) return cabinFont.material;
+                cabinTextMat = new Material(sh) { name = "Cabin text", mainTexture = cabinFont.material.mainTexture };
+                var font = cabinFont;
+                Font.textureRebuilt += f => { if (f == font && cabinTextMat != null) cabinTextMat.mainTexture = f.material.mainTexture; };
+            }
+            return cabinTextMat;
         }
 
         Prop AddProp(string id, string name, Vector3 at, Func<string> prompt, Action use, float size = 0.18f, bool shared = false)
@@ -119,6 +140,7 @@ namespace Rocket
             BuildSeatsAndHatch(hab, h);
             BuildCabinLife(hab, h, front);
             if (hab) BuildHabExtras(h);
+            BuildCabinKit(hab, h, front);   // milestone 36: the overhead panel, gauges, glass, vents, seats, clutter, floating things
             ResetCabinLight();
             // in a room: how the others left this cabin (the blinds, the locker, the lights, the plant, the chess)
             if (Coop.Active && insidePart != null)
@@ -353,6 +375,7 @@ namespace Rocket
 
         string RadioText()
         {
+            if (BreakerOff("radio")) return "";
             if (Coop.Active)
             {
                 var chat = Coop.Current.room.State.chat;
@@ -363,6 +386,7 @@ namespace Rocket
 
         void RadioCall()
         {
+            if (BreakerOff("radio")) { Show("The radio's dead: its breaker is pulled (the overhead panel).", 2.5f); return; }
             string line = RadioCalls[radioCall % RadioCalls.Length];
             radioCall++;
             GameAudio.I?.Click();
@@ -530,8 +554,8 @@ namespace Rocket
             tp.animate = (pp, dt) =>
             {
                 // a pendulum under the ship's gravity (none in space: it just drifts)
-                bool weight = active != null && (active.landed || active.thrustNow > 1 || active.Altitude < active.body.atmosphereHeight);
-                float g = weight ? 9f : 0.15f;
+                bool weight = active != null && (active.landed || active.gForce > 0.05);
+                float g = weight ? 9f * Mathf.Clamp((float)active.gForce, 0.3f, 3f) : 0.15f;
                 pp.vel += -g * Mathf.Sin(pp.shown * Mathf.Deg2Rad) * 40f * dt;
                 pp.vel *= weight ? 1f - 0.4f * dt : 1f - 0.05f * dt;
                 pp.shown += pp.vel * dt;
@@ -608,7 +632,7 @@ namespace Rocket
                         b.AddBox(m * 0.97f + Vector3.up * 1.2f, new Vector3(0.025f, 0.025f, (p1 - p0).magnitude * 0.7f), C(0.85f, 0.86f, 0.88f), along);
                         for (int s = -1; s <= 1; s += 2) b.AddBox(m * 0.985f + Vector3.up * 1.2f + (p1 - p0).normalized * s * (p1 - p0).magnitude * 0.33f, new Vector3(0.02f, 0.02f, 0.06f), C(0.6f, 0.6f, 0.62f), Quaternion.LookRotation(n));
                     }
-                    if (i == 1 || i == 10)
+                    if (i == 1)
                         for (int c = 0; c < 3; c++) b.AddBox(m * 0.975f + Vector3.up * (h / 2) + (p1 - p0).normalized * (c - 1) * 0.04f, new Vector3(0.018f, h - 0.3f, 0.018f), c == 1 ? C(0.8f, 0.15f, 0.12f) : C(0.1f, 0.1f, 0.11f), Quaternion.LookRotation(n));
                     if (i == 2 || i == 9)
                     {
@@ -818,7 +842,7 @@ namespace Rocket
             if (lookedAt == null) return false;
             if (lookedAt.scroll != null && Mathf.Abs(In.Scroll) > 0.01f) lookedAt.scroll(In.Scroll);
             // (a click only while the mouse is looking round: with ALT held it's for the panels)
-            if (In.Down(K.E) || In.LeftDown && !In.Held(K.LeftAlt) && !In.Typing) { lookedAt.use?.Invoke(); GameAudio.I?.Click(); return true; }
+            if (In.Down(K.E) || In.LeftDown && !In.Held(K.LeftAlt) && !In.Typing) { lookedAt.use?.Invoke(); KitSound(lookedAt.sound ?? "ui_click"); return true; }
             return false;
         }
 
@@ -831,7 +855,7 @@ namespace Rocket
                 if (p.animate != null && (p.moving != null || p.id == "chess")) p.animate(p, dt);
                 if (!inside) return;   // (the hatch opened: out we go)
             }
-            foreach (var (go, on) in lamps) { bool o = false; try { o = on(); } catch { } if (go.activeSelf != o) go.SetActive(o); }
+            foreach (var (go, on) in lamps) { bool o = false; try { o = on() || LampTest; } catch { } if (go.activeSelf != o) go.SetActive(o); }
             screenT -= dt;
             if (screenT <= 0)
             {
@@ -840,6 +864,7 @@ namespace Rocket
             }
             // the low-fuel lamp blinks
             foreach (var (go, on) in lamps) if (go.activeSelf && go.name == "Lamp") go.transform.localScale = Vector3.one * (0.85f + 0.15f * Mathf.Sin(Time.time * 6f));
+            UpdateCabinKit(dt);   // milestone 36
             ConsumeCabinEvents();
         }
 
@@ -849,7 +874,8 @@ namespace Rocket
             {
                 case "cabinlights":
                     cabinLightMode = Mathf.RoundToInt(p.state) % 3;
-                    if (cabinMat != null) cabinMat.SetFloat("_Ambient", cabinLightMode == 0 ? 0.45f : cabinLightMode == 1 ? 0.18f : 0.3f);
+                    lastAmbient = -1;
+                    ApplyCabinAmbient();
                     if (cabinMat != null) cabinMat.SetColor("_Tint", cabinLightMode == 2 ? C(1f, 0.45f, 0.4f) : Color.white);
                     if (cabinLights != null) cabinLights.SetActive(cabinLightMode != 1);
                     break;
@@ -978,7 +1004,10 @@ namespace Rocket
             string s0 = screens.Count > 0 && screens[0].tm != null ? screens[0].tm.text.Replace('\n', ' ') : "";
             return $"props {props.Count} ({string.Join(",", props.Select(p => p.id))}), screens {screens.Count}, lamps lit {lamps.Count(l => l.go.activeSelf)}/{lamps.Count}, " +
                    $"lights {cabinLightMode}, plant {plantGrow:0.00}, chess {chessMoves}, blinds shut {props.Count(p => p.id.StartsWith("blind") && p.state > 0.5f)}, " +
-                   $"locker {(FindProp("locker")?.state > 0.5f ? "open" : "shut")}, screen 1: \"{s0}\"";
+                   $"locker {(FindProp("locker")?.state > 0.5f ? "open" : "shut")}, screen 1: \"{s0}\"; " +
+                   $"gauges {gauges.Count}, floating {floaters.Count(f => f.t != null && f.t.localPosition.y > f.restH + 0.05f)}/{floaters.Count}, " +
+                   $"vibration {vibration:0.00}, alarm {(alarmFlashing ? "FLASHING" : "quiet")}, keypad \"{keypadShow}\", fans {(BreakerOff("fans") ? "off" : "on")}, " +
+                   $"flood {KitValue("knob_flood", 0.3f):0.00}, ambient {lastAmbient:0.00}";
         }
     }
 }

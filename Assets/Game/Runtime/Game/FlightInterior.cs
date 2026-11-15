@@ -75,6 +75,7 @@ namespace Rocket
             room = null;
             cabinFolk.Clear();
             props.Clear(); screens.Clear(); lamps.Clear();
+            ClearCabinKit();
             ResetCabinLight();
             SetWorldAo(true);
         }

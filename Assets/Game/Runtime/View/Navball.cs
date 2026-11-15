@@ -58,6 +58,9 @@ namespace Rocket
 
         public void SetActive(bool on) => cam.enabled = on;
 
+        /// <summary>How the ball is turned (after Orient): the cabin's attitude ball copies it.</summary>
+        public Quaternion BallRotation => ballRot;
+
         Vector3 Local(Vector3d w) => new Vector3((float)Vector3d.Dot(w, east), (float)Vector3d.Dot(w, up), (float)Vector3d.Dot(w, south));
 
         public void Orient(VesselSim v)

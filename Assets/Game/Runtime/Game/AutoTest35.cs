@@ -125,6 +125,31 @@ namespace Rocket
             yield return new WaitForSecondsRealtime(0.6f);
             yield return Shot("741_cabin_abort_cover");
             Log($"after one press of ABORT: destroyed={f.active.destroyed}, stage {f.active.nextStage} (it needs a second press)");
+            // milestone 36: the overhead panel (lamp test, a breaker, the keypad, a knob) and the gauge strip
+            Log($"looking at: {f.TestLookAt("lamptest", 0.7f)}");
+            f.TestUse("lamptest");
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Shot("750_overhead_lamp_test");
+            f.TestUse("brk_fans");
+            f.TestUse("key4"); f.TestUse("key2"); f.TestUse("keyENT");
+            f.TestUse("knob_flood"); f.TestUse("knob_flood");
+            yield return new WaitForSecondsRealtime(2.8f);
+            Log($"looking at: {f.TestLookAt("key5", 0.7f)}");
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Shot("751_overhead_panel");
+            Log($"panel: {f.CabinInfo()}");
+            f.TestUse("brk_fans");
+            f.TestUse("knob_flood"); f.TestUse("knob_flood"); f.TestUse("knob_flood");   // (round to 0.3 again)
+            Log($"looking at: {f.TestLookAt("masteralarm", 0.9f)}");
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Shot("752_gauge_strip");
+            f.TestCabinLook(-100f, -15f);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Shot("753_stowage_and_velcro");
+            f.TestCabinLook(-45f, -5f);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Shot("754_bungee_and_patch");
+            f.TestCabinLook(0f, -12f);
             // STAGE from the desk: away we go, the screens running
             f.TestLookAt("stage", 0.6f);
             f.TestUse("stage");
@@ -133,6 +158,50 @@ namespace Rocket
             yield return new WaitForSecondsRealtime(0.5f);
             yield return Shot("742_cabin_liftoff");
             Log($"after STAGE: launched={f.active.hasLaunched}, alt {f.active.Altitude:0} m; {f.CabinInfo()}");
+            f.LeaveInterior();
+
+            // milestone 36: weightless in orbit (the loose things float), then reentry (the windows glow, the cabin shakes)
+            var podDesign = VesselDesign.Stack("Cabin orbit test", "chute.s", "pod.wren", "shield.s");
+            double r = home.radius + 120000;
+            var odir = CelestialBody.DirectionFromLatLon(0, 10);
+            var opos = home.FixedToInertial(odir, u.ut) * r;
+            var orbiter = VesselSim.CreateFree(podDesign, home, opos, CelestialBody.EastAt(opos.normalized) * Math.Sqrt(home.mu / r), Quaternion.FromToRotation(Vector3.up, opos.normalized.ToFloat()));
+            foreach (var p in orbiter.parts) p.crew.Clear();
+            orbiter.parts.First(p => p.def.crew > 0).crew.Add("Iris Ardling");
+            orbiter.hasLaunched = true; orbiter.career = u.career;
+            u.Add(orbiter);
+            root.Fly(orbiter);
+            yield return new WaitForSecondsRealtime(1.5f);
+            f = root.flight;
+            f.EnterInterior();
+            yield return new WaitForSecondsRealtime(5f);
+            f.TestCabinLook(20f, 8f);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Shot("755_zero_g_floating");
+            Log($"in orbit: g {orbiter.gForce:0.00}; {f.CabinInfo()}");
+            Log($"looking at: {f.TestLookAt("float0", 0.8f)}");
+            f.TestUse("float0");
+            yield return new WaitForSecondsRealtime(1f);
+            yield return Shot("756_pushed_the_pen");
+            f.LeaveInterior();
+            double rr = home.radius + 42000;
+            var rdir = CelestialBody.DirectionFromLatLon(0, 40);
+            var rpos = home.FixedToInertial(rdir, u.ut) * rr;
+            var rvel = CelestialBody.EastAt(rpos.normalized) * 3200 - rpos.normalized * 120;
+            var faller2 = VesselSim.CreateFree(podDesign, home, rpos, rvel, Quaternion.FromToRotation(Vector3.up, (-rvel.normalized).ToFloat()));
+            foreach (var p in faller2.parts) p.crew.Clear();
+            faller2.parts.First(p => p.def.crew > 0).crew.Add("Iris Ardling");
+            faller2.hasLaunched = true; faller2.career = u.career;
+            u.Add(faller2);
+            root.Fly(faller2);
+            yield return new WaitForSecondsRealtime(0.5f);
+            f = root.flight;
+            f.EnterInterior();
+            yield return new WaitForSecondsRealtime(1.5f);
+            f.TestCabinLook(0f, 0f);
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return Shot("757_reentry_glow");
+            Log($"reentry: heat flux {faller2.heatFlux / 1000:0} kW/m2, destroyed {faller2.destroyed}; {f.CabinInfo()}");
             f.LeaveInterior();
 
             // a habitat on the ground

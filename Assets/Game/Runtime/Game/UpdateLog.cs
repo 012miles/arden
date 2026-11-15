@@ -23,6 +23,16 @@ namespace Rocket
         /// <summary>Every update, newest first.</summary>
         public static readonly Update[] All =
         {
+            U(36, "Nov 14, 2026", "A cabin you could live in",
+                "An overhead panel: 16 circuit breakers that really cut things, FLOOD / PANEL / VOLUME / TEMP knobs, guarded switches and LAMP TEST",
+                "A keypad computer: type a program number and ENT (1 height, 2 speed, 3 fuel, 4 high point, 5 clock... and a few secrets)",
+                "Real instruments: needle gauges for fuel, power, climb and g, and an attitude ball that turns with the ship",
+                "MASTER ALARM flashes and beeps for new trouble until you press it; CAUTION stays lit while it lasts",
+                "The cockpit shakes (not your view) under thrust and in reentry, the lights flicker, and the windows glow orange",
+                "In space, loose things float about the cabin: push them around; with weight again they drop to the floor",
+                "Glass and bolts in every window, fluttering vent streamers, the fans' hum, clicks and thuds for every switch",
+                "Lived in: stowage bags, Velcro with a tablet, camera and torch, bungee cords with snacks, a photo from home, a mission patch, sticky notes",
+                "Seats with bolsters, foot rests and a hand controller; a food warmer in habitats"),
             U(35, "Nov 14, 2026", "Lessons, crashes and the sea",
                 "Tutorials: three new lessons (get into orbit, land on Tal, dock with a station) that set you up and talk you through it",
                 "A game opens at the space centre: click a building to go in",

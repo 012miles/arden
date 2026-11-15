@@ -11,7 +11,8 @@ Developed by captaincarl24
 - **Go further**: rendezvous and docking, space stations, landers, rovers, bases, supplies for long voyages, aerobraking and heat shields, and an intercept planner.
 - **Crew**: Ardlings with jobs and experience. Walk in first or third person (C), run, jump, plant flags, climb back in; ENTER climbs out
   after any landing the crew lived through. TAB goes inside the cabin: walk round, look out of the windows at the real world, and use
-  everything (E): STAGE, ABORT, switches, the throttle, live screens, the radio, blinds, lights, the snack locker and more.
+  everything (E): STAGE, ABORT, switches, circuit breakers, a keypad computer, needle gauges and an attitude ball, the radio,
+  blinds, lights, the snack locker and more. In space the loose things float; in reentry the windows glow and the cabin shakes.
 - **Make it yours**: paint your rocket in 16 colours and stick on decals (built-in ones or your own pictures), save your own presets, and
   dress your Ardling (suit colour, visor note, hat) for multiplayer.
 - **Easy to read**: rest the mouse on a game word (like "radial in") and a box explains it, or open the Definitions page; hide the whole
