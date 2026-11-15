@@ -18,6 +18,8 @@ namespace Rocket
         public int body, sas, vessel, snap, warp;
         public bool rcs, landed, destroyed, hasNode, rails;
         public string target;
+        public float roll;    // milestone 41: the host's roll-out to the pad, its time + 1 (0: not rolling out)
+        public int rollPad;
     }
 
     /// <summary>
@@ -67,10 +69,13 @@ namespace Rocket
         public readonly NetRoom room;
         readonly GameRoot root;
         public static bool Active => Current != null && Current.room != null && Current.room.Connected && Current.room.State.Rocket;
-        /// <summary>Milestone 34: an expedition (everyone builds, the players are the crew, a mission with a budget and a report).</summary>
+        /// <summary>Milestone 34: an expedition (the builder builds, the players are the crew, a mission with a budget and a report).</summary>
         public bool Expedition => room.State.activity == 2;
-        /// <summary>Whether this player builds: the builder in a rocket room, everyone in an expedition.</summary>
-        public bool CanBuild => Expedition || Has(Builder);
+        /// <summary>Whether this player builds: whoever holds the Builder job, in a rocket room and an expedition alike
+        /// (milestone 41: everyone used to build in an expedition, which made the jobs meaningless). Nobody holding it (they
+        /// just left): anyone can, until the job is handed on.</summary>
+        public bool CanBuild => Has(Builder) || NobodyBuilds;
+        public bool NobodyBuilds => room.State.players.Count > 0 && !room.State.players.Any(p => p.Has((MRole)Builder));
         public bool IsHost => room.IsHost;
         /// <summary>A campaign room: the host's saved space program (money, research, contracts), shared with everyone.</summary>
         public bool Campaign => room.State.campaign;
@@ -102,7 +107,7 @@ namespace Rocket
 
         public bool Has(int role) => room.Me != null && room.Me.Has((MRole)role);
         public static int RoleFor(CAct a) => a == CAct.Build || a == CAct.Science ? Builder : a == CAct.Steer ? Pilot : a == CAct.Navigate ? Control : Engineer;
-        public bool CanDo(CAct a) => Has(RoleFor(a)) || (a == CAct.Build && Expedition);
+        public bool CanDo(CAct a) => Has(RoleFor(a)) || (a == CAct.Build && NobodyBuilds);
         public bool SenderCan(int who, CAct a) { var p = room.State.Player(who); return p != null && p.Has((MRole)RoleFor(a)); }
         public string Holder(int role) => string.Join(", ", room.State.players.Where(p => p.Has((MRole)role)).Select(p => p.name).DefaultIfEmpty("nobody"));
         public string MyJobs(bool flying) => string.Join("; ", Enumerable.Range(0, 4).Where(Has).Select(r => $"{RoleNames[r]}: {(flying ? FlyJobs[r] : BuildJobs[r])}"));
@@ -284,7 +289,7 @@ namespace Rocket
                     }
                     room.Touch();
                     root.Launch(d, st.runway, Mathf.Clamp(st.pad, 0, LaunchSite.Pads.Length - 1));
-                    if (Expedition) root.flight.SeatPlayers(st.players.Select(q => q.name).ToList());
+                    root.flight.SeatPlayers(st.players.Select(q => q.name).ToList());   // the players are the crew (milestone 41: in a rocket room too, so they wear the looks they made)
                     root.flight.Notice(Expedition ? $"Off on the expedition! Everyone's aboard. {MyJobs(true)}" : $"Flying together! {MyJobs(true)}");
                     break;
                 }
@@ -357,8 +362,8 @@ namespace Rocket
             room.Send(new NetMsg { t = "launch", on = runway, n = pad });
         }
 
-        public bool AllReady => room.State.players.Where(p => Expedition ? p.id != room.MyId : !p.Has((MRole)Builder)).All(p => p.ready);
-        public string NotReady => string.Join(", ", room.State.players.Where(p => (Expedition ? p.id != room.MyId : !p.Has((MRole)Builder)) && !p.ready).Select(p => p.name));
+        public bool AllReady => room.State.players.Where(p => !p.Has((MRole)Builder) && p.id != room.MyId).All(p => p.ready);
+        public string NotReady => string.Join(", ", room.State.players.Where(p => !p.Has((MRole)Builder) && p.id != room.MyId && !p.ready).Select(p => p.name));
 
         /// <summary>Why the team's rocket can't go on this expedition yet (over budget, not enough seats), or null.</summary>
         public string LaunchProblem(VesselDesign d)

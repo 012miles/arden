@@ -132,10 +132,33 @@ namespace Rocket.EditorTools
                 Check(Math.Abs(radar) < 0.1, $"landed {radar:0.00} m off the ground at {ground:0} m");
                 return $"{ground:0} m";
             }
-            var peak = Extreme(home, true, out _);
+            // (milestone 41: a landing settles now, so on a steep spot it tips over, as it should: these land on the levellest
+            // ground near the peak and the pit)
+            Vector3d Level(CelestialBody b, Vector3d around)
+            {
+                Vector3d east = CelestialBody.EastAt(around), north = CelestialBody.NorthAt(around), best = around;
+                double bestSlope = double.MaxValue, h0 = Terrain.Height(b, around);
+                double Slope(Vector3d c)
+                {
+                    Vector3d e = CelestialBody.EastAt(c), n = CelestialBody.NorthAt(c);
+                    double k = 6 / b.radius;
+                    return (Math.Abs(Terrain.Height(b, (c + e * k).normalized) - Terrain.Height(b, (c - e * k).normalized))
+                          + Math.Abs(Terrain.Height(b, (c + n * k).normalized) - Terrain.Height(b, (c - n * k).normalized))) / 12;
+                }
+                for (int i = -12; i <= 12; i++)
+                    for (int j = -12; j <= 12; j++)
+                    {
+                        var c = (around + east * (i * 30 / b.radius) + north * (j * 30 / b.radius)).normalized;
+                        if (Math.Abs(Terrain.Height(b, c) - h0) > 400) continue;
+                        double s0 = Slope(c);
+                        if (s0 < bestSlope) { bestSlope = s0; best = c; }
+                    }
+                return best;
+            }
+            var peak = Level(home, Extreme(home, true, out _));
             string a = Drop(home, peak, out double hp);
             Check(hp > 1500, $"the mountain was only {hp:0} m");
-            var pit = Extreme(Tal, false, out _);
+            var pit = Level(Tal, Extreme(Tal, false, out _));
             string c = Drop(Tal, pit, out _);
             return $"touched down on an Arden peak at {a} and in a Tal low at {c}";
         }

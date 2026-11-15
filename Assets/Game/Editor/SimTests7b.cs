@@ -199,7 +199,7 @@ namespace Rocket.EditorTools
                 foreach (var p in v.parts) if (p.def.kind == PartKind.Leg) { p.legsDeployed = true; p.legDeploy = 1; }
                 v.disableRails = true;
                 double t = 0;
-                for (int i = 0; i < 400 && !v.landed && !v.destroyed; i++) { v.Step(0.01, t); t += 0.01; }
+                for (int i = 0; i < 3000 && !v.landed && !v.destroyed; i++) { v.Step(0.01, t); t += 0.01; }   // (milestone 41: a soft landing settles for a moment before it parks)
                 return v;
             }
             var hard = Drop(14);
@@ -209,7 +209,8 @@ namespace Rocket.EditorTools
             var crash = Drop(25);
             Check(crash.destroyed, "25 m/s onto legs rated 12 survived");
             var soft = Drop(5);
-            Check(soft.landed && !soft.parts.Any(p => p.broken), "5 m/s broke legs");
+            Check(!soft.parts.Any(p => p.broken), "5 m/s broke legs");
+            Check(soft.landed && !soft.destroyed, $"5 m/s didn't settle and park: landed={soft.landed} settling={soft.settling} {soft.destroyReason}");
 
             // Broken legs won't deploy; a pilot can't fix them, an engineer can
             hard.ToggleGroup(Groups.Gear);

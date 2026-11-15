@@ -468,6 +468,9 @@ namespace Rocket
             }
         }
 
+        /// <summary>Milestone 41: only the builder changes or launches the rocket (in an expedition too); with nobody holding the
+        /// job (they just left), anyone may, until it's handed on.</summary>
+        bool BuilderOk(NetPlayer p) => p != null && (p.Has(MRole.Lead) || !State.players.Any(q => q.Has(MRole.Lead)));
         static int CountJobs(NetPlayer p) { int n = 0; for (int r = 0; r < 4; r++) if ((p.roles & (1 << r)) != 0) n++; return n; }
 
         /// <summary>Shares the four roles out among whoever's here: the host first (with the extras when there are fewer than four).</summary>
@@ -604,8 +607,8 @@ namespace Rocket
                     return;
                 // ---- rocket rooms (milestone 30)
                 case "design":
-                    // (milestone 34: in an expedition everyone builds the one rocket)
-                    if ((State.activity == 1 && Role(MRole.Lead) || State.activity == 2) && State.coopPhase == 0 && !string.IsNullOrEmpty(m.json) && m.json != State.designJson) { State.designJson = m.json; p.changes++; MarkDirty(); }
+                    // (milestone 41: only the builder, in an expedition too)
+                    if (State.Rocket && BuilderOk(p) && State.coopPhase == 0 && !string.IsNullOrEmpty(m.json) && m.json != State.designJson) { State.designJson = m.json; p.changes++; MarkDirty(); }
                     return;
                 case "note":
                     if (State.Rocket && !string.IsNullOrWhiteSpace(m.a))
@@ -626,7 +629,7 @@ namespace Rocket
                 }
                 case "goal": if (State.Rocket && Role((MRole)Coop.Control) && State.coopPhase == 0 && Coop.Goals.Any(g => g.id == m.b)) { State.goal = m.b; State.goalDone = false; MarkDirty(); } return;
                 case "pad": if (State.Rocket && Role((MRole)Coop.Control) && State.coopPhase == 0) { State.runway = m.n < 0; State.pad = Math.Max(0, m.n); MarkDirty(); } return;
-                case "launch": if ((State.activity == 1 && Role(MRole.Lead) || State.activity == 2) && State.coopPhase == 0) OnHostCommand?.Invoke(who, m); return;
+                case "launch": if (State.Rocket && BuilderOk(p) && State.coopPhase == 0) OnHostCommand?.Invoke(who, m); return;
                 case "exsc": if (State.activity == 2 && State.coopPhase == 0 && (Role((MRole)Coop.Control) || who == MyId) && Expedition.Scenarios.Any(x => x.id == m.b)) { State.exScenario = m.b; MarkDirty(); } return;
                 case "exdiff": if (State.activity == 2 && State.coopPhase == 0 && (Role((MRole)Coop.Control) || who == MyId)) { State.exDifficulty = Mathf.Clamp(m.n, 0, 2); MarkDirty(); } return;
                 case "in": if (State.Rocket && Role((MRole)Coop.Pilot)) OnHostCommand?.Invoke(who, m); return;

@@ -143,6 +143,7 @@ namespace Rocket
             Coop.Current?.Update();          // milestone 30: a rocket room
             GameAudio.I?.Update();
             if (!inMenu && !inMission && In.Down(K.F1)) Ui.ToggleHidden();   // milestone 34: hide the interface anywhere you play
+            if (!inMenu && !inMission && In.Down(K.F10)) AskForMenu();       // milestone 41: back to the main menu from anywhere
             if (inMenu || inMission) Ui.Hidden = false;
             if (inMission) mission.Update();
             else if (inMenu) menu.Update();
@@ -154,6 +155,30 @@ namespace Rocket
             }
         }
 
+        float menuAskUntil = -1;
+        /// <summary>
+        /// Milestone 41 (captaincarl24: "add like a goto menu key"): F10 twice goes to the main menu from the builder, a flight
+        /// or a room (leaving the room). The first press asks, so a stray key doesn't end a flight.
+        /// </summary>
+        void AskForMenu()
+        {
+            if (Time.unscaledTime < menuAskUntil) { menuAskUntil = -1; GoToMenu(); return; }
+            menuAskUntil = Time.unscaledTime + 3f;
+        }
+        public void GoToMenu()
+        {
+            if (Coop.Current != null) LeaveCoop();
+            else ShowMenu();
+        }
+        void DrawMenuAsk()
+        {
+            if (Time.unscaledTime >= menuAskUntil || inMenu || inMission) return;
+            var r = new Rect(Ui.W / 2 - 260, 96, 520, 44);
+            Ui.Box(r); Ui.Box(r);
+            Ui.Text(new Rect(r.x + 12, r.y + 4, r.width - 140, 36), Coop.Current != null ? $"Press {In.Name(K.F10)} again to leave the room for the main menu" : $"Press {In.Name(K.F10)} again for the main menu", new GUIStyle(Ui.Label) { alignment = TextAnchor.MiddleLeft, wordWrap = true });
+            if (Ui.Press(new Rect(r.xMax - 122, r.y + 7, 110, 30), "Main menu", Ui.Button)) { menuAskUntil = -1; GoToMenu(); }
+        }
+
         void OnGUI()
         {
             Ui.Begin();
@@ -162,7 +187,8 @@ namespace Rocket
             if (e.type == EventType.MouseDown && e.button == 0 && Ui.MouseOverUI(In.MousePosition)) GameAudio.I?.Click();
             if (Ui.Hidden && !inMenu && !inMission && !(inFlight && flight != null && flight.photoMode)) { Ui.DrawHiddenHint(); return; }
             // while the Definitions window is open, the screen behind it is drawn but takes no clicks or keys
-            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open || Lessons.PickerOpen || EndCredits.Active || StorePanel.Open) && e.type != EventType.Repaint && e.type != EventType.Layout;
+            bool report = Coop.Active && !inFlight && Coop.Current.ReportShowing;   // milestone 41: the expedition report, over the builder
+            bool blocked = (Glossary.Open && !inMenu || MyArdling.Open || Lessons.PickerOpen || EndCredits.Active || StorePanel.Open || report) && e.type != EventType.Repaint && e.type != EventType.Layout;
             if (blocked) GUI.enabled = false;
             DrawScreen();
             if (blocked) GUI.enabled = true;
@@ -172,7 +198,9 @@ namespace Rocket
             if (inFlight && !Ui.Hidden) Lessons.Draw(flight);   // milestone 35: a lesson's box
             if (!inMenu && !inFlight) Lessons.DrawPicker(); else Lessons.PickerOpen = false;
             if (!inFlight && !inMission) StorePanel.Draw(universe); else StorePanel.Open = false;   // milestone 38: the supply store
+            if (report) Coop.Current.DrawReport(Ui.W, Ui.H);   // milestone 41: (over everything, so Close works)
             EndCredits.Draw();   // milestone 35: the credits roll
+            DrawMenuAsk();       // milestone 41: "F10 again for the main menu"
             Glossary.DrawTip();
         }
 
@@ -387,6 +415,9 @@ namespace Rocket
             if (v == null || !universe.vessels.Contains(v)) return;
             revertSnapshot = null;
             hangar.Exit();
+            menu.Leave();          // (milestone 41: from the title too)
+            inMenu = false;
+            inMission = false;
             inFlight = true;
             SetWorldVisible(true);
             flight.BeginExisting(v);

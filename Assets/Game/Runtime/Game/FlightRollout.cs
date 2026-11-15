@@ -85,7 +85,11 @@ namespace Rocket
         {
             bool wasA = rollout.t < LegA;
             rollout.t += dt;
-            if (rollout.t >= LegA + LegB) { EndRollout(); return; }
+            if (rollout.t >= LegA + LegB)
+            {
+                if (remote) { rollout.t = LegA + LegB - 0.01f; PlaceRollout(); return; }   // (a room: waits for the host's to end)
+                EndRollout(); return;
+            }
             if (wasA && rollout.t >= LegA) { camYaw = RoadBearing() + 75f; camPitch = 7f; }   // the second leg: from beside the road ahead
             camYaw += dt * 4f;
             PlaceRollout();
@@ -108,7 +112,7 @@ namespace Rocket
             camYaw = 180f;
             camPitch = 6f;
             camDist = Mathf.Clamp(active.Length * 1.5f + 10f, 15f, 150f);
-            Show($"{active.name} is on {LaunchSite.Pads[pad].name.ToLowerInvariant()}. Press SPACE to launch.", 6f);
+            Show(remote ? $"{active.name} is on {LaunchSite.Pads[pad].name.ToLowerInvariant()}." : $"{active.name} is on {LaunchSite.Pads[pad].name.ToLowerInvariant()}. Press SPACE to launch.", 6f);
         }
 
         /// <summary>The roll-out's own screen: a caption, a Skip button and the fades.</summary>
@@ -123,7 +127,7 @@ namespace Rocket
             GUI.Box(box, GUIContent.none, Ui.Panel);
             Ui.Text(new Rect(box.x + 16, box.y + 8, box.width - 150, 30), say, Ui.Title);
             Ui.Text(new Rect(box.x + 16, box.y + 38, box.width - 150, 24), Words.T("SPACE to skip", "SPACE to skip", "Press SPACE to skip"), Ui.Small);
-            if (Ui.Press(new Rect(box.xMax - 120, box.y + 16, 104, 38), "Skip  >", Ui.Button)) EndRollout();
+            if (Ui.Press(new Rect(box.xMax - 120, box.y + 16, 104, 38), "Skip  >", Ui.Button)) { if (remote) rolloutSkippedHere = true; EndRollout(); }
             if (r != null && rollout != null && r.fade > 0.001f)
             {
                 var was = GUI.color;

@@ -96,6 +96,8 @@ namespace Rocket
         /// <summary>Height the plan wants (it fills the space between the team and the chat).</summary>
         public const float PlanMinHeight = 470;
 
+        public bool ReportShowing => showReport && !string.IsNullOrEmpty(room.State.exReport);
+
         /// <summary>The report after an expedition: the score and stars, each line, what went well and what to change.</summary>
         public void DrawReport(float W, float H)
         {
@@ -104,8 +106,8 @@ namespace Rocket
             try { rep = JsonUtility.FromJson<ExReport>(room.State.exReport); } catch { showReport = false; return; }
             var sc = Rocket.Expedition.Scenario(rep.scenario);
             Ui.Dim(new Rect(0, 0, W, H), 0.5f);
-            Ui.Press(new Rect(0, 0, W, H), GUIContent.none, GUIStyle.none);
             var r = new Rect(W / 2 - 360, Mathf.Max(20, H / 2 - 320), 720, Mathf.Min(640, H - 40));
+            Ui.ShieldAround(r, W, H);   // milestone 41: (a whole-screen shield here swallowed Close)
             Ui.Box(r); Ui.Box(r);
             Ui.Text(new Rect(r.x + 20, r.y + 14, 500, 30), "Expedition report", Ui.Title);
             Ui.Text(new Rect(r.x + 20, r.y + 46, r.width - 40, 22), $"<b>{sc.name}</b>  ·  {Rocket.Expedition.DifficultyNames[Mathf.Clamp(rep.difficulty, 0, 2)]}  ·  {rep.team}  ·  {rep.date}", Ui.Small);

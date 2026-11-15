@@ -23,7 +23,7 @@ namespace Rocket
         public bool FirstPersonView => firstPerson && active != null && active.IsEva && !active.destroyed && !mapView && !photoMode && replay == null;
 
         /// <summary>The mouse is steering the view (first person, nothing in the way, ALT not held).</summary>
-        bool MouseLooking => (FirstPersonView || (inside && !mapView)) && !paused && !Glossary.Open && !packOpen && !tradeOpen && !In.Held(K.LeftAlt) && Application.isFocused;
+        bool MouseLooking => (FirstPersonView || (inside && !mapView)) && active != null && !active.destroyed && !paused && !Glossary.Open && !packOpen && !tradeOpen && !In.Held(K.LeftAlt) && Application.isFocused;
 
         /// <summary>Walking extras, after HandleEvaKeys has read W/S/A/D: the camera key, running, strafing, the mouse.</summary>
         void HandleWalkInput(VesselSim v)

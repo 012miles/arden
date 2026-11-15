@@ -136,14 +136,14 @@ namespace Rocket
             if (Words.Easy) return
                 "Play with up to four friends, each on their own computer on the same Wi-Fi. Pick Multiplayer, make a room or join one. " +
                 "Your friends can find your room in their list, or type its code. Press My Ardling to pick your colour, face and hat!\n\n" +
-                "Expedition: everyone builds one rocket together, then you all ride in it. Pick a trip, like landing on Tal. Stay under the money, " +
+                "Expedition: the builder builds the rocket while everyone else helps and comments, then you all ride in it. Pick a trip, like landing on Tal. Stay under the money, " +
                 "bring enough food, and land next to old outposts to grab fuel. At the end you get points and stars.\n\n" +
                 "Rocket room: one friend builds, the others say what they think. Then one flies, one drops the stages, and one plans where to go.\n\n" +
                 "Press TAB to walk inside your capsule, and ENTER to climb out after landing.";
             if (Words.Engineer) return
                 "Multiplayer: up to four players on one local network, each on their own device. Title > Multiplayer: host an Expedition or a Rocket room, " +
                 "or join from the list or by room code (it encodes the host's address). My Ardling sets the look the others see.\n\n" +
-                "Expedition: all players edit the one design (last change wins; changes wait while you hold a part). The host or mission control picks the mission " +
+                "Expedition: the builder builds the one design while the others watch it come together, comment and get ready. The host or mission control picks the mission " +
                 "and difficulty; the plan shows budget, mass and TWR, delta-v against the trip, supplies against trip time, power, instruments, antennas and seats. " +
                 "Every player needs a seat. The host simulates the flight and streams it; goals are checked once a second; outposts and wrecks can be scavenged " +
                 "within 300 m. Ending the expedition scores it out of 1000 with notes and a leaderboard.\n\n" +
@@ -151,7 +151,7 @@ namespace Rocket
             return
                 "Play with up to four people, each on their own computer on the same Wi-Fi. On the title screen pick Multiplayer, then host an Expedition " +
                 "or a Rocket room, or join one from the list or with its room code. My Ardling picks how you look to everyone (suit colour, visor note, hat).\n\n" +
-                "Expedition: everyone builds one rocket together, and every player rides in it as an Ardling. Pick a mission and difficulty, keep under the budget, " +
+                "Expedition: the team's builder builds one rocket (the others comment and get ready), and every player rides in it as an Ardling. Pick a mission and difficulty, keep under the budget, " +
                 "and watch the six resources in the plan (mass, power, budget, data, comms, time). Fly through the real solar system, survive on your supplies, " +
                 "land beside outposts and wrecks to scavenge fuel and food, walk inside the cabin (TAB) and climb out on the surface (ENTER). " +
                 "The report at the end says what went well and what to change, and the best runs go on the leaderboard.\n\n" +

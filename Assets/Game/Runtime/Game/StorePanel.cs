@@ -31,8 +31,8 @@ namespace Rocket
             c.RefreshQuests(DateTime.UtcNow);   // milestone 40
             float W = Ui.W, H = Ui.H;
             Ui.Dim(new Rect(0, 0, W, H), 0.55f);
-            Ui.Press(new Rect(0, 0, W, H), GUIContent.none, GUIStyle.none);   // (nothing behind takes clicks)
             var r = new Rect(W / 2 - 380, H / 2 - 310, 760, 620);
+            Ui.ShieldAround(r, W, H);   // (nothing round it takes clicks; milestone 41: its own buttons do)
             Ui.Box(r); Ui.Box(r);
             Ui.Text(new Rect(r.x + 18, r.y + 14, 400, 28), "Supply store", Ui.Title);
             bool free = !c.IsCareer;

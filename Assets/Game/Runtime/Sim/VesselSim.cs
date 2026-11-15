@@ -753,7 +753,8 @@ namespace Rocket
             }
 
             // Rolling on wheels: spring-damper contact physics instead of the "landed" lock.
-            if (WheelsDown && alt < Terrain.MaxHeight(body) + 1500 && RadarAltitude(ut) < 4)
+            if (settling && (RadarAltitude(ut) >= 4 || OverWater(ut))) settling = false;   // (bounced or lifted off)
+            if ((WheelsDown || settling) && alt < Terrain.MaxHeight(body) + 1500 && RadarAltitude(ut) < 4 && !OverWater(ut))   // (milestone 41: wheels don't roll on the sea; a touchdown settles here)
             {
                 StepGround(dt, ut, fLocal, thrustTorque, gimbal);
                 if (!destroyed) UpdateDamage(dt, dynPressure / 1000.0);
@@ -868,9 +869,14 @@ namespace Rocket
             leadingPart = -1;
             UpdateChutes(dt);
             // Park: with the brakes on, no thrust and nearly stopped, lock to the ground so time warp works.
+            // (Milestone 41: and a touchdown parks once it's settled: still for a moment, on its legs or on its side.)
             Vector3 relSpin = angVel - body.AngularVelocityVector.ToFloat();
-            if (brakesOn && fLocal.sqrMagnitude == 0 && driveInput == 0 && SurfaceRelVelocity.magnitude < 0.15 && relSpin.magnitude < 0.02f)
+            bool still = fLocal.sqrMagnitude == 0 && driveInput == 0 && SurfaceRelVelocity.magnitude < 0.15 && relSpin.magnitude < 0.02f;
+            if (settling) { settleStill = still ? settleStill + dt : 0; settleTime += dt; }
+            bool settled = settling && (settleStill > 0.35 || settleTime > 25 && fLocal.sqrMagnitude == 0 && SurfaceRelVelocity.magnitude < 0.6);
+            if (brakesOn && still || settled)
             {
+                settling = false;
                 landedFixedPos = body.InertialToFixed(pos, ut + dt);
                 landedFixedRot = Quaternion.Inverse(body.RotationAt(ut + dt)) * rot;
                 landed = true;
@@ -1526,7 +1532,7 @@ namespace Rocket
             bool steer = false;
             Vector3 autoRate = Vector3.zero;
             if (steerDirection.HasValue) { autoRate = RateTowardDirection(steerDirection.Value); steer = true; }
-            else if (sas == SasMode.Stability)
+            else if (sas == SasMode.Stability && !settling)   // (milestone 41: SAS doesn't hold a ship up on one leg while it settles)
             {
                 steer = true;
                 if (manual || (rolling && driveInput != 0)) sasHoldValid = false; // a rover driving over bumps goes where the ground takes it
@@ -1552,7 +1558,7 @@ namespace Rocket
                     else autoRate = RateTowardRotation(sasHold);
                 }
             }
-            else if (sas != SasMode.Off)
+            else if (sas != SasMode.Off && !settling)
             {
                 steer = true;
                 var d = SasDirection();
@@ -1646,6 +1652,7 @@ namespace Rocket
 
         void StepLanded(double dt, double ut, Vector3 fLocal)
         {
+            if (!IsEva && InWater) { StepFloat(dt, ut, fLocal); return; }   // milestone 41: floating, not parked
             ConsumePropellant(dt);
             SyncLanded(ut + dt);
             sasHoldValid = false;
@@ -1713,12 +1720,20 @@ namespace Rocket
         {
             double minH = LowestPoint(ut, out var low);
             if (low == null || minH >= 0) return;
+            bool gaveWay = false;
             // Lifting off: ignore millimetre-scale wobble in the terrain height (it's evaluated in single precision).
             if (minH > -0.05 && Vector3d.Dot(SurfaceRelVelocity, pos.normalized) > 0.005) return;
             double impact = SurfaceRelVelocity.magnitude;
             float tolerance = low.def.kind == PartKind.Leg && low.legDeploy < 0.9f ? 4f * low.Toughness : low.CrashLimit;
             bool water = Terrain.IsWater(body, body.InertialToFixed(pos, ut));
             if (water) tolerance *= Terrain.WaterCushion;   // the sea gives (milestone 25)
+            if (water)
+            {
+                // milestone 41: straight down into the water is what hurts; skimming in at a shallow angle mostly doesn't
+                Vector3d upW = pos.normalized, sv = SurfaceRelVelocity;
+                double down = Math.Abs(Vector3d.Dot(sv, upW));
+                impact = down + 0.15 * (sv - upW * Vector3d.Dot(sv, upW)).magnitude;
+            }
             if (impact > tolerance)
             {
                 // Deployed landing legs give way (up to 60% over their rating), soaking up the hit: the vessel settles
@@ -1733,6 +1748,7 @@ namespace Rocket
                     int n = hit.Count;
                     lastEvent = $"{n} landing leg{(n == 1 ? "" : "s")} gave way at {impact:F0} m/s (rated {tolerance:F0}). An engineer on EVA can fix {(n == 1 ? "it" : "them")}.";
                     minH = LowestPoint(ut, out _);
+                    gaveWay = true;
                 }
                 else
                 {
@@ -1740,7 +1756,16 @@ namespace Rocket
                     return;
                 }
             }
+            if (water && !IsEva) { EnterWater(ut); return; }   // milestone 41: in it goes, and floats (or not)
             pos = pos + pos.normalized * (-minH);
+            if (!IsEva && !gaveWay)
+            {
+                // milestone 41: not parked where it first touched: it settles on its legs (or tips over) on the ground's
+                // contact physics, and parks once it's still
+                rails = null;
+                if (!settling) { settling = true; settleStill = 0; settleTime = 0; }
+                return;
+            }
             landedFixedPos = body.InertialToFixed(pos, ut);
             landedFixedRot = Quaternion.Inverse(body.RotationAt(ut)) * rot;
             landed = true;

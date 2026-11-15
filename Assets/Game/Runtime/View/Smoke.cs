@@ -284,6 +284,68 @@ namespace Rocket
         }
 
         /// <summary>
+        /// Milestone 41: a splash: white water thrown up and out in drops that fall back, and a puff of spray that drifts off.
+        /// 'up' is the local vertical; size grows with how hard it went in.
+        /// </summary>
+        public static void Splash(Vector3 at, Vector3 up, float size)
+        {
+            if (sparkMat == null) sparkMat = new Material(Resources.Load<Shader>("Shaders/RocketSpark")) { name = "Sparks" };
+            if (mat == null) mat = new Material(Resources.Load<Shader>("Shaders/RocketSmoke")) { name = "Smoke" };
+            var go = new GameObject("Splash");
+            go.transform.SetPositionAndRotation(at, Quaternion.FromToRotation(Vector3.up, up));
+            ParticleSystem Make(string name, Material m, ParticleSystemRenderMode mode)
+            {
+                var c = new GameObject(name);
+                c.transform.SetParent(go.transform, false);
+                var ps = c.AddComponent<ParticleSystem>();
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                var main = ps.main;
+                main.loop = false; main.playOnAwake = false; main.duration = 1f;
+                main.cullingMode = ParticleSystemCullingMode.AlwaysSimulate;
+                main.simulationSpace = ParticleSystemSimulationSpace.Custom;
+                main.customSimulationSpace = Anchor;
+                var em = ps.emission; em.rateOverTime = 0f;
+                var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 38f; shape.radius = size * 0.3f;
+                shape.rotation = new Vector3(-90f, 0, 0);   // (the cone points along local +Y: up out of the water)
+                var r = c.GetComponent<ParticleSystemRenderer>();
+                r.sharedMaterial = m; r.renderMode = mode; r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
+                r.maxParticleSize = 4f;
+                return ps;
+            }
+            var drops = Make("Drops", sparkMat, ParticleSystemRenderMode.Stretch);
+            {
+                var main = drops.main;
+                main.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.8f);
+                main.startSpeed = new ParticleSystem.MinMaxCurve(size * 1.2f, size * 3.4f);
+                main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.28f);
+                main.startColor = new ParticleSystem.MinMaxGradient(new Color(0.85f, 0.93f, 1f, 0.9f), new Color(0.6f, 0.75f, 0.85f, 0.7f));
+                main.gravityModifier = 1f;
+                var r = drops.GetComponent<ParticleSystemRenderer>(); r.velocityScale = 0.05f; r.lengthScale = 1.4f;
+                drops.Emit(Mathf.Clamp((int)(size * 30), 30, 220));
+            }
+            var mist = Make("Spray", mat, ParticleSystemRenderMode.Billboard);
+            {
+                var main = mist.main;
+                main.startLifetime = new ParticleSystem.MinMaxCurve(1.5f, 3.5f);
+                main.startSpeed = new ParticleSystem.MinMaxCurve(size * 0.3f, size * 1.2f);
+                main.startSize = new ParticleSystem.MinMaxCurve(size * 0.6f, size * 1.4f);
+                main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+                main.startColor = new Color(0.92f, 0.95f, 1f, 0.55f);
+                main.gravityModifier = 0.05f;
+                var drag = mist.limitVelocityOverLifetime; drag.enabled = true; drag.limit = 1f; drag.dampen = 0.15f;
+                var col = mist.colorOverLifetime; col.enabled = true;
+                var g = new Gradient();
+                g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.85f, 0.9f, 0.95f), 1f) },
+                          new[] { new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0.3f, 0.4f), new GradientAlphaKey(0f, 1f) });
+                col.color = g;
+                var sol = mist.sizeOverLifetime; sol.enabled = true;
+                sol.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0, 0.6f), new Keyframe(1, 2.2f)));
+                mist.Emit(Mathf.Clamp((int)(size * 6), 8, 40));
+            }
+            Object.Destroy(go, 6f);
+        }
+
+        /// <summary>
         /// Milestone 26: the pad's water deluge before liftoff: white steam and spray billowing out from the deck for a while,
         /// rolling along the ground and rising. Fire and forget at a render-space point ('up' is the local vertical).
         /// </summary>

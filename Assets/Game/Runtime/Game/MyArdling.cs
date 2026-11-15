@@ -66,8 +66,8 @@ namespace Rocket
             float W = Ui.W, H = Ui.H;
             var dim = new Rect(0, 0, W, H);
             Ui.Dim(dim, 0.55f);
-            Ui.Press(dim, GUIContent.none, GUIStyle.none);
             var r = new Rect(W / 2 - 420, Mathf.Max(20, H / 2 - 290), 840, Mathf.Min(580, H - 40));
+            Ui.ShieldAround(r, W, H);   // milestone 41: (a whole-screen shield here swallowed every click in the window)
             Ui.Box(r); Ui.Box(r);
             Ui.Text(new Rect(r.x + 18, r.y + 12, 300, 30), "My Ardling", Ui.Title);
             Ui.Text(new Rect(r.x + 170, r.y + 19, r.width - 200, 20), "How you look to everyone in a room. Kept on this computer.", Ui.Small);
@@ -171,7 +171,14 @@ namespace Rocket
                 var data = cam.GetUniversalAdditionalCameraData();
                 data.renderType = CameraRenderType.Base;
                 data.renderPostProcessing = false;   // (no exposure: the colours as they are)
+                data.renderShadows = false;
+                // milestone 41: its own studio lights (a warm key from the front, a cool rim behind) instead of the sun and a
+                // doubled fill, which washed the colours out to pastel
+                Lamp("Key light", new Vector3(1.3f, 1.9f, 2.4f), new Color(1f, 0.95f, 0.88f), 9f);
+                Lamp("Rim light", new Vector3(-1.6f, 1.6f, -1.8f), new Color(0.7f, 0.82f, 1f), 5f);
+                Lamp("Fill light", new Vector3(-1.8f, 0.4f, 2.2f), new Color(0.85f, 0.9f, 1f), 2.5f);
             }
+            if (!rig.activeSelf) FlightMode.SetWorldAo(false);   // milestone 41: the world's ambient occlusion grained the preview
             rig.SetActive(true);
             string key = $"{look.suit}|{look.paper}|{look.face}|{look.hat}";
             if (model == null || builtFor != key)
@@ -186,7 +193,27 @@ namespace Rocket
             return rt;
         }
 
-        static void HidePreview() { if (rig != null) rig.SetActive(false); }
+        static void HidePreview()
+        {
+            if (rig == null || !rig.activeSelf) return;
+            rig.SetActive(false);
+            var f = GameRoot.I != null ? GameRoot.I.flight : null;
+            FlightMode.SetWorldAo(!(f != null && f.inside));   // (back on, unless the cabin wants it off)
+        }
+
+        static void Lamp(string name, Vector3 at, Color c, float intensity)
+        {
+            var g = new GameObject(name) { layer = PreviewLayer };
+            g.transform.SetParent(rig.transform, false);
+            g.transform.localPosition = at;
+            var l = g.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.color = c;
+            l.intensity = intensity;
+            l.range = 9f;
+            l.shadows = LightShadows.None;
+            l.cullingMask = 1 << PreviewLayer;
+        }
 
         /// <summary>A whole Ardling standing at the origin (feet on y = 0), on the preview layer.</summary>
         public static GameObject Build(Ardlings.Look look, int layer = PreviewLayer)
@@ -203,7 +230,8 @@ namespace Rocket
                 var r = g.AddComponent<MeshRenderer>();
                 r.sharedMaterial = Mats.Lit;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                if (layer == PreviewLayer) { var pb = new MaterialPropertyBlock(); pb.SetFloat("_Ambient", 0.6f); r.SetPropertyBlock(pb); }   // lit evenly, whatever the sun's doing
+                // the preview: no sun (its own lamps light it) and a soft fill, so the colours stay true whatever the sun's doing
+                if (layer == PreviewLayer) { var pb = new MaterialPropertyBlock(); pb.SetFloat("_Ambient", 0.3f); pb.SetFloat("_SunScale", 0f); r.SetPropertyBlock(pb); }
             }
             Piece(body.transform, Ardlings.Body(look, false));
             var note = Ardlings.AddNote(body.transform, look);

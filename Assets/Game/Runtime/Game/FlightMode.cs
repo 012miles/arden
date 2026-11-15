@@ -527,6 +527,7 @@ namespace Rocket
             }
             CoopHostTick(Mathf.Min(Time.unscaledDeltaTime, 0.1f));
             if (!root.inFlight || active?.parts == null) return;   // mission control ended the flight just now (milestone 32: this used to crash)
+            DeathTick();   // milestone 41: out of the cabin, the pointer back, the death screen
             trajTimer -= Time.unscaledDeltaTime;
             if (trajTimer <= 0 || mapView || railsWarp)
             {
@@ -564,6 +565,7 @@ namespace Rocket
             audio?.Update(active, paused || photoMode, mapView, railsWarp, Time.unscaledDeltaTime);
             UpdateMusic();
             UpdateBooms(Time.unscaledDeltaTime);
+            UpdateSplashes();                        // milestone 41: into the sea
             UpdateChunks(Time.unscaledDeltaTime);   // milestone 35: the pieces of a crash
             UpdateItemViews();   // milestone 38: things lying about
             UpdateDroneViews();  // milestone 40: drones and traders
@@ -580,7 +582,7 @@ namespace Rocket
         {
             if (rollout != null)
             {
-                if (In.Down(K.Space) || In.Down(K.Escape)) EndRollout();
+                if (In.Down(K.Space) || In.Down(K.Escape)) { if (remote) rolloutSkippedHere = true; EndRollout(); }
                 active.inputPitch = active.inputYaw = active.inputRoll = active.driveInput = 0;
                 return;
             }
@@ -600,7 +602,7 @@ namespace Rocket
             if (inside) HandleInteriorKeys(v);   // milestone 34: walking round the cabin
             else
             {
-                if (In.Down(K.Tab) && !mapView && CanGoInside) EnterInterior();   // milestone 34: into the cabin
+                if (In.Down(K.Tab) && !mapView && !v.IsEva) EnterInterior();   // milestone 34: into the cabin (milestone 41: says why when it can't)
                 if (v.IsEva) HandleEvaKeys(v);
                 else HandleVesselKeys(v);
                 if (!(Coop.Active && remote)) HandleGetOut(v);   // milestone 34: ENTER gets out after a landing
@@ -1429,6 +1431,23 @@ namespace Rocket
             {
                 double alt = rel.magnitude - b.radius;
                 Smoke.Burst((b.AbsolutePosition(renderUt) + rel - originAbs).ToFloat(), size * 0.45f, b.HasAtmosphere && b.PressureAtm(alt) > 0.02);   // (milestone 35: smaller, so the wreckage shows)
+            }
+        }
+
+        /// <summary>Milestone 41: spray where a ship went into the sea (its sim notes how hard), and a splash's thud.</summary>
+        void UpdateSplashes()
+        {
+            foreach (var v in U.vessels)
+            {
+                if (v.splash <= 0) continue;
+                float s = v.splash;
+                v.splash = 0;
+                if (s < 1.5f || active == null || v.body != active.body || Vector3d.Distance(v.pos, active.pos) > 3000) continue;
+                var b = v.body;
+                Vector3d up = v.pos.normalized;
+                Vector3d at = up * b.radius;   // where it met the water
+                Smoke.Splash((b.AbsolutePosition(renderUt) + at - originAbs).ToFloat(), up.ToFloat(), Mathf.Clamp(Mathf.Sqrt(s) * Mathf.Max(1f, v.Length * 0.25f), 1f, 9f));
+                if (v == active) audio?.Clunk(Mathf.Clamp01(s / 20f));
             }
         }
 

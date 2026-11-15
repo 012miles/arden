@@ -163,7 +163,7 @@ namespace Rocket
                 float vs = (float)Vector3d.Dot(active.SurfaceRelVelocity, active.pos.normalized);
                 if (!fallWasLanded && active.landed && !railsWarp)
                 {
-                    float hurt = Survival.FallHurt(-fallVs) * (easy ? 0.5f : 1f);
+                    float hurt = Survival.FallHurt(-fallVs) * (easy ? 0.5f : 1f) * (active.InWater ? 0.25f : 1f);   // (milestone 41: water's softer)
                     if (hurt > 0.5f && active.EvaName != null) HurtArdling(U.career.VitalsOf(active.EvaName), hurt, active, "the fall");
                 }
                 if (!active.landed) fallVs = vs;

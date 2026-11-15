@@ -177,8 +177,8 @@ namespace Rocket
             if (!PickerOpen) return;
             float W = Ui.W, H = Ui.H;
             Ui.Dim(new Rect(0, 0, W, H), 0.5f);
-            Ui.Press(new Rect(0, 0, W, H), GUIContent.none, GUIStyle.none);
             var r = new Rect(W / 2 - 300, H / 2 - 230, 600, 460);
+            Ui.ShieldAround(r, W, H);   // milestone 41
             Ui.Box(r); Ui.Box(r);
             Ui.Text(new Rect(r.x + 18, r.y + 14, 400, 28), "Tutorials", Ui.Title);
             if (Ui.Press(new Rect(r.xMax - 44, r.y + 14, 30, 28), "×", Ui.ButtonSmall) || In.EscapeDown) { PickerOpen = false; return; }

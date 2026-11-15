@@ -79,6 +79,20 @@ namespace Rocket
         }
 
         /// <summary>GUI.Button, noted for the layout check (buttons that land on other buttons). Its words have definitions on hover.</summary>
+        /// <summary>
+        /// Milestone 41: a window's click shield. Clicks round the window are swallowed; clicks on it reach its buttons. (A
+        /// shield over the whole screen drawn before the window used to swallow the window's own buttons too: in IMGUI the
+        /// first control drawn under the pointer takes the click, so My Ardling, the store, the expedition report, the
+        /// tutorials and the definitions could only be shut with ESC.)
+        /// </summary>
+        public static void ShieldAround(Rect r, float W, float H)
+        {
+            GUI.Button(new Rect(0, 0, W, Mathf.Max(0, r.y)), GUIContent.none, GUIStyle.none);
+            GUI.Button(new Rect(0, r.yMax, W, Mathf.Max(0, H - r.yMax)), GUIContent.none, GUIStyle.none);
+            GUI.Button(new Rect(0, r.y, Mathf.Max(0, r.x), r.height), GUIContent.none, GUIStyle.none);
+            GUI.Button(new Rect(r.xMax, r.y, Mathf.Max(0, W - r.xMax), r.height), GUIContent.none, GUIStyle.none);
+        }
+
         public static bool Press(Rect r, string text, GUIStyle s) { Note(r, s); Glossary.Scan(r, text, s); return GUI.Button(r, text, s); }
         public static bool Press(Rect r, GUIContent c, GUIStyle s) { Note(r, s); Glossary.Scan(r, c?.text, s); return GUI.Button(r, c, s); }
         public static bool Press(Rect r, string text) { Note(r, Button); Glossary.Scan(r, text, Button); return GUI.Button(r, text, Button ?? GUI.skin.button); }

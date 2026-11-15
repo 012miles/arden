@@ -24,6 +24,7 @@ namespace Rocket
         /// <summary>Inside a cabin (TAB).</summary>
         public bool inside;
         PartState insidePart;
+        int insideIdx = -1;   // milestone 41: which part, by number (a room's copy of the ship is renewed every half second)
         GameObject room;
         Camera icam;
         Vector3 ipos;
@@ -50,9 +51,16 @@ namespace Rocket
 
         public void EnterInterior()
         {
+            if (inside || mapView || photoMode || replay != null || rollout != null) return;
             var p = CabinPart();
-            if (p == null) { Show("Nobody's aboard: there's no cabin to go into.", 2.5f); return; }
+            if (p == null)
+            {
+                Show(active == null || active.destroyed ? "There's nothing left to go inside." : active.IsEva ? "You're outside: walk up to the hatch and board (B) first."
+                    : active.parts.Any(q => q.def.crew > 0) ? "Nobody's aboard: there's no one to go inside as." : "This ship has no cabin to go into: it needs a capsule, cockpit or habitat.", 3f);
+                return;
+            }
             insidePart = p;
+            insideIdx = p.index;
             BuildRoom(p);
             inside = true;
             firstPerson = false;
@@ -68,8 +76,9 @@ namespace Rocket
         {
             if (!inside) return;
             inside = false;
-            insidePart = null;
             SendPose(false);
+            insidePart = null;
+            insideIdx = -1;
             if (icam != null) icam.enabled = false;
             if (room != null) UnityEngine.Object.Destroy(room);
             room = null;
@@ -87,7 +96,8 @@ namespace Rocket
         {
             v.inputPitch = v.inputYaw = v.inputRoll = v.driveInput = 0;
             v.inputTranslate = Vector3.zero;
-            if (insidePart == null || !v.parts.Contains(insidePart) || insidePart.crew.Count == 0 && !Coop.Active) { LeaveInterior(); return; }
+            ResolveInsidePart();
+            if (insidePart == null || v.destroyed || v.IsEva || insidePart.crew.Count == 0 && !Coop.Active) { LeaveInterior(); return; }
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
             UpdateCabinProps(dt);   // milestone 35: the moving parts and the live screens
             if (!inside) return;
@@ -124,6 +134,18 @@ namespace Rocket
             if (ipSend <= 0) { ipSend = 0.12f; SendPose(true); }
         }
 
+        /// <summary>
+        /// Milestone 41 (captaincarl24: "inside tab also doesnt work super buggy"): in a room, everyone but the host gets a new
+        /// copy of the ship from the host every half second, with new parts, so the cabin's part is looked up again by its
+        /// number. (It used to throw everyone but the host straight back out.)
+        /// </summary>
+        void ResolveInsidePart()
+        {
+            if (active == null) { insidePart = null; return; }
+            if (insidePart != null && active.parts.Contains(insidePart)) return;
+            insidePart = active.parts.FirstOrDefault(p => p.index == insideIdx);
+        }
+
         // near something and facing it
         bool Facing(Vector3 at, float reach)
         {
@@ -139,6 +161,8 @@ namespace Rocket
         /// <summary>Both cameras: the cabin's from where you stand, the world's from inside the part looking the same way.</summary>
         void ApplyInteriorCamera(Camera world)
         {
+            if (inside) ResolveInsidePart();
+            if (inside && (insidePart == null || active == null || active.destroyed)) LeaveInterior();   // (crashed, or the cabin's gone)
             if (!inside || room == null || insidePart == null || mapView || photoMode)
             {
                 if (icam != null && icam.enabled) icam.enabled = false;

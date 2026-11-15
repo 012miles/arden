@@ -159,7 +159,7 @@ namespace Rocket
         /// The world's ambient occlusion off inside (its radius is made for the outside: in a 2 m cabin it filled every
         /// corner with dark grain), back on outside.
         /// </summary>
-        static void SetWorldAo(bool on)
+        internal static void SetWorldAo(bool on)
         {
             if (!aoLooked)
             {

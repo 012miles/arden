@@ -276,8 +276,8 @@ namespace Rocket
             float W = Ui.W, H = Ui.H;
             var dim = new Rect(0, 0, W, H);
             Ui.Dim(dim, 0.5f);
-            Ui.Press(dim, GUIContent.none, GUIStyle.none);   // eats clicks behind the window
             var r = new Rect(W / 2 - 470, Mathf.Max(30, H / 2 - 330), 940, Mathf.Min(660, H - 60));
+            Ui.ShieldAround(r, W, H);   // eats clicks round the window (milestone 41: not the window's own)
             if (!DrawPage(r) || In.EscapeDown) Open = false;
         }
 

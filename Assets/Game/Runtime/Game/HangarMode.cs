@@ -1858,7 +1858,6 @@ namespace Rocket
                 else c.DrawBuildPanel(new Rect(x, buildY, 340, buildH), design);
                 c.DrawChat(new Rect(x, H - 10 - chatH, 340, chatH));
             }
-            c.DrawReport(W, H);   // milestone 34: the expedition's report, after a flight
             if (!string.IsNullOrEmpty(c.room.State.summary)) Ui.Text(new Rect(300, 126, x - 310, 40), c.room.State.summary, new GUIStyle(Ui.Small) { wordWrap = true });   // (under the markers' legend)
         }
 
@@ -1867,7 +1866,7 @@ namespace Rocket
         {
             var c = Coop.Current;
             Ui.Box(new Rect(0, 0, W, 52));
-            Ui.Text(new Rect(14, 8, 600, 30), $"ROCKET ROOM  <size=14>· {c.Holder(Coop.Builder)} is building \"{design.name}\"</size>", Ui.Title);
+            Ui.Text(new Rect(14, 8, 600, 30), $"{(c.Expedition ? "EXPEDITION" : "ROCKET ROOM")}  <size=14>· {c.Holder(Coop.Builder)} is building \"{design.name}\"</size>", Ui.Title);
             if (Ui.Press(new Rect(W - 150, 10, 136, 32), "Leave the room", Ui.Button)) { root.LeaveCoop(); return; }
             if (!c.Campaign) Ui.Text(new Rect(640, 16, W - 820, 22), "Click a part of the rocket to comment on it. Right-drag to look round, scroll to zoom.", Ui.Small);
             else Ui.Text(new Rect(380, H - 56, W - 780, 22), "Click a part of the rocket to comment on it. Right-drag to look round, scroll to zoom.", Ui.Small);
@@ -1881,7 +1880,8 @@ namespace Rocket
             {
                 float th = c.TeamHeight(false);
                 c.DrawTeam(new Rect(10, 60, 360, th), false);
-                c.DrawBuildPanel(new Rect(10, 60 + th + 6, 360, H - 60 - th - 110), design);
+                if (c.Expedition) c.DrawExpeditionPlan(new Rect(10, 60 + th + 6, 360, H - 60 - th - 110), design);   // (milestone 41: only the builder builds an expedition's rocket too)
+                else c.DrawBuildPanel(new Rect(10, 60 + th + 6, 360, H - 60 - th - 110), design);
                 c.DrawChat(new Rect(10, H - 98, 360, 88));
             }
             // the stages, readable but not clickable (an invisible button over them takes the clicks first)

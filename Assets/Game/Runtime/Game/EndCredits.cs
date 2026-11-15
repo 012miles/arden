@@ -70,7 +70,7 @@ namespace Rocket
             if (!Active) return;
             float W = Ui.W, H = Ui.H;
             Ui.Dim(new Rect(0, 0, W, H), 0.94f);
-            Ui.Press(new Rect(0, 0, W, H), GUIContent.none, GUIStyle.none);   // eats clicks
+            // (milestone 41: no whole-screen shield: it swallowed Skip. The screen behind takes no clicks while this runs.)
             if (title == null)
             {
                 title = new GUIStyle(Ui.Hero) { alignment = TextAnchor.MiddleCenter, fontSize = 46 };

@@ -17,6 +17,7 @@ namespace Rocket
     public partial class FlightMode
     {
         public bool remote;          // this device shows the host's flight
+        bool rolloutSkippedHere;     // milestone 41: this player skipped the host's roll-out
         bool coopExec;               // carrying out a command (or the game's own move): no job check
         float coopSendT, coopSnapT, coopInT, coopGoalT, nodeEditUntil;
         long coopSig;
@@ -108,6 +109,7 @@ namespace Rocket
                 throttle = (float)v.throttle, sas = (int)v.sas, rcs = v.rcsOn, landed = v.landed, destroyed = v.destroyed,
                 body = root.bodies.IndexOf(v.body), vessel = v.id, snap = coopSnap, warp = warp, rails = railsWarp,
                 target = target != null ? target.name : null,
+                roll = rollout != null ? rollout.t + 1f : 0f, rollPad = rollout != null ? rollout.pad : 0,   // milestone 41
             };
             if (node != null) { f.hasNode = true; f.nodeUt = node.ut; f.nodePro = (float)node.prograde; f.nodeNor = (float)node.normal; f.nodeRad = (float)node.radial; }
             return f;
@@ -217,6 +219,7 @@ namespace Rocket
             ClearScene();
             design = null;
             remote = true;
+            rolloutSkippedHere = false;
             active = VesselSim.FromSave(save, root.bodies, ut);
             U.Add(active);
             StartFlight();
@@ -251,6 +254,7 @@ namespace Rocket
                 active.landed = f.landed;
                 warp = f.warp; railsWarp = f.rails;
                 target = string.IsNullOrEmpty(f.target) ? null : root.bodies.FirstOrDefault(x => x.name == f.target);
+                FollowHostRollout(f);   // milestone 41: everyone sees the roll-out to the pad, not just the host
                 if (f.destroyed && !active.destroyed)
                 {
                     active.destroyed = true;
@@ -291,6 +295,27 @@ namespace Rocket
                 nodeEditUntil = Time.unscaledTime + 1.2f;
                 c.room.Send(new NetMsg { t = "cmd", a = "nodeset", b = string.Join(";", new[] { node.ut, node.prograde, node.normal, node.radial }.Select(x => x.ToString("R", CultureInfo.InvariantCulture))) });
             }
+        }
+
+        /// <summary>
+        /// Milestone 41 (captaincarl24: "when the host has the moving rocket to pad animation other people dont"): the host's
+        /// roll-out comes in with each frame, and this device rolls its own crawler out alongside, kept to the host's time.
+        /// SPACE skips it here only (the host's carries on).
+        /// </summary>
+        void FollowHostRollout(FlightFrame f)
+        {
+            if (f.roll > 0f && !rolloutSkippedHere && !active.hasLaunched && !active.destroyed)
+            {
+                if (rollout == null && active.body == Home) StartRollout(Mathf.Clamp(f.rollPad, 0, LaunchSite.Pads.Length - 1));
+                if (rollout == null) return;
+                float want = f.roll - 1f;
+                if (Mathf.Abs(rollout.t - want) > 0.4f)
+                {
+                    if (rollout.t < LegA && want >= LegA) { camYaw = RoadBearing() + 75f; camPitch = 7f; }   // (the second leg's camera)
+                    rollout.t = Mathf.Min(want, LegA + LegB - 0.05f);
+                }
+            }
+            else if (f.roll <= 0f && rollout != null) EndRollout();
         }
 
         void AddNodeLocal(double t, double p, double n, double r)
@@ -357,10 +382,11 @@ namespace Rocket
         }
 
         /// <summary>The pause menu in a rocket room: resume, end the flight (host or mission control), leave the room.</summary>
-        void DrawCoopPause(float W, float H)
+        void DrawCoopPause(float W, float H, float atY = -1)
         {
             var c = Coop.Current;
-            var r = new Rect(W / 2 - 190, H / 2 - 130, 380, active.destroyed ? 266 : 236);
+            float ph = active.destroyed ? 230 : 236;
+            var r = new Rect(W / 2 - 190, atY >= 0 ? Mathf.Min(atY, H - 10 - ph) : H / 2 - 130, 380, ph);
             Ui.Box(r); Ui.Box(r);
             Ui.Text(new Rect(r.x, r.y + 12, r.width, 30), active.destroyed ? "The rocket was lost" : "Paused (the flight goes on)", Ui.BigCenter);
             float y = r.y + 56;
@@ -371,7 +397,7 @@ namespace Rocket
             if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), canEnd ? "Back to building (everyone)" : "The host or mission control ends the flight", Ui.Button)) { paused = false; CoopEndFlight(); return; }
             GUI.enabled = true;
             y += 36;
-            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), "Leave the room", Ui.Button)) { paused = false; root.LeaveCoop(); return; }
+            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), $"Leave the room (main menu, {In.Name(K.F10)})", Ui.Button)) { paused = false; root.LeaveCoop(); return; }
             y += 36;
             float hw = (r.width - 88) / 2;
             if (Ui.Press(new Rect(r.x + 40, y, hw, 30), $"Hide UI ({In.Name(K.F1)})", Ui.Button)) { paused = false; Ui.ToggleHidden(); return; }

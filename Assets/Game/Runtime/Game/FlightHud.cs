@@ -137,7 +137,7 @@ namespace Rocket
             double hdg = Math.Atan2(Vector3d.Dot(horiz, CelestialBody.EastAt(up)), Vector3d.Dot(horiz, CelestialBody.NorthAt(up))) * 180 / Math.PI;
             if (hdg < 0) hdg += 360;
             Row(Words.T("Pitch / heading", "Pitch / heading", ""), horiz.magnitude < 0.02 ? $"{pitchDeg:0} deg / --" : $"{pitchDeg:0} deg / {hdg:000} deg", true);
-            string status = v.destroyed ? $"<color=#ff7060>{Words.T("Destroyed", "Destroyed", "Broken")}</color>" : v.landed ? Words.T("Landed", "Landed", "On the ground") :
+            string status = v.destroyed ? $"<color=#ff7060>{Words.T("Destroyed", "Destroyed", "Broken")}</color>" : v.landed && !v.IsEva && v.InWater ? (v.submerged > 0.97f ? "<color=#ff9a60>Sinking</color>" : "Floating") : v.landed ? Words.T("Landed", "Landed", "On the ground") :
                 v.WheelsDown && v.RadarAltitude(ut) < 0.3 ? (v.brakesOn ? Words.T("Rolling (brakes on)", "Rolling (brakes on)", "Parked") : "Rolling") :
                 body.HasAtmosphere && alt < body.atmosphereHeight ? "Flying" :
                 orbit != null && orbit.IsElliptic && orbit.Periapsis - body.radius > body.SafeAltitude && orbit.Apoapsis < body.SoiRadius ? Words.T("In orbit", "In orbit", "Going round!") :
@@ -312,7 +312,7 @@ namespace Rocket
             if (showScience) DrawSciencePanel(new Rect(320, popTop, 440, 360));
             if (showMining && v.HasMiningKit) DrawMiningPanel(showScience ? 770 : 320, popTop);
 
-            if (v.destroyed) DrawEndPanel("Vessel destroyed", v.destroyReason);
+            if (v.destroyed) DrawDeathScreen(W, H);   // milestone 41
             else if (paused && !showHowTo && !showBadges) DrawEndPanel("Paused", "");
             if (showBadges && !showHowTo)
             {
@@ -904,16 +904,23 @@ namespace Rocket
             return $"After the burn: Ap {Ui.Dist(p0.orbit.Apoapsis - b.radius)}, Pe {Ui.Dist(p0.orbit.Periapsis - b.radius)}";
         }
 
-        void DrawEndPanel(string title, string detail)
+        /// <summary>The pause menu, or the ways on after the ship's lost (milestone 41: under the death screen, no title).</summary>
+        void DrawEndPanel(string title, string detail, float atY = -1)
         {
-            if (Coop.Active) { DrawCoopPause(Ui.W, Ui.H); return; }
+            if (Coop.Active) { DrawCoopPause(Ui.W, Ui.H, atY); return; }
             float W = Ui.W, H = Ui.H;
-            float ph = paused && !active.destroyed ? 560 : active.destroyed && CanReplay ? 382 : 346;
-            var r = new Rect(W / 2 - 190, Mathf.Min(H / 2 - ph / 2, H - 266 - ph), 380, ph);   // clear of the navball
+            float ph = paused && !active.destroyed ? 596 : active.destroyed && CanReplay ? 418 : 382;   // (milestone 41: + the main menu)
+            if (title == null) ph -= 76;
+            var r = new Rect(W / 2 - 190, Mathf.Max(10, atY >= 0 ? Mathf.Min(atY, H - 10 - ph) : Mathf.Min(H / 2 - ph / 2, H - 266 - ph)), 380, ph);   // clear of the navball (but never off the top)
             Ui.Box(r);
-            Ui.Text(new Rect(r.x, r.y + 12, r.width, 30), title, Ui.BigCenter);
-            Ui.Text(new Rect(r.x + 16, r.y + 46, r.width - 32, 40), Words.Say(detail), Ui.Center);
-            float y = r.y + 92;
+            if (title == null) Ui.Box(r);   // (darker over the death screen)
+            float y = r.y + 16;
+            if (title != null)
+            {
+                Ui.Text(new Rect(r.x, r.y + 12, r.width, 30), title, Ui.BigCenter);
+                Ui.Text(new Rect(r.x + 16, r.y + 46, r.width - 32, 40), Words.Say(detail), Ui.Center);
+                y = r.y + 92;
+            }
             if (paused && !active.destroyed)
             {
                 float hw0 = (r.width - 88) / 2;
@@ -986,7 +993,9 @@ namespace Rocket
                 y += 36;
             }
             if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), active.destroyed || active.landed ? "Back to the builder" : "Back to the builder (it stays out there)", Ui.Button))
-                root.EnterHangar();
+            { root.EnterHangar(); return; }
+            y += 36;
+            if (Ui.Press(new Rect(r.x + 40, y, r.width - 80, 30), $"Main menu ({In.Name(K.F10)})", Ui.Button)) { paused = false; root.ShowMenu(); return; }   // milestone 41
         }
     }
 }

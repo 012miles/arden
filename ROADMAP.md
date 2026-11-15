@@ -862,6 +862,34 @@ Stage three, the last, of captaincarl24's "add the rest of all the systems in th
 - **Rooms**: the host runs the drones and sends them round; players' attacks, buying and selling go to the host.
 - 4 new sim tests (drones, guards, quests, trading and the machine); `-autotestDrones` (780-785).
 
+### Milestone 41: fixes, water and landings (2026-11-15)
+captaincarl24's bug reports and asks, all in one update:
+- **Window clicks** (Ui.ShieldAround): My Ardling, the supply store, the expedition report, the tutorials list and the definitions
+  each drew a whole-screen invisible button before their own, and in IMGUI the first control under the pointer takes the click,
+  so only ESC worked. Now only the space round each window is shielded. The expedition report draws over everything from GameRoot.
+- **My Ardling**: the preview has its own key, rim and fill lights (no sun, a soft fill) and turns the world's SSAO off while
+  it shows (it grained the model). Rocket rooms seat the players as the crew (as expeditions did), so their looks show.
+- **Roles**: only the builder builds (and only the builder's design and launch are taken by the host), in expeditions too;
+  watchers see the expedition plan and the report. With nobody holding the job, anyone may until it's handed on.
+- **Inside (TAB)**: the cabin's part is found again by its number after each of the host's half-second ship copies (everyone
+  but the host used to be thrown out); TAB says why it can't go in.
+- **Crashes and the death screen** (Game/FlightDeath.cs): lost while inside or in first person: out of the cabin, the pointer
+  freed, the camera pulled back; a death screen fades in (YOU DIED / CREW LOST / VESSEL DESTROYED, the cause, who was aboard,
+  flight time, highest, fastest, a tip that fits) over the usual ways on, now with Main menu.
+- **Rooms**: the host's roll-out to the pad goes out in each frame (FlightFrame.roll) and players roll their own crawler alongside.
+- **F10 twice**: the main menu from anywhere (leaves a room).
+- **Water** (Sim/VesselSimWater.cs): floating ships ride on buoyancy from the parts under water (each part's shape volume times
+  an air factor: cabins 2.4, tanks 2.0, engines 0.5), worked out at points round each part so a tilt dips one side; buoyancy
+  off the centre of mass turns them (capsules upright, tall rockets onto their side); water drag (hard on bobbing, light on
+  gliding); engines push across the sea and lift off; wheels paddle; yaw steers; heavier than the water it can push aside: it
+  sinks (a warning, then lost below 25 m); a drift onto land washes up. Splashdowns plunge in and throw spray (Smoke.Splash);
+  a shallow skim counts mostly the downward speed. The HUD says Floating or Sinking.
+- **Landings settle** (Sim/VesselSimSettle.cs): a touchdown no longer parks at the angle it touched: it settles on the rovers'
+  contact physics (every foot and part on the ground pushes back and grips; SAS lets go) and parks once still for 0.35 s.
+- **Space centre**: no labels; the building under the pointer glows (a box round it) with its name and what it's for.
+- The update log keeps the first version and the latest updates only.
+- 7 new sim tests; `-autotestArdling` (790-799).
+
 ## Next
 - Ideas welcome. (Controller support: not wanted.)
 

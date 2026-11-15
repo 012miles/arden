@@ -175,7 +175,7 @@ namespace Rocket
             if (Ui.Press(new Rect(hostR.x + 20 + half, y, half, 34), "Rocket room", hubKind == 1 ? Ui.ButtonSel : Ui.Button)) hubKind = 1;
             y += 40;
             Ui.Text(new Rect(hostR.x + 14, y, hostR.width - 28, 54), hubKind == 1 ? "Build a rocket and fly it together: a builder, a pilot, a flight engineer and mission control."
-                : "Everyone builds one rocket with the real parts and rides in it as an Ardling: a mission with a budget, the real solar system, supplies to survive on, outposts to scavenge, and a scored report. Works on your own too.", wrap);
+                : "The builder builds one rocket with the real parts and everyone rides in it as an Ardling: a mission with a budget, the real solar system, supplies to survive on, outposts to scavenge, and a scored report. Works on your own too.", wrap);
             y += 58;
             if (Ui.Press(new Rect(hostR.x + 14, hostR.yMax - 58, hostR.width - 28, 44), "Host", Ui.Button))
             {

@@ -15,6 +15,7 @@ namespace Rocket
         F2,
         LeftMeta,   // Cmd on a Mac (the Windows key on a PC): Cmd+Z undoes, like Ctrl+Z
         Enter, LeftAlt,   // milestone 34: get out after landing; free the pointer in first person
+        F10,              // milestone 41: the main menu, from anywhere
     }
 
     /// <summary>Thin input wrapper so game code doesn't care which Unity input backend is active.</summary>
@@ -165,7 +166,7 @@ namespace Rocket
             (K.Y, "Deploy"), (K.Backspace, "Abort"), (K.F, "Thermal view"), (K.P, "Autopilot"), (K.M, "Map"), (K.O, "Map layers"),
             (K.Tab, "Focus next world (map) / go inside the cabin"), (K.V, "Vessel list"), (K.LeftBracket, "Previous vessel"), (K.RightBracket, "Next vessel"),
             (K.Period, "Warp faster"), (K.Comma, "Warp slower"), (K.Slash, "Stop warp"), (K.F5, "Quicksave"), (K.F9, "Quickload"),
-            (K.F1, "Hide / show the interface"), (K.C, "Angle snap (builder) / camera view (EVA)"), (K.Enter, "Get out after landing"), (K.LeftAlt, "Free the pointer (first person)"),
+            (K.F1, "Hide / show the interface"), (K.C, "Angle snap (builder) / camera view (EVA)"), (K.Enter, "Get out after landing"), (K.LeftAlt, "Free the pointer (first person)"), (K.F10, "Main menu (press twice)"),
         };
 
         public static string Override(K k)

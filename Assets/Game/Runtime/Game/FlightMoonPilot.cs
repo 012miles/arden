@@ -135,7 +135,7 @@ namespace Rocket
                     return;
                 }
                 case TripPhase.Brake:
-                    if (v.landed) { v.throttle = 0; v.steerDirection = null; trip = TripPhase.Done; Show($"Landed on {v.body.name}! Press ENTER to climb out.", 5f); return; }
+                    if (v.landed || v.settling) { v.throttle = 0; v.steerDirection = null; trip = TripPhase.Done; Show($"Landed on {v.body.name}! Press ENTER to climb out.", 5f); return; }
                     LandingBurn(v);
                     return;
                 case TripPhase.Done:

@@ -70,6 +70,7 @@ namespace Rocket
             padRocket?.Destroy();
             padRocket = null;
             centre = false;
+            if (glow != null) glow.SetActive(false);   // milestone 41
         }
 
         // ---------------------------------------------------------------- the space centre, clickable (milestone 25)
@@ -79,7 +80,8 @@ namespace Rocket
         float centreYaw = 205f, centreDist = 1250f;
         string centreHover;
 
-        struct Place { public string name, does; public double e, n; public float h; public System.Action go; }
+        // (milestone 41: w and d are the building's size east-west and north-south, for the glow round it on hover)
+        struct Place { public string name, does; public double e, n; public float h, w, d; public System.Action go; }
 
         Place[] Places()
         {
@@ -87,22 +89,22 @@ namespace Rocket
             System.Action Builder(System.Action then) => () => { root.EnterHangar(); then?.Invoke(); };
             var list = new List<Place>
             {
-                new Place { name = "Assembly building", does = "Build rockets", e = 0, n = 340, h = 92, go = Builder(() => h.PlaneView(false)) },
-                new Place { name = "Airport hangar", does = "Build planes", e = -300, n = 460, h = 34, go = Builder(() => h.PlaneView(true)) },
-                new Place { name = "Mission control", does = "Missions and contracts", e = 170, n = 140, h = 26, go = Builder(() => h.ShowMissions(true)) },
-                new Place { name = "Tracking station", does = "Your ships out there", e = -200, n = 1100, h = 34, go = Builder(() => h.ShowVessels(true)) },
-                new Place { name = "Research campus", does = "The tech tree", e = -1228, n = 190, h = 30, go = Builder(() => h.ShowTech(true)) },
-                new Place { name = "Headquarters", does = "Facilities and upgrades", e = -181, n = 263, h = 30, go = Builder(() => h.ShowCenter(true)) },
-                new Place { name = "Astronaut complex", does = "Your crew", e = 150, n = 320, h = 22, go = Builder(() => h.ShowCrew(true)) },
-                new Place { name = "Visitor centre", does = "Badges you've earned", e = 655, n = 1218, h = 40, go = Builder(() => h.ShowBadges(true)) },
-                new Place { name = "Supply store", does = "Food, kit, your locker; sell finds", e = -48, n = 307, h = 14, go = () => StorePanel.Open = true },   // milestone 38
-                new Place { name = "Quest board", does = "Daily and weekly quests", e = 330, n = 380, h = 12, go = () => StorePanel.OpenAt(3) },   // milestone 40
+                new Place { name = "Assembly building", does = "Build rockets", e = 0, n = 340, h = 92, w = 110, d = 86, go = Builder(() => h.PlaneView(false)) },
+                new Place { name = "Airport hangar", does = "Build planes", e = -300, n = 460, h = 30, w = 78, d = 72, go = Builder(() => h.PlaneView(true)) },
+                new Place { name = "Mission control", does = "Missions and contracts", e = 170, n = 140, h = 26, w = 44, d = 34, go = Builder(() => h.ShowMissions(true)) },
+                new Place { name = "Tracking station", does = "Your ships out there", e = -200, n = 1100, h = 34, w = 46, d = 46, go = Builder(() => h.ShowVessels(true)) },
+                new Place { name = "Research campus", does = "The tech tree", e = -1228, n = 190, h = 30, w = 150, d = 90, go = Builder(() => h.ShowTech(true)) },
+                new Place { name = "Headquarters", does = "Facilities and upgrades", e = -181, n = 263, h = 30, w = 64, d = 32, go = Builder(() => h.ShowCenter(true)) },
+                new Place { name = "Astronaut complex", does = "Your crew", e = 150, n = 320, h = 22, w = 40, d = 34, go = Builder(() => h.ShowCrew(true)) },
+                new Place { name = "Visitor centre", does = "Badges you've earned", e = 655, n = 1218, h = 28, w = 86, d = 30, go = Builder(() => h.ShowBadges(true)) },
+                new Place { name = "Supply store", does = "Food, kit, your locker; sell finds", e = -48, n = 307, h = 9, w = 18, d = 14, go = () => StorePanel.Open = true },   // milestone 38
+                new Place { name = "Quest board", does = "Daily and weekly quests", e = 330, n = 380, h = 6, w = 10, d = 6, go = () => StorePanel.OpenAt(3) },   // milestone 40
             };
             for (int i = 0; i < LaunchSite.Pads.Length; i++)
             {
                 int pad = i;
                 var pd = LaunchSite.Pads[i];
-                list.Add(new Place { name = pd.name, does = "Launch from here", e = pd.e, n = pd.n, h = 48, go = Builder(() => h.SetLaunchPad(pad)) });
+                list.Add(new Place { name = pd.name, does = "Launch from here", e = pd.e, n = pd.n, h = 48, w = 60, d = 60, go = Builder(() => h.SetLaunchPad(pad)) });
             }
             return list.ToArray();
         }
@@ -132,7 +134,7 @@ namespace Rocket
             GUI.Box(bar, GUIContent.none, Ui.Panel);
             Ui.Text(new Rect(bar.x + 16, bar.y + 8, 420, 24), "SPACE CENTRE", Ui.Header);
             bool first = root.universe != null && root.universe.vessels.Count == 0;
-            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 420, 20), first ? "Click the <b>Assembly building</b> to build your first rocket." : "Click a building to go in. Right-drag to look round, scroll to zoom.", Ui.Small);
+            Ui.Text(new Rect(bar.x + 16, bar.y + 30, 440, 20), first ? "Point at the <b>Assembly building</b> and click to build your first rocket." : "Point at a building to see what it is, click to go in. Right-drag turns, scroll zooms.", Ui.Small);
             if (Ui.Press(new Rect(bar.xMax - 300, bar.y + 10, 130, 34), "Title screen", Ui.Button)) { centre = false; root.ShowMenu(); return; }
             if (Ui.Press(new Rect(bar.xMax - 162, bar.y + 10, 146, 34), "Rocket builder", Ui.ButtonGo)) { root.EnterHangar(); return; }
             BodyView site = null;
@@ -140,45 +142,138 @@ namespace Rocket
             if (site == null) return;
             var cam = root.farCam;
             Vector2 mouse = new Vector2(In.MousePosition.x / Ui.Scale, (Screen.height - In.MousePosition.y) / Ui.Scale);
-            string hover = null;
-            // where each label goes: above its building, nudged up until it clears the labels already placed (nearest first)
-            var shown = new List<(Place p, Rect r, float fx, float fy, float depth)>();
+            // Milestone 41 (captaincarl24: "when you put your mouse over the building it highlights it and shows the name cuz its
+            // too crowded like how kerbal did it"): no labels everywhere. Each building's box is projected onto the screen; the
+            // nearest one under the pointer glows and its name and what it does show by the pointer. Clicking goes in.
+            Place? best = null;
+            Rect bestRect = default;
+            float bestDepth = float.MaxValue;
+            bool overBar = bar.Contains(mouse);
             foreach (var p in Places())
             {
-                Vector3 top = site.SiteWorld(p.e, p.n, p.h), foot = site.SiteWorld(p.e, p.n, 0);
-                Vector3 sp = cam.WorldToScreenPoint(top), sf = cam.WorldToScreenPoint(foot);
-                if (sp.z <= 0) continue;
-                float x = sp.x / Ui.Scale, y = (Screen.height - sp.y) / Ui.Scale - 30, fy = (Screen.height - sf.y) / Ui.Scale;
-                if (x < 0 || x > W || y < 70 || y > H) continue;
-                shown.Add((p, new Rect(x - 80, y, 160, 28), x, fy, sp.z));
-            }
-            shown.Sort((a, c) => a.depth.CompareTo(c.depth));
-            var placed = new List<Rect>();
-            for (int i = 0; i < shown.Count; i++)
-            {
-                var r = shown[i].r;
-                for (int k = 0; k < 12; k++)
+                if (ForceHover != null)
                 {
-                    bool clash = false;
-                    foreach (var q in placed) if (q.Overlaps(new Rect(r.x - 4, r.y - 3, r.width + 8, r.height + 6))) { clash = true; r.y = q.y - r.height - 6; break; }
-                    if (!clash) break;
+                    // (tours: as if the pointer were on this building)
+                    if (p.name == ForceHover && ScreenBox(cam, site, p, out Rect fr, out float fd)) { best = p; bestRect = fr; bestDepth = fd; mouse = fr.center; }
+                    continue;
                 }
-                placed.Add(r);
-                shown[i] = (shown[i].p, r, shown[i].fx, shown[i].fy, shown[i].depth);
+                if (overBar) break;
+                if (!ScreenBox(cam, site, p, out Rect r, out float depth)) continue;
+                if (!r.Contains(mouse) || depth >= bestDepth) continue;
+                best = p; bestRect = r; bestDepth = depth;
             }
-            foreach (var (p, r0, fx, fy, _) in shown)
+            centreHover = best?.name;
+            ShowGlow(site, best);
+            if (best == null) return;
+            var b = best.Value;
+            // the name by the pointer (kept on screen)
+            var nameStyle = new GUIStyle(Ui.Label) { fontStyle = FontStyle.Bold, fontSize = 16, wordWrap = false };
+            var doesStyle = new GUIStyle(Ui.Small) { wordWrap = false };
+            float tw = Mathf.Max(nameStyle.CalcSize(new GUIContent(b.name)).x, doesStyle.CalcSize(new GUIContent(b.does + "   (click to go in)")).x) + 24;
+            var tip = new Rect(mouse.x + 18, mouse.y + 14, tw, 50);
+            if (tip.xMax > W - 8) tip.x = mouse.x - 18 - tw;
+            if (tip.yMax > H - 8) tip.y = mouse.y - 14 - tip.height;
+            Ui.Box(tip); Ui.Box(tip);
+            Ui.Text(new Rect(tip.x + 12, tip.y + 5, tw - 16, 22), $"<color=#ffd56a>{b.name}</color>", nameStyle);
+            Ui.Text(new Rect(tip.x + 12, tip.y + 27, tw - 16, 18), $"{b.does}   <color=#8fa3b3>(click to go in)</color>", doesStyle);
+            // the click (an invisible button over the building's box)
+            if (Ui.Press(bestRect, GUIContent.none, GUIStyle.none)) { ShowGlow(site, null); b.go(); return; }
+        }
+
+        /// <summary>A building's box on the screen (its eight corners projected), and how far away it is; false if it's behind or off screen.</summary>
+        bool ScreenBox(Camera cam, BodyView site, Place p, out Rect r, out float depth)
+        {
+            r = default; depth = 0;
+            float xMin = float.MaxValue, yMin = float.MaxValue, xMax = float.MinValue, yMax = float.MinValue;
+            for (int k = 0; k < 8; k++)
             {
-                // a thin line down to the building, then the label (bigger, with what it does, under the mouse)
-                var was = GUI.color;
-                GUI.color = new Color(1f, 1f, 1f, 0.55f);
-                GUI.DrawTexture(new Rect(fx - 1, r0.yMax, 2, Mathf.Max(0, fy - r0.yMax)), Texture2D.whiteTexture);
-                GUI.color = was;
-                bool over = centreHover == p.name;
-                var r = over ? new Rect(r0.center.x - 110, r0.y - 18, 220, 46) : r0;
-                if (r.Contains(mouse)) hover = p.name;
-                if (Ui.Press(r, over ? $"{p.name}\n<size=11>{p.does}</size>" : p.name, over ? Ui.ButtonSmallSel : Ui.ButtonSmall)) { p.go(); return; }
+                double e = p.e + ((k & 1) == 0 ? -0.5 : 0.5) * p.w, n = p.n + ((k & 2) == 0 ? -0.5 : 0.5) * p.d;
+                Vector3 sp = cam.WorldToScreenPoint(site.SiteWorld(e, n, (k & 4) == 0 ? 0f : p.h));
+                if (sp.z <= 0) return false;
+                float x = sp.x / Ui.Scale, y = (Screen.height - sp.y) / Ui.Scale;
+                xMin = Mathf.Min(xMin, x); xMax = Mathf.Max(xMax, x); yMin = Mathf.Min(yMin, y); yMax = Mathf.Max(yMax, y);
             }
-            centreHover = hover;
+            depth = cam.WorldToScreenPoint(site.SiteWorld(p.e, p.n, p.h * 0.5f)).z;
+            // small things get a little extra room to point at
+            float pad = Mathf.Max(0, 18 - Mathf.Min(xMax - xMin, yMax - yMin)) * 0.5f;
+            r = Rect.MinMaxRect(xMin - pad, yMin - pad, xMax + pad, yMax + pad);
+            return r.xMax > 0 && r.yMax > 70 && r.x < Ui.W && r.y < Ui.H;
+        }
+
+        /// <summary>For tours: the building to show as pointed at.</summary>
+        public static string ForceHover;
+        GameObject glow;
+        Material glowMat;
+        string glowFor;
+
+        /// <summary>A soft yellow glow box round the building under the pointer (none: hidden).</summary>
+        void ShowGlow(BodyView site, Place? p)
+        {
+            if (p == null || site?.SiteTransform == null) { if (glow != null) glow.SetActive(false); glowFor = null; return; }
+            var b = p.Value;
+            if (glow == null)
+            {
+                glow = new GameObject("Building glow") { hideFlags = HideFlags.DontSave };
+                glow.AddComponent<MeshFilter>();
+                glowMat = new Material(Mats.Additive) { name = "Building glow" };
+                var mr = glow.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = glowMat;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                mr.receiveShadows = false;
+            }
+            if (glowFor != b.name)
+            {
+                glowFor = b.name;
+                var old = glow.GetComponent<MeshFilter>().sharedMesh;
+                glow.GetComponent<MeshFilter>().sharedMesh = GlowBox(b.w + 4, b.h + 3, b.d + 4);
+                if (old != null) UnityEngine.Object.Destroy(old);
+            }
+            glow.SetActive(true);
+            var t = site.SiteTransform;
+            glow.transform.SetPositionAndRotation(site.SiteWorld(b.e, b.n, 0), t.rotation);
+            float pulse = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 4f);
+            glowMat.SetColor("_Color", new Color(1f, 0.82f, 0.35f, pulse));
+        }
+
+        /// <summary>A box w x h x d standing on y = 0: faint faces and bright edges (vertex colours; drawn additive).</summary>
+        static Mesh GlowBox(float w, float h, float d)
+        {
+            var v = new List<Vector3>(); var c = new List<Color>(); var tri = new List<int>();
+            void Quad(Vector3 a, Vector3 b2, Vector3 c2, Vector3 d2, Color col)
+            {
+                int i = v.Count;
+                v.Add(a); v.Add(b2); v.Add(c2); v.Add(d2);
+                for (int k = 0; k < 4; k++) c.Add(col);
+                tri.AddRange(new[] { i, i + 1, i + 2, i, i + 2, i + 3, i, i + 2, i + 1, i, i + 3, i + 2 });   // (both sides)
+            }
+            float x = w * 0.5f, z = d * 0.5f;
+            var face = new Color(1, 1, 1, 0.16f);
+            Vector3[] q = { new Vector3(-x, 0, -z), new Vector3(x, 0, -z), new Vector3(x, 0, z), new Vector3(-x, 0, z) };
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 a = q[k], b2 = q[(k + 1) % 4];
+                Quad(a, b2, b2 + Vector3.up * h, a + Vector3.up * h, face);
+            }
+            Quad(q[0] + Vector3.up * h, q[1] + Vector3.up * h, q[2] + Vector3.up * h, q[3] + Vector3.up * h, face);
+            // edges: thin bands, brighter
+            float t = Mathf.Clamp(Mathf.Max(w, d) * 0.012f, 0.35f, 1.4f);
+            var edge = new Color(1, 1, 1, 0.9f);
+            void Edge(Vector3 a, Vector3 b2)
+            {
+                Vector3 dir = (b2 - a).normalized;
+                Vector3 s1 = Vector3.Cross(dir, Mathf.Abs(dir.y) > 0.9f ? Vector3.right : Vector3.up).normalized * t, s2 = Vector3.Cross(dir, s1).normalized * t;
+                Quad(a - s1, b2 - s1, b2 + s1, a + s1, edge);
+                Quad(a - s2, b2 - s2, b2 + s2, a + s2, edge);
+            }
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 a = q[k], b2 = q[(k + 1) % 4];
+                Edge(a, b2); Edge(a + Vector3.up * h, b2 + Vector3.up * h); Edge(a, a + Vector3.up * h);
+            }
+            var m = new Mesh { name = "Building glow" };
+            m.SetVertices(v); m.SetColors(c); m.SetTriangles(tri, 0);
+            m.RecalculateBounds();
+            return m;
         }
 
         /// <summary>The last design built, standing on the pad (a model only, not part of any game).</summary>
@@ -277,6 +372,7 @@ namespace Rocket
             if (hideGui) return;
             float W = Ui.W, H = Ui.H;
             if (centre) { DrawCentre(W, H); return; }
+            if (glow != null && glow.activeSelf) glow.SetActive(false);   // (milestone 41: left the space centre)
             // A soft dark wash down the left, so the menu reads against a bright sky
             if (shade == null)
             {
